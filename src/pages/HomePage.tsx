@@ -115,12 +115,11 @@ const MagneticButton: React.FC<{
   };
 
   if (as === 'link' && to) {
+    const MotionLink = motion.create(Link);
     return (
-      <motion.div {...motionProps}>
-        <Link to={to} className={className}>
-          {children}
-        </Link>
-      </motion.div>
+      <MotionLink to={to} {...motionProps}>
+        {children}
+      </MotionLink>
     );
   }
 
@@ -316,7 +315,7 @@ const HomePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1, ease: [0.16, 1, 0.3, 1] }}
           >
-            StageZero is a premium launchpad for high-conviction onchain projects. Discover promising
+            StageZero is a launchpad for high-conviction onchain projects. Discover promising
             teams, join fair launches, and ship faster with integrated creator tooling.
           </motion.p>
           <motion.div
@@ -325,16 +324,14 @@ const HomePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.15, ease: [0.16, 1, 0.3, 1] }}
           >
-            <MagneticButton as="link" to="/presales" className="btn-primary inline-flex items-center gap-2">
-              <Rocket className="w-4 h-4" />
-              Explore IDOs
+            <MagneticButton as="link" to="/presales" className="btn-primary inline-flex items-center gap-2 p-6 rounded-full font-semibold">
+              Explore Projects
             </MagneticButton>
-            {!isConnected && (
+            {/* {!isConnected && (
               <MagneticButton onClick={openConnectModal} className="btn-secondary inline-flex items-center gap-2">
-                <Wallet className="w-4 h-4" />
                 Connect Wallet
               </MagneticButton>
-            )}
+            )} */}
           </motion.div>
         </div>
       </motion.section>
@@ -450,11 +447,10 @@ const HomePage: React.FC = () => {
                         {presale.saleTokenSymbol || 'Unknown Token'}
                       </h3>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          presale.status === 'live'
-                            ? 'bg-status-live-bg text-status-live'
-                            : 'bg-status-upcoming-bg text-status-upcoming'
-                        }`}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${presale.status === 'live'
+                          ? 'bg-status-live-bg text-status-live'
+                          : 'bg-status-upcoming-bg text-status-upcoming'
+                          }`}
                       >
                         {presale.status === 'live' ? 'Live' : 'Upcoming'}
                       </span>
@@ -500,11 +496,10 @@ const HomePage: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <h3 className="font-display text-display-sm text-ink">{item.symbol}</h3>
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            item.status === 'Live'
-                              ? 'bg-status-live-bg text-status-live'
-                              : 'bg-status-upcoming-bg text-status-upcoming'
-                          }`}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${item.status === 'Live'
+                            ? 'bg-status-live-bg text-status-live'
+                            : 'bg-status-upcoming-bg text-status-upcoming'
+                            }`}
                         >
                           {item.status}
                         </span>
@@ -607,10 +602,10 @@ const HomePage: React.FC = () => {
                         reducedMotion
                           ? {}
                           : {
-                              duration: item.floatDuration,
-                              repeat: Infinity,
-                              ease: 'easeInOut',
-                            }
+                            duration: item.floatDuration,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                          }
                       }
                     >
                       <item.icon className="w-7 h-7" />
@@ -686,10 +681,10 @@ const HomePage: React.FC = () => {
               reducedMotion
                 ? {}
                 : {
-                    x: [0, 30, -10, 0],
-                    y: [0, -20, 15, 0],
-                    scale: [1, 1.1, 0.95, 1],
-                  }
+                  x: [0, 30, -10, 0],
+                  y: [0, -20, 15, 0],
+                  scale: [1, 1.1, 0.95, 1],
+                }
             }
             transition={
               reducedMotion
@@ -703,10 +698,10 @@ const HomePage: React.FC = () => {
               reducedMotion
                 ? {}
                 : {
-                    x: [0, -20, 25, 0],
-                    y: [0, 15, -10, 0],
-                    scale: [1, 0.9, 1.15, 1],
-                  }
+                  x: [0, -20, 25, 0],
+                  y: [0, 15, -10, 0],
+                  scale: [1, 0.9, 1.15, 1],
+                }
             }
             transition={
               reducedMotion
@@ -720,10 +715,10 @@ const HomePage: React.FC = () => {
               reducedMotion
                 ? {}
                 : {
-                    x: [0, 15, -15, 0],
-                    y: [0, -10, 20, 0],
-                    scale: [1, 1.08, 0.92, 1],
-                  }
+                  x: [0, 15, -15, 0],
+                  y: [0, -10, 20, 0],
+                  scale: [1, 1.08, 0.92, 1],
+                }
             }
             transition={
               reducedMotion

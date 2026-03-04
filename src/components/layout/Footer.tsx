@@ -43,7 +43,7 @@ const Footer: React.FC = () => {
               <span className="font-black text-accent leading-none" style={{ fontSize: '1.575rem', marginLeft: '-0.05em' }}>ZERO</span>
             </Link>
             <p className="text-body-sm text-ink-faint">
-              {currentYear} StageZero. All rights reserved.
+              {currentYear} StageZero Labs. All rights reserved.
             </p>
           </div>
 

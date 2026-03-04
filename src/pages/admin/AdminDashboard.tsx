@@ -1,0 +1,317 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { useAccount } from 'wagmi';
+import { formatUnits, isAddress, type Address } from 'viem';
+import { toast } from 'sonner';
+import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from 'lucide-react';
+import { useChainContracts } from '@/lib/hooks/useChainContracts';
+import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
+import { useSetFeeRecipient } from '@/lib/hooks/useAdminActions';
+import { useFactoryOwner, useFeeRecipient } from '@/lib/utils/admin';
+import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.16, 1, 0.3, 1] as const,
+    },
+  },
+};
+
+const AdminDashboard: React.FC = () => {
+  const { address } = useAccount();
+  const { presaleFactory, nftFactory, explorerUrl } = useChainContracts();
+  const { totalDeployments, isLoading: isLoadingNFTs } = useUserNFTs();
+  const { factoryOwner, isLoading: isLoadingOwner } = useFactoryOwner();
+  const {
+    feeRecipient,
+    isLoading: isLoadingFeeRecipient,
+    refetch: refetchFeeRecipient,
+  } = useFeeRecipient();
+  const { presales, isLoading: isLoadingPresales } = useLaunchpadPresales('all');
+
+  const [newFeeRecipient, setNewFeeRecipient] = useState('');
+  const {
+    setFeeRecipient,
+    isBusy,
+    isSuccess,
+    isError,
+    error,
+    reset,
+  } = useSetFeeRecipient();
+
+  const totalPresales = presales?.length ?? 0;
+  const livePresales = presales?.filter((p) => p.status === 'live').length ?? 0;
+  const upcomingPresales = presales?.filter((p) => p.status === 'upcoming').length ?? 0;
+  const endedPresales = presales?.filter((p) =>
+    ['ended', 'finalized', 'cancelled'].includes(p.status)
+  ).length ?? 0;
+
+  const totalRaised = useMemo(() => {
+    if (!presales || presales.length === 0) return '0';
+    let sum = 0n;
+    for (const p of presales) {
+      sum += p.totalRaised ?? 0n;
+    }
+    return Number(formatUnits(sum, 18)).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  }, [presales]);
+
+  const isOnChainOwner = useMemo(() => {
+    if (!address || !factoryOwner) return false;
+    return address.toLowerCase() === factoryOwner.toLowerCase();
+  }, [address, factoryOwner]);
+
+  useEffect(() => {
+    if (isSuccess) {
+      toast.success('Fee recipient updated successfully.');
+      setNewFeeRecipient('');
+      reset();
+      refetchFeeRecipient();
+    }
+  }, [isSuccess, reset, refetchFeeRecipient]);
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message ?? 'Failed to update fee recipient.');
+      reset();
+    }
+  }, [isError, error, reset]);
+
+  const handleCopy = (value: string) => {
+    if (!value) return;
+    navigator.clipboard?.writeText(value);
+    toast.success('Copied to clipboard.');
+  };
+
+  const handleSetFeeRecipient = () => {
+    if (!newFeeRecipient || !isAddress(newFeeRecipient)) {
+      toast.error('Enter a valid address.');
+      return;
+    }
+    setFeeRecipient(newFeeRecipient as Address);
+  };
+
+  const adminStatusLabel = isOnChainOwner ? 'On-chain owner' : 'Admin access';
+
+  return (
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-10"
+    >
+      <motion.section variants={itemVariants} className="space-y-3">
+        <p className="text-label text-ink-faint uppercase tracking-wider">Admin</p>
+        <h1 className="font-display text-display-lg text-ink">Stage0 Admin</h1>
+        <p className="text-body text-ink-muted max-w-3xl">
+          Manage presales, whitelisted creators, and platform settings from one place.
+        </p>
+      </motion.section>
+
+      <motion.section variants={itemVariants} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="stat-card">
+          <p className="text-body-sm text-ink-muted">Total Presales</p>
+          <p className="font-display text-display-sm text-ink">
+            {isLoadingPresales ? '...' : totalPresales}
+          </p>
+        </div>
+        <div className="stat-card">
+          <p className="text-body-sm text-ink-muted">Live</p>
+          <p className="font-display text-display-sm text-ink">
+            {isLoadingPresales ? '...' : livePresales}
+          </p>
+        </div>
+        <div className="stat-card">
+          <p className="text-body-sm text-ink-muted">Upcoming</p>
+          <p className="font-display text-display-sm text-ink">
+            {isLoadingPresales ? '...' : upcomingPresales}
+          </p>
+        </div>
+        <div className="stat-card">
+          <p className="text-body-sm text-ink-muted">Ended</p>
+          <p className="font-display text-display-sm text-ink">
+            {isLoadingPresales ? '...' : endedPresales}
+          </p>
+        </div>
+        <div className="stat-card">
+          <p className="text-body-sm text-ink-muted">Total Raised</p>
+          <p className="font-display text-display-sm text-ink">
+            {isLoadingPresales ? '...' : totalRaised}
+          </p>
+        </div>
+      </motion.section>
+
+      <motion.section variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Link to="/admin/presales" className="glass-card rounded-3xl p-6 group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-accent-muted text-accent flex items-center justify-center">
+                <Coins className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-body font-medium text-ink">Manage Presales</p>
+                <p className="text-body-sm text-ink-muted">Edit fees and status</p>
+              </div>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-muted group-hover:text-ink" />
+          </div>
+        </Link>
+
+        <Link to="/admin/whitelist" className="glass-card rounded-3xl p-6 group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-ink/10 text-ink flex items-center justify-center">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-body font-medium text-ink">Whitelist Creators</p>
+                <p className="text-body-sm text-ink-muted">Add or remove access</p>
+              </div>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-muted group-hover:text-ink" />
+          </div>
+        </Link>
+
+        <div className="glass-card rounded-3xl p-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-ink/10 text-ink flex items-center justify-center">
+              <Settings className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-body font-medium text-ink">Platform Settings</p>
+              <p className="text-body-sm text-ink-muted">Fee recipient + metadata</p>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* NFT Factory */}
+      <motion.section variants={itemVariants} className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-label text-ink-faint uppercase tracking-wider">NFT Launchpad</p>
+            <h2 className="font-display text-display-md text-ink">NFT Factory</h2>
+            <p className="text-body text-ink-muted max-w-2xl">
+              Deploy standard ERC721 or ERC721A collections with configurable mint windows and wallet limits.
+            </p>
+          </div>
+          <a
+            href={`${explorerUrl}/address/${nftFactory}`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-ghost inline-flex items-center gap-2 self-start md:self-auto"
+          >
+            View Factory <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
+
+        <div className="glass-card rounded-3xl p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-accent-secondary/15 text-accent-secondary flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-display text-display-sm text-ink">Factory Activity</p>
+              <p className="text-body-sm text-ink-muted">Total deployments on this factory</p>
+            </div>
+          </div>
+          <p className="font-display text-display-md text-ink font-mono">
+            {isLoadingNFTs ? '...' : Number(totalDeployments).toLocaleString()}
+          </p>
+          <Link to="/create/nft" className="btn-primary inline-flex">Create NFT Collection</Link>
+        </div>
+      </motion.section>
+
+      <motion.section variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-card rounded-3xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-display-sm text-ink">Factory Details</h2>
+            <span className="text-xs text-ink-faint">{adminStatusLabel}</span>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-body-sm text-ink-muted">Presale Factory</p>
+              <div className="flex items-center gap-2">
+                <code className="text-body-sm font-mono text-ink break-all">{presaleFactory}</code>
+                <button
+                  onClick={() => handleCopy(presaleFactory)}
+                  className="p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+                  aria-label="Copy factory address"
+                >
+                  <Copy className="w-4 h-4 text-ink-muted" />
+                </button>
+              </div>
+              <a
+                href={`${explorerUrl}/address/${presaleFactory}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-body-sm text-accent link-underline inline-flex items-center gap-1 mt-1"
+              >
+                View on explorer
+              </a>
+            </div>
+
+            <div>
+              <p className="text-body-sm text-ink-muted">On-chain Owner</p>
+              <p className="text-body-sm font-mono text-ink break-all">
+                {isLoadingOwner ? 'Loading...' : factoryOwner ?? 'Unknown'}
+              </p>
+              {isOnChainOwner && (
+                <p className="text-xs text-status-live mt-1">✓ Connected wallet is owner</p>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        <div className="glass-card rounded-3xl p-6 space-y-4">
+          <h2 className="font-display text-display-sm text-ink">Fee Recipient</h2>
+          <div>
+            <p className="text-body-sm text-ink-muted">Current Fee Recipient</p>
+            <p className="text-body-sm font-mono text-ink break-all">
+              {isLoadingFeeRecipient ? 'Loading...' : feeRecipient ?? 'Unknown'}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-body-sm text-ink-muted">Update Fee Recipient</label>
+            <input
+              value={newFeeRecipient}
+              onChange={(event) => setNewFeeRecipient(event.target.value)}
+              placeholder="0x..."
+              className="input-field font-mono"
+            />
+            <button
+              onClick={handleSetFeeRecipient}
+              disabled={!newFeeRecipient || isBusy}
+              className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isBusy ? 'Updating...' : 'Update Recipient'}
+            </button>
+            <p className="text-xs text-ink-faint">
+              Only the presale factory owner can update this setting.
+            </p>
+          </div>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+};
+
+export default AdminDashboard;

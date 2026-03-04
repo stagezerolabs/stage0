@@ -58,9 +58,9 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
   const navItems = isConnected
     ? [
-        ...privateNavItems,
-        ...(isOwner ? [{ path: '/admin', label: 'Admin' }] : []),
-      ]
+      ...privateNavItems,
+      ...(isOwner ? [{ path: '/admin', label: 'Admin' }] : []),
+    ]
     : publicNavItems;
 
   const handleMobileChainSwitch = useCallback(() => {
@@ -87,17 +87,16 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className={`sticky top-0 z-50 py-5 border-b border-transparent transition-all duration-500 ${
-        scrolled || themeMode === 'light'
+      className={`sticky top-0 z-50 py-5 border-b border-transparent transition-all duration-500 ${scrolled || themeMode === 'light'
           ? 'bg-void/80 backdrop-blur-2xl border-border shadow-float'
           : 'bg-transparent'
-      }`}
+        }`}
     >
       <nav className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
         {/* Logo */}
         <Link to="/" className="group inline-flex items-center">
           <span className="text-xl font-bold tracking-[0.18em] text-ink leading-none text-engraved">STAGE</span>
-          <span className="font-black text-accent leading-none" style={{ fontSize: '1.75rem', marginLeft: '-0.05em', filter: 'drop-shadow(0 0 8px rgba(255,138,0,0.30))' }}>0</span>
+          <span className="font-black text-accent leading-none" style={{ fontSize: '1.75rem', marginLeft: '-0.05em', filter: 'drop-shadow(0 0 8px rgba(255,138,0,0.30))' }}>ZERO</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -109,11 +108,10 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
               className="relative px-4 py-2 text-body-sm font-medium transition-colors duration-300"
             >
               <span
-                className={`relative z-10 ${
-                  location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                className={`relative z-10 ${location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                     ? 'text-ink'
                     : 'text-ink-muted hover:text-ink'
-                }`}
+                  }`}
               >
                 {item.label}
               </span>
@@ -343,11 +341,10 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
               {isConnected && chainInfo && (
                 <button
                   onClick={handleMobileChainSwitch}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${
-                    chainInfo.unsupported
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${chainInfo.unsupported
                       ? 'text-status-error bg-status-error/10'
                       : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
-                  }`}
+                    }`}
                 >
                   {chainInfo.unsupported ? (
                     'Switch Network'
@@ -369,11 +366,10 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`block px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${
-                    location.pathname === item.path
+                  className={`block px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${location.pathname === item.path
                       ? 'bg-canvas-alt text-ink'
                       : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </Link>

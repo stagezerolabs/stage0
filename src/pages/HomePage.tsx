@@ -62,13 +62,13 @@ const HomePage: React.FC = () => {
       {/* Hero Section */}
       <motion.section variants={itemVariants} className="text-center pt-8 md:pt-16">
         <div className="relative max-w-4xl mx-auto space-y-6">
-          <span className="ghost-numeral -top-20 left-1/2 -translate-x-1/2" aria-hidden="true">0</span>
+          {/* <span className="ghost-numeral -top-20 left-1/2 -translate-x-1/2" aria-hidden="true">0</span> */}
           <h1 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-ink leading-tight text-engraved">
             Community Driven Launches on{' '}
             <span style={{ color: '#8B7CFF' }}>Rise</span> Chain
           </h1>
           <p className="text-base sm:text-lg text-ink-muted max-w-2xl mx-auto">
-            Stage0 is a premium launchpad for high-conviction onchain projects. Discover promising
+            StageZero is a premium launchpad for high-conviction onchain projects. Discover promising
             teams, join fair launches, and ship faster with integrated creator tooling.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -203,8 +203,8 @@ const HomePage: React.FC = () => {
                         <h3 className="font-display text-display-sm text-ink">{item.symbol}</h3>
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${item.status === 'Live'
-                              ? 'bg-status-live-bg text-status-live'
-                              : 'bg-status-upcoming-bg text-status-upcoming'
+                            ? 'bg-status-live-bg text-status-live'
+                            : 'bg-status-upcoming-bg text-status-upcoming'
                             }`}
                         >
                           {item.status}
@@ -240,7 +240,7 @@ const HomePage: React.FC = () => {
         <div className="text-center">
           <h2 className="font-display text-display-md text-ink">How It Works</h2>
           <p className="text-body-lg text-ink-muted max-w-2xl mx-auto mt-4">
-            Participating in Stage0 is simple and straightforward.
+            Participating in StageZero is simple and straightforward.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -248,7 +248,7 @@ const HomePage: React.FC = () => {
             {
               step: 1,
               title: 'Connect Wallet',
-              description: 'Link your wallet to access Stage0 and all launchpad features.',
+              description: 'Link your wallet to access StageZero and all launchpad features.',
               icon: Wallet,
             },
             {
@@ -322,13 +322,13 @@ const HomePage: React.FC = () => {
             <div className="space-y-4 max-w-xl">
               <p className="text-label text-accent-secondary uppercase tracking-[0.18em]">Tier Access Engine</p>
               <h3 className="font-display text-display-md text-ink">
-                Stake on Stage0 to unlock
+                Stake on StageZero to unlock
                 <br />
                 <span className="text-accent-secondary">exclusive allocations</span>
               </h3>
               <p className="text-body text-ink-muted">
                 Higher tier levels unlock guaranteed allocations and priority access to the most
-                anticipated launches on Stage0.
+                anticipated launches on StageZero.
               </p>
               <Link to="/staking" className="btn-primary">
                 Start Staking

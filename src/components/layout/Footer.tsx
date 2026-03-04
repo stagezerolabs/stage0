@@ -40,10 +40,10 @@ const Footer: React.FC = () => {
           <div className="flex flex-col items-center md:items-start gap-4">
             <Link to="/" className="inline-flex items-center">
               <span className="text-lg font-bold tracking-[0.16em] text-ink leading-none text-engraved">STAGE</span>
-              <span className="font-black text-accent leading-none" style={{ fontSize: '1.575rem', marginLeft: '-0.05em' }}>0</span>
+              <span className="font-black text-accent leading-none" style={{ fontSize: '1.575rem', marginLeft: '-0.05em' }}>ZERO</span>
             </Link>
             <p className="text-body-sm text-ink-faint">
-              {currentYear} Stage0. All rights reserved.
+              {currentYear} StageZero. All rights reserved.
             </p>
           </div>
 

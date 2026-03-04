@@ -1,7 +1,6 @@
 import CountUp from '@/components/ui/CountUp';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { projects } from '@/lib/projects';
-import { useConnectModal } from '@rainbow-me/rainbowkit';
 import {
   motion,
   useInView,
@@ -27,7 +26,6 @@ import {
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits } from 'viem';
-import { useAccount } from 'wagmi';
 
 /* ─── Shared Hooks ─── */
 
@@ -204,8 +202,6 @@ const creatorTools = [
 /* ─── Main Component ─── */
 
 const HomePage: React.FC = () => {
-  const { openConnectModal } = useConnectModal();
-  const { isConnected } = useAccount();
   const { presales } = useLaunchpadPresales('all');
   const reducedMotion = useReducedMotion();
   const { mouseX, mouseY } = useMousePosition();

@@ -188,7 +188,7 @@ const Dashboard: React.FC = () => {
 
   const createdPresales = useMemo(() => {
     if (!address) return [];
-    return presales.filter((presale) => presale.owner.toLowerCase() === address.toLowerCase());
+    return presales.filter((presale) => presale.owner?.toLowerCase() === address.toLowerCase());
   }, [address, presales]);
 
   const filteredMyNFTDeployments = useMemo(() => {

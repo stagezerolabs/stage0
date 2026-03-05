@@ -1,10 +1,4 @@
 import { Badge } from '@/components/ui/badge';
-import { motion } from 'framer-motion';
-import { ArrowRight, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
-import { formatUnits, type Address } from 'viem';
 import {
   LaunchpadPresaleContract,
   StakingContract,
@@ -16,6 +10,12 @@ import {
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
+import { motion } from 'framer-motion';
+import { ArrowRight, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { formatUnits, zeroAddress, type Address } from 'viem';
+import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,8 +54,7 @@ const ConnectWalletPlaceholder: React.FC<{ message: string }> = ({ message }) =>
 const Dashboard: React.FC = () => {
   const { address, isConnected } = useAccount();
   const [nftTypeFilter, setNftTypeFilter] = useState<'all' | 'erc721' | 'erc721a'>('all');
-  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
-  const safeAddress = (address ?? ZERO_ADDRESS) as Address;
+  const safeAddress = (address ?? zeroAddress) as Address;
   const chainId = useChainId();
   const nativeToken = getNativeTokenLabel(chainId);
   const stakingAddress = getStakingContractAddress(chainId);
@@ -81,7 +80,7 @@ const Dashboard: React.FC = () => {
       { address: stakingAddress, abi: StakingContract, functionName: 'stakingToken' },
     ],
     query: {
-      enabled: stakingAddress !== ZERO_ADDRESS,
+      enabled: stakingAddress !== zeroAddress,
     },
   });
 
@@ -90,11 +89,11 @@ const Dashboard: React.FC = () => {
   const { data: stakingData, isLoading: isStakingLoading } = useReadContracts({
     contracts: stakingToken && address
       ? ([
-          { address: stakingToken, abi: erc20Abi, functionName: 'symbol' },
-          { address: stakingToken, abi: erc20Abi, functionName: 'decimals' },
-          { address: stakingAddress, abi: StakingContract, functionName: 'balanceOf', args: [safeAddress] },
-          { address: stakingAddress, abi: StakingContract, functionName: 'pendingRewards', args: [safeAddress] },
-        ] as const)
+        { address: stakingToken, abi: erc20Abi, functionName: 'symbol' },
+        { address: stakingToken, abi: erc20Abi, functionName: 'decimals' },
+        { address: stakingAddress, abi: StakingContract, functionName: 'balanceOf', args: [safeAddress] },
+        { address: stakingAddress, abi: StakingContract, functionName: 'pendingRewards', args: [safeAddress] },
+      ] as const)
       : [],
     query: {
       enabled: Boolean(stakingToken && address),
@@ -199,8 +198,8 @@ const Dashboard: React.FC = () => {
 
   const balanceDisplay = balance
     ? `${Number(balance.formatted).toLocaleString(undefined, {
-        maximumFractionDigits: 4,
-      })} ${balance.symbol ?? nativeToken}`
+      maximumFractionDigits: 4,
+    })} ${balance.symbol ?? nativeToken}`
     : `0 ${nativeToken}`;
 
   return (
@@ -292,8 +291,8 @@ const Dashboard: React.FC = () => {
                         presale.status === 'live'
                           ? 'live'
                           : presale.status === 'upcoming'
-                          ? 'upcoming'
-                          : 'closed';
+                            ? 'upcoming'
+                            : 'closed';
 
                       return (
                         <Link
@@ -346,8 +345,8 @@ const Dashboard: React.FC = () => {
                         <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
                           {pendingRewards > 0n
                             ? `${Number(formatUnits(pendingRewards, stakingDecimals)).toLocaleString(undefined, {
-                                maximumFractionDigits: 4,
-                              })} ${stakingSymbol}`
+                              maximumFractionDigits: 4,
+                            })} ${stakingSymbol}`
                             : '—'}
                         </p>
                         <div className="col-span-2 flex items-center justify-end">
@@ -443,8 +442,8 @@ const Dashboard: React.FC = () => {
                       presale.status === 'live'
                         ? 'live'
                         : presale.status === 'upcoming'
-                        ? 'upcoming'
-                        : 'closed';
+                          ? 'upcoming'
+                          : 'closed';
                     return (
                       <Link
                         key={presale.address}
@@ -504,11 +503,10 @@ const Dashboard: React.FC = () => {
               <button
                 key={tag.value}
                 onClick={() => setNftTypeFilter(tag.value)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  nftTypeFilter === tag.value
-                    ? 'bg-accent text-accent-foreground'
-                    : 'bg-ink/5 text-ink-muted hover:bg-ink/10'
-                }`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${nftTypeFilter === tag.value
+                  ? 'bg-accent text-accent-foreground'
+                  : 'bg-ink/5 text-ink-muted hover:bg-ink/10'
+                  }`}
               >
                 {tag.label}
               </button>
@@ -547,8 +545,8 @@ const Dashboard: React.FC = () => {
                       collection.status === 'live'
                         ? 'live'
                         : collection.status === 'upcoming'
-                        ? 'upcoming'
-                        : 'closed';
+                          ? 'upcoming'
+                          : 'closed';
 
                     return (
                       <div

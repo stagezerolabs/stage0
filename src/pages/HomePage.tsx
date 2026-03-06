@@ -235,24 +235,42 @@ const HomePage: React.FC = () => {
   const titleWords = 'Community Driven Launches on'.split(' ');
 
   return (
-    <div className="w-full relative bg-canvas text-ink min-h-screen pb-20">
+    <div className="w-full relative text-ink min-h-screen pb-20">
 
       {/* ─── Hero Section ─── */}
       <motion.section
-        className="relative pt-24 pb-40 md:pt-20 md:pb-56 overflow-hidden rounded-b-[3rem] border-b border-white/5 mb-20"
+        className="relative pt-24 pb-40 md:pt-20 md:pb-56 overflow-hidden rounded-[3rem] mb-20"
       >
-        <motion.div
-          className="absolute inset-0 w-full h-full z-0"
-          style={{ y: heroBgY }}
-        >
-          {/* Subtle gradient overlay to ensure text readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-canvas/40 via-canvas/80 to-canvas z-10" />
-          <img
-            src="https://res.cloudinary.com/dma1c8i6n/image/upload/v1760355735/8E0E699B-A13D-4070-88B3-95CFB47DBB1F_hexjo9.jpg"
-            alt="Hero abstract background"
-            className="w-full h-full object-cover opacity-60 mix-blend-screen"
-          />
-        </motion.div>
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-canvas/40" />
+
+          <div className="absolute inset-x-3 top-3 bottom-3 md:inset-x-8 md:top-6 md:bottom-6 rounded-[2.4rem] overflow-hidden border border-border/40 shadow-float">
+            <motion.div className="absolute -inset-y-8 inset-x-0" style={{ y: heroBgY }}>
+              <img
+                src="https://res.cloudinary.com/dma1c8i6n/image/upload/v1760355735/8E0E699B-A13D-4070-88B3-95CFB47DBB1F_hexjo9.jpg"
+                alt="Hero abstract background"
+                className="w-full h-full object-cover object-center opacity-60 scale-[1.05]"
+              />
+            </motion.div>
+
+            <div
+              className="absolute inset-0 opacity-25 mix-blend-soft-light"
+              style={{
+                backgroundImage:
+                  'linear-gradient(to right, rgba(255, 255, 255, 0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
+                backgroundSize: '34px 34px',
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-canvas/20 via-canvas/55 to-canvas/90" />
+            <div
+              className="absolute inset-0"
+              style={{ background: 'radial-gradient(120% 85% at 50% 8%, transparent 45%, rgb(var(--color-canvas) / 0.72) 100%)' }}
+            />
+            <div className="absolute inset-0 border border-white/10 rounded-[2.4rem] pointer-events-none" />
+          </div>
+
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-canvas/95" />
+        </div>
 
         <motion.div
           className="relative z-20 max-w-5xl mx-auto px-4 text-center space-y-8"
@@ -272,7 +290,7 @@ const HomePage: React.FC = () => {
               </motion.span>
             ))}
             <motion.span
-              className="inline-block text-accent bg-clip-text text-transparent bg-gradient-to-r from-accent to-accent-tertiary"
+              className="inline-block text-accent"
               initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               transition={{ duration: 0.8, delay: 0.2 + titleWords.length * 0.05, ease: [0.16, 1, 0.3, 1] }}
@@ -572,27 +590,39 @@ const HomePage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-[280px]">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-6 auto-rows-[220px]">
             {creatorTools.map((tool, idx) => {
-              // Create bento span rules
-              const isLarge = idx === 0 || idx === 3;
-              const colSpanClass = isLarge ? 'md:col-span-2' : 'col-span-1';
+              const layoutClasses = [
+                'md:col-span-3 md:row-span-2 md:col-start-1 md:row-start-1',
+                'md:col-span-3 md:row-span-1 md:col-start-4 md:row-start-1',
+                'md:col-span-3 md:row-span-1 md:col-start-4 md:row-start-2',
+                'md:col-span-3 md:row-span-1 md:col-start-1 md:row-start-3',
+                'md:col-span-3 md:row-span-1 md:col-start-4 md:row-start-3',
+              ];
+              const offsetClasses = [
+                'md:-translate-y-1',
+                'md:-translate-y-2',
+                'md:translate-y-2',
+                'md:translate-y-1',
+                'md:-translate-y-1',
+              ];
+              const isFeatureCard = idx === 0;
 
               return (
                 <motion.div
                   key={tool.href}
-                  className={`relative overflow-hidden rounded-3xl group border border-white/5 bg-canvas-alt ${colSpanClass}`}
-                  whileHover={reducedMotion ? {} : { scale: 0.98 }}
+                  className={`relative overflow-hidden rounded-3xl group border border-white/5 bg-canvas-alt min-h-[220px] transition-transform duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]}`}
+                  whileHover={reducedMotion ? {} : { scale: 0.99 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
                   <Link to={tool.href} className="block w-full h-full relative">
                     <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
 
-                    <div className="absolute inset-x-0 bottom-0 p-8 flex flex-col justify-end">
-                      <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md text-accent flex items-center justify-center mb-6 transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)]">
+                    <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
+                      <div className={`w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
                         <tool.icon className="w-7 h-7" />
                       </div>
-                      <h3 className="font-display text-2xl font-bold text-ink mb-2">{tool.title}</h3>
+                      <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
                       <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
                     </div>
                   </Link>
@@ -618,7 +648,7 @@ const HomePage: React.FC = () => {
               </div>
               <h3 className="font-display text-4xl md:text-6xl text-ink leading-tight font-bold">
                 Stake to unlock <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-accent-secondary">exclusive allocations</span>
+                <span className="text-accent">exclusive allocations</span>
               </h3>
               <p className="text-lg text-ink-muted max-w-xl mx-auto lg:mx-0">
                 Level up your tier status for guaranteed allocations and priority access to the most

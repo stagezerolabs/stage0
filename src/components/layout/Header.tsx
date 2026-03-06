@@ -46,10 +46,12 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   }, [location.pathname]);
 
   const publicNavItems = [
+    { path: '/', label: 'Home' },
     { path: '/presales', label: 'Launchpad' },
   ];
 
   const privateNavItems = [
+    { path: '/', label: 'Home' },
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/presales', label: 'Launchpad' },
     { path: '/tools', label: 'Tools' },
@@ -82,15 +84,15 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     onToggleTheme();
   }, [onToggleTheme]);
 
+  const headerSurfaceClass = themeMode === 'light'
+    ? 'bg-canvas/95 backdrop-blur-2xl border-border shadow-float'
+    : scrolled
+      ? 'bg-void/80 backdrop-blur-2xl border-border shadow-float'
+      : 'bg-transparent';
+
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className={`sticky top-0 z-50 py-5 border-b border-transparent transition-all duration-500 ${scrolled || themeMode === 'light'
-          ? 'bg-void/80 backdrop-blur-2xl border-border shadow-float'
-          : 'bg-transparent'
-        }`}
+    <header
+      className={`sticky top-0 z-50 py-5 border-b border-transparent transition-all duration-500 ${headerSurfaceClass}`}
     >
       <nav className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
         {/* Logo */}
@@ -297,7 +299,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="md:hidden overflow-hidden border-b border-border/40 bg-void/90 backdrop-blur-2xl"
+            className={`md:hidden overflow-hidden border-b border-border/40 backdrop-blur-2xl ${themeMode === 'light' ? 'bg-canvas/95' : 'bg-void/90'}`}
           >
             <div className="max-w-7xl mx-auto px-6 py-4 space-y-1">
               <button
@@ -378,7 +380,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.header>
+    </header>
   );
 };
 

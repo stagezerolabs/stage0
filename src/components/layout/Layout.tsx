@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 
@@ -9,8 +10,11 @@ type LayoutProps = {
 };
 
 const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) => {
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
+
   return (
-    <div className="relative flex flex-col min-h-screen bg-canvas overflow-x-hidden">
+    <div className="relative flex flex-col min-h-screen bg-canvas" style={{ overflowX: 'clip' }}>
       {/* Atmospheric sky layer */}
       <div className="sky-layer" style={{ zIndex: 0 }} />
 
@@ -59,9 +63,13 @@ const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) =
       <Header themeMode={themeMode} onToggleTheme={onToggleTheme} />
 
       <main className="relative flex-grow" style={{ zIndex: 10 }}>
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16">
-          {children}
-        </div>
+        {isHomePage ? (
+          <div className="w-full px-0">{children}</div>
+        ) : (
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16">
+            {children}
+          </div>
+        )}
       </main>
 
       <Footer />

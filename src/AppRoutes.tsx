@@ -1,5 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
-import { useAccount } from 'wagmi';
+import { Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
@@ -31,17 +30,12 @@ type AppRoutesProps = {
   onToggleTheme: () => void;
 };
 
-const HomeOrDashboard = () => {
-  const { isConnected } = useAccount();
-  return isConnected ? <Navigate to="/dashboard" replace /> : <HomePage />;
-};
-
 const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
   return (
     <Layout themeMode={themeMode} onToggleTheme={onToggleTheme}>
       <Routes>
         {/* Public routes */}
-        <Route path="/" element={<HomeOrDashboard />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/presales" element={<PresalesPage />} />
         <Route path="/presales/:address" element={<PresaleDetailPage />} />
         <Route path="/nfts/:address" element={<NFTDetailPage />} />

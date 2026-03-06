@@ -242,34 +242,51 @@ const HomePage: React.FC = () => {
         className="relative pt-24 pb-40 md:pt-20 md:pb-56 overflow-hidden rounded-[3rem] mb-20"
       >
         <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-canvas/40" />
+          <div className="absolute inset-0 bg-canvas/25" />
 
-          <div className="absolute inset-x-3 top-3 bottom-3 md:inset-x-8 md:top-6 md:bottom-6 rounded-[2.4rem] overflow-hidden border border-border/40 shadow-float">
+          <div className="absolute inset-x-3 top-3 bottom-3 md:inset-x-8 md:top-6 md:bottom-6 rounded-[2.4rem] overflow-hidden border border-border/35 shadow-float">
             <motion.div className="absolute -inset-y-8 inset-x-0" style={{ y: heroBgY }}>
               <img
                 src="https://res.cloudinary.com/dma1c8i6n/image/upload/v1760355735/8E0E699B-A13D-4070-88B3-95CFB47DBB1F_hexjo9.jpg"
                 alt="Hero abstract background"
-                className="w-full h-full object-cover object-center opacity-60 scale-[1.05]"
+                className="w-full h-full object-cover object-center scale-[1.05]"
+                style={{ opacity: 'var(--hero-image-opacity)' }}
               />
             </motion.div>
 
             <div
-              className="absolute inset-0 opacity-25 mix-blend-soft-light"
+              className="absolute inset-0"
               style={{
                 backgroundImage:
                   'linear-gradient(to right, rgba(255, 255, 255, 0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
                 backgroundSize: '34px 34px',
+                opacity: 'var(--hero-grid-opacity)',
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-canvas/20 via-canvas/55 to-canvas/90" />
             <div
               className="absolute inset-0"
-              style={{ background: 'radial-gradient(120% 85% at 50% 8%, transparent 45%, rgb(var(--color-canvas) / 0.72) 100%)' }}
+              style={{
+                background:
+                  'linear-gradient(to bottom, rgb(var(--color-canvas) / var(--hero-overlay-top)), rgb(var(--color-canvas) / var(--hero-overlay-mid)), rgb(var(--color-canvas) / var(--hero-overlay-bottom)))',
+              }}
             />
-            <div className="absolute inset-0 border border-white/10 rounded-[2.4rem] pointer-events-none" />
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  'radial-gradient(120% 85% at 50% 8%, transparent 45%, rgb(var(--color-canvas) / var(--hero-vignette-bottom)) 100%)',
+              }}
+            />
+            <div className="absolute inset-0 border border-border/30 rounded-[2.4rem] pointer-events-none" />
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-canvas/95" />
+          <div
+            className="absolute inset-x-0 bottom-0 h-24"
+            style={{
+              background:
+                'linear-gradient(to bottom, transparent, rgb(var(--color-canvas) / var(--hero-bottom-fade)))',
+            }}
+          />
         </div>
 
         <motion.div
@@ -277,7 +294,7 @@ const HomePage: React.FC = () => {
           style={{ y: heroContentY, opacity: heroOpacity }}
         >
 
-          <h1 className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-8xl text-ink leading-[1.1] tracking-tight drop-shadow-2xl">
+          <h1 className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-8xl text-ink leading-[1.1] tracking-tight">
             {titleWords.map((word, i) => (
               <motion.span
                 key={i}
@@ -307,7 +324,7 @@ const HomePage: React.FC = () => {
             </motion.span>
           </h1>
           <motion.p
-            className="text-lg md:text-xl text-ink-muted max-w-3xl mx-auto drop-shadow-md"
+            className="text-lg md:text-xl text-ink-muted max-w-3xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
@@ -324,7 +341,7 @@ const HomePage: React.FC = () => {
             <MagneticButton as="link" to="/presales" className="btn-primary py-4 px-8 text-lg rounded-full shadow-lg shadow-accent/20">
               Explore Projects
             </MagneticButton>
-            <MagneticButton as="link" to="/create/token" className="btn-secondary py-4 px-8 text-lg rounded-full backdrop-blur-md bg-canvas-alt/50 border border-white/10 hover:bg-canvas-alt/80">
+            <MagneticButton as="link" to="/create/token" className="btn-secondary py-4 px-8 text-lg rounded-full bg-canvas-alt border border-border/40 hover:bg-canvas-alt">
               Launch Token
             </MagneticButton>
           </motion.div>
@@ -390,7 +407,7 @@ const HomePage: React.FC = () => {
                 <motion.div
                   key={stat.label}
                   ref={ref}
-                  className={`ambient-stat-card ${stat.cardClass} text-center relative overflow-hidden bg-canvas-alt/40 border border-white/5 backdrop-blur-sm rounded-3xl p-8`}
+                  className={`ambient-stat-card ${stat.cardClass} text-center relative overflow-hidden bg-canvas-alt border border-border/50 rounded-3xl p-8`}
                   style={{
                     rotateX: reducedMotion ? 0 : springX,
                     rotateY: reducedMotion ? 0 : springY,
@@ -468,7 +485,7 @@ const HomePage: React.FC = () => {
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
-                        <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-lg ${isLive
+                        <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${isLive
                           ? 'bg-status-live-bg text-status-live border border-status-live/20'
                           : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
                           }`}>
@@ -619,7 +636,7 @@ const HomePage: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
 
                     <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
-                      <div className={`w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
+                      <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
                         <tool.icon className="w-7 h-7" />
                       </div>
                       <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>

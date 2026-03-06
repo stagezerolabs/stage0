@@ -84,15 +84,13 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     onToggleTheme();
   }, [onToggleTheme]);
 
-  const headerSurfaceClass = themeMode === 'light'
-    ? 'bg-canvas/95 backdrop-blur-2xl border-border shadow-float'
-    : scrolled
-      ? 'bg-void/80 backdrop-blur-2xl border-border shadow-float'
-      : 'bg-transparent';
+  const headerSurfaceClass = scrolled || themeMode === 'light'
+    ? 'bg-canvas-alt/90 backdrop-blur-xl border-border'
+    : 'bg-transparent';
 
   return (
     <header
-      className={`sticky top-0 z-50 py-5 border-b border-transparent transition-all duration-500 ${headerSurfaceClass}`}
+      className={`sticky top-0 z-50 py-5 border-b border-transparent transition-colors duration-300 ${headerSurfaceClass}`}
     >
       <nav className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
         {/* Logo */}
@@ -125,7 +123,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute inset-0 bg-canvas-alt rounded-lg backdrop-blur-sm border border-border/20"
+                    className="absolute inset-0 bg-canvas-alt rounded-lg"
                   />
                 )}
               </AnimatePresence>
@@ -299,7 +297,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className={`md:hidden overflow-hidden border-b border-border/40 backdrop-blur-2xl ${themeMode === 'light' ? 'bg-canvas/95' : 'bg-void/90'}`}
+            className="md:hidden overflow-hidden border-b border-border bg-canvas-alt/95 backdrop-blur-xl"
           >
             <div className="max-w-7xl mx-auto px-6 py-4 space-y-1">
               <button

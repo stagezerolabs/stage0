@@ -12,15 +12,16 @@ type LayoutProps = {
 const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) => {
   const location = useLocation();
   const isHomePage = location.pathname === '/';
+  const showAtmosphere = themeMode === 'dark';
 
   return (
     <div className="relative flex flex-col min-h-screen bg-canvas" style={{ overflowX: 'clip' }}>
       {/* Atmospheric sky layer */}
-      <div className="sky-layer" style={{ zIndex: 0 }} />
+      {showAtmosphere && <div className="sky-layer" style={{ zIndex: 0 }} />}
 
       {/* Subtle gradient accent at top */}
       <div
-        className="fixed top-0 left-0 right-0 h-[700px] pointer-events-none opacity-60"
+        className="fixed top-0 left-0 right-0 h-[520px] pointer-events-none opacity-50"
         style={{
           background: 'var(--layout-top-glow)',
           zIndex: 1,
@@ -28,34 +29,38 @@ const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) =
       />
 
       {/* Light streaks */}
-      <div className="light-streak" style={{ top: '35vh', zIndex: 1 }} />
-      <div className="light-streak--2" style={{ top: '65vh', zIndex: 1 }} />
+      {showAtmosphere && <div className="light-streak" style={{ top: '35vh', zIndex: 1 }} />}
+      {showAtmosphere && <div className="light-streak--2" style={{ top: '65vh', zIndex: 1 }} />}
 
       {/* Geometric monoliths */}
-      <div
-        className="geo-monolith"
-        style={{
-          width: '300px',
-          height: '400px',
-          top: '15%',
-          left: '8%',
-          animation: 'geoRotate 120s linear infinite',
-          opacity: 0.03,
-          zIndex: 1,
-        }}
-      />
-      <div
-        className="geo-monolith"
-        style={{
-          width: '200px',
-          height: '350px',
-          top: '40%',
-          right: '6%',
-          animation: 'geoRotate 180s linear infinite reverse',
-          opacity: 0.05,
-          zIndex: 1,
-        }}
-      />
+      {showAtmosphere && (
+        <div
+          className="geo-monolith"
+          style={{
+            width: '300px',
+            height: '400px',
+            top: '15%',
+            left: '8%',
+            animation: 'geoRotate 120s linear infinite',
+            opacity: 0.03,
+            zIndex: 1,
+          }}
+        />
+      )}
+      {showAtmosphere && (
+        <div
+          className="geo-monolith"
+          style={{
+            width: '200px',
+            height: '350px',
+            top: '40%',
+            right: '6%',
+            animation: 'geoRotate 180s linear infinite reverse',
+            opacity: 0.05,
+            zIndex: 1,
+          }}
+        />
+      )}
 
       {/* Subtle noise texture overlay */}
       <div className="noise-overlay" />

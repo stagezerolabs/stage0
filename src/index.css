@@ -189,6 +189,33 @@
     text-shadow: none;
   }
 
+  .hero-rise {
+    color: rgb(var(--color-accent));
+    font-weight: 700;
+    position: relative;
+    isolation: isolate;
+  }
+
+  :root[data-theme='dark'] .hero-rise,
+  :root:not([data-theme='light']) .hero-rise {
+    font-weight: 800;
+    background-image: linear-gradient(
+      var(--rise-angle),
+      var(--rise-c1),
+      var(--rise-c2),
+      var(--rise-c3)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: riseColorMorph 10s ease-in-out infinite;
+  }
+
+  :root[data-theme='light'] .hero-rise-orbs {
+    display: none;
+  }
+
   /* Keep gradient only for truncated wallet addresses */
   .truncated-address-gradient {
     background: var(--brand-gradient);
@@ -585,6 +612,65 @@
   100% { background-position: 0% 0%; }
 }
 
+@keyframes riseColorMorph {
+  0%, 100% {
+    --rise-angle: 135deg;
+    --rise-c1: #ff8a00;
+    --rise-c2: #c492e0;
+    --rise-c3: #8b7cff;
+  }
+  20% {
+    --rise-angle: 210deg;
+    --rise-c1: #f49858;
+    --rise-c2: #8b7cff;
+    --rise-c3: #ff8a00;
+  }
+  40% {
+    --rise-angle: 300deg;
+    --rise-c1: #8b7cff;
+    --rise-c2: #ffaa32;
+    --rise-c3: #c492e0;
+  }
+  60% {
+    --rise-angle: 380deg;
+    --rise-c1: #c492e0;
+    --rise-c2: #ff8a00;
+    --rise-c3: #8b7cff;
+  }
+  80% {
+    --rise-angle: 450deg;
+    --rise-c1: #ffaa32;
+    --rise-c2: #c492e0;
+    --rise-c3: #f49858;
+  }
+}
+
+
+/* Animatable Rise text gradient properties */
+@property --rise-angle {
+  syntax: '<angle>';
+  initial-value: 135deg;
+  inherits: false;
+}
+
+@property --rise-c1 {
+  syntax: '<color>';
+  initial-value: #ff8a00;
+  inherits: false;
+}
+
+@property --rise-c2 {
+  syntax: '<color>';
+  initial-value: #c492e0;
+  inherits: false;
+}
+
+@property --rise-c3 {
+  syntax: '<color>';
+  initial-value: #8b7cff;
+  inherits: false;
+}
+
 /* Rotating gradient border for enhanced project cards */
 @property --border-angle {
   syntax: '<angle>';
@@ -657,12 +743,22 @@
   .stat-card,
   .ambient-stat-card,
   .btn-primary,
-  .icon-surreal {
+  .icon-surreal,
+  .hero-rise {
     transition-duration: 0.01ms !important;
   }
 
   .progress-ring__circle {
     transition-duration: 0.01ms !important;
+  }
+
+  .hero-rise {
+    animation: none !important;
+    text-shadow: none !important;
+  }
+
+  .hero-rise-orbs {
+    display: none !important;
   }
 }
 

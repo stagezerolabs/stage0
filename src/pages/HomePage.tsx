@@ -199,6 +199,54 @@ const creatorTools = [
   { title: 'NFT Deploy', icon: ImageIcon, href: '/create/nft', description: 'Launch NFT collections seamlessly.' },
 ];
 
+/* ─── Rise Glow Orbs (dark mode only) ─── */
+
+const riseOrbs = [
+  { color: 'rgba(255, 138, 0, 0.45)', size: 32, blur: 14, left: '10%', top: '20%', x: [0, 18, -12, 8, -18, 4, 0], y: [0, -14, 10, -18, 6, 14, 0], duration: 7.2, scale: [1, 1.35, 0.85, 1.25, 0.9, 1.15, 1] },
+  { color: 'rgba(139, 124, 255, 0.38)', size: 38, blur: 16, left: '78%', top: '12%', x: [0, -14, 20, -10, 14, -6, 0], y: [0, 12, -16, 14, -10, 8, 0], duration: 9.8, scale: [1, 0.9, 1.3, 0.88, 1.2, 0.95, 1] },
+  { color: 'rgba(255, 170, 50, 0.32)', size: 26, blur: 12, left: '42%', top: '72%', x: [0, 14, -20, 16, -10, 8, 0], y: [0, -18, 8, -12, 16, -6, 0], duration: 6.4, scale: [1, 1.2, 0.9, 1.35, 0.85, 1.1, 1] },
+  { color: 'rgba(244, 152, 88, 0.35)', size: 30, blur: 13, left: '88%', top: '58%', x: [0, -10, 16, -14, 12, -8, 0], y: [0, 14, -12, 18, -14, 6, 0], duration: 8.6, scale: [1, 1.15, 0.92, 1.28, 0.88, 1.05, 1] },
+  { color: 'rgba(120, 200, 255, 0.28)', size: 22, blur: 11, left: '28%', top: '38%', x: [0, 20, -10, 14, -20, 6, 0], y: [0, -10, 16, -14, 8, -12, 0], duration: 10.2, scale: [1, 0.88, 1.3, 0.9, 1.22, 0.95, 1] },
+  { color: 'rgba(255, 138, 0, 0.30)', size: 24, blur: 12, left: '58%', top: '80%', x: [0, -16, 12, -8, 18, -10, 0], y: [0, 10, -14, 16, -12, 8, 0], duration: 7.8, scale: [1, 1.25, 0.88, 1.18, 0.92, 1.1, 1] },
+  { color: 'rgba(139, 124, 255, 0.22)', size: 20, blur: 10, left: '50%', top: '10%', x: [0, 12, -18, 10, -14, 16, 0], y: [0, -16, 12, -8, 14, -10, 0], duration: 11.5, scale: [1, 1.1, 0.92, 1.3, 0.86, 1.05, 1] },
+];
+
+const RiseGlowOrbs: React.FC = () => (
+  <span
+    className="hero-rise-orbs"
+    style={{ position: 'absolute', inset: '-0.3em -0.4em', zIndex: -1, pointerEvents: 'none' }}
+    aria-hidden="true"
+  >
+    {riseOrbs.map((orb, i) => (
+      <motion.span
+        key={i}
+        style={{
+          position: 'absolute',
+          width: orb.size,
+          height: orb.size,
+          left: orb.left,
+          top: orb.top,
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${orb.color}, transparent 70%)`,
+          filter: `blur(${orb.blur}px)`,
+          mixBlendMode: 'screen',
+          transform: 'translate(-50%, -50%)',
+        }}
+        animate={{
+          x: orb.x,
+          y: orb.y,
+          scale: orb.scale,
+        }}
+        transition={{
+          duration: orb.duration,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      />
+    ))}
+  </span>
+);
+
 /* ─── Main Component ─── */
 
 const HomePage: React.FC = () => {
@@ -307,11 +355,12 @@ const HomePage: React.FC = () => {
               </motion.span>
             ))}
             <motion.span
-              className="inline-block text-accent"
+              className="inline-block hero-rise"
               initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               transition={{ duration: 0.8, delay: 0.2 + titleWords.length * 0.05, ease: [0.16, 1, 0.3, 1] }}
             >
+              <RiseGlowOrbs />
               Rise
             </motion.span>{' '}
             <motion.span

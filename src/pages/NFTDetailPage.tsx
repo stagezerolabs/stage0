@@ -142,6 +142,12 @@ const NFTDetailPage: React.FC = () => {
         functionName: 'mintedBy',
         args: [userAddress],
       },
+      {
+        abi: NFTCollectionContract,
+        address: collectionAddress,
+        functionName: 'mintedPerWallet',
+        args: [userAddress],
+      },
     ] as const;
   }, [collectionAddress, userAddress]);
 
@@ -234,7 +240,17 @@ const NFTDetailPage: React.FC = () => {
 
   const userMinted = useMemo(() => {
     if (!userMintedData || userMintedData.length === 0) return 0n;
-    return (userMintedData[0]?.result as bigint | undefined) ?? 0n;
+
+    const mintedBy = userMintedData[0];
+    const mintedPerWallet = userMintedData[1];
+
+    if (mintedBy?.status === 'success' && typeof mintedBy.result === 'bigint') {
+      return mintedBy.result;
+    }
+    if (mintedPerWallet?.status === 'success' && typeof mintedPerWallet.result === 'bigint') {
+      return mintedPerWallet.result;
+    }
+    return 0n;
   }, [userMintedData]);
 
   const maxMintable = useMemo(() => {

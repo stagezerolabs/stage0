@@ -9,6 +9,7 @@ import {
 } from '@/config';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
+import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { motion } from 'framer-motion';
 import { ArrowRight, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
@@ -74,6 +75,12 @@ const Dashboard: React.FC = () => {
     creator: address as Address | undefined,
     enabled: isConnected && Boolean(address),
   });
+  const {
+    holdings: myNftHoldings,
+    totalOwned: totalOwnedNFTs,
+    totalMinted: totalMintedNFTs,
+    isLoading: isNftHoldingsLoading,
+  } = useUserNFTHoldings(address as Address | undefined, isConnected && Boolean(address));
 
   const { data: stakingTokenData } = useReadContracts({
     contracts: [
@@ -154,6 +161,11 @@ const Dashboard: React.FC = () => {
 
     return results;
   }, [address, presales, contributionResults]);
+
+  const nftPurchaseAllocations = useMemo(
+    () => myNftHoldings.filter((holding) => holding.mintedCount > 0n),
+    [myNftHoldings]
+  );
 
   const tokenMetaQueries = useMemo(() => {
     if (createdTokens.length === 0) return [];
@@ -264,17 +276,22 @@ const Dashboard: React.FC = () => {
             </div>
 
             {isConnected ? (
-              allocations.length === 0 && !hasStakedAllocation && !isPresalesLoading && !isContributionsLoading ? (
+              allocations.length === 0 &&
+              nftPurchaseAllocations.length === 0 &&
+              !hasStakedAllocation &&
+              !isPresalesLoading &&
+              !isContributionsLoading &&
+              !isNftHoldingsLoading ? (
                 <div className="bg-canvas-alt rounded-3xl border border-border p-8 text-center">
-                  <p className="text-body text-ink-muted">No presale allocations yet.</p>
+                  <p className="text-body text-ink-muted">No allocations yet.</p>
                 </div>
               ) : (
                 <div className="bg-canvas-alt rounded-3xl border border-border overflow-hidden">
                   {/* Table Header */}
                   <div className="hidden md:grid grid-cols-12 gap-6 px-6 py-4 border-b border-border bg-canvas/40">
-                    <span className="text-label text-ink-faint uppercase col-span-4">Presale</span>
-                    <span className="text-label text-ink-faint uppercase text-right col-span-3">Contributed</span>
-                    <span className="text-label text-ink-faint uppercase text-right col-span-3">Purchased</span>
+                    <span className="text-label text-ink-faint uppercase col-span-4">Allocation</span>
+                    <span className="text-label text-ink-faint uppercase text-right col-span-3">Contributed / Minted</span>
+                    <span className="text-label text-ink-faint uppercase text-right col-span-3">Purchased / Held</span>
                     <span className="text-label text-ink-faint uppercase text-right col-span-2">Status</span>
                   </div>
                   {/* Table Body */}
@@ -321,6 +338,47 @@ const Dashboard: React.FC = () => {
                           </p>
                           <div className="col-span-2 flex items-center justify-end">
                             <Badge variant={statusVariant}>{presale.status}</Badge>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                    {nftPurchaseAllocations.map((holding) => {
+                      const statusVariant =
+                        holding.status === 'live'
+                          ? 'live'
+                          : holding.status === 'upcoming'
+                          ? 'upcoming'
+                          : 'closed';
+
+                      return (
+                        <Link
+                          key={`nft-${holding.address}`}
+                          to={`/nfts/${holding.address}`}
+                          className="grid grid-cols-1 md:grid-cols-12 gap-6 px-6 py-5 hover:bg-canvas/40 transition-colors duration-300 group items-center"
+                        >
+                          <div className="col-span-4 flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {holding.metadataImage ? (
+                                <img src={holding.metadataImage} alt={holding.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Image className="w-4 h-4 text-ink-muted" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-body font-medium text-ink group-hover:text-accent transition-colors duration-300">
+                                {holding.name}
+                              </p>
+                              <p className="text-body-sm text-ink-muted font-mono">{holding.symbol}</p>
+                            </div>
+                          </div>
+                          <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
+                            {holding.mintedCount.toString()} NFT{holding.mintedCount === 1n ? '' : 's'}
+                          </p>
+                          <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
+                            {holding.ownedCount.toString()} Held
+                          </p>
+                          <div className="col-span-2 flex items-center justify-end">
+                            <Badge variant={statusVariant}>{holding.status}</Badge>
                           </div>
                         </Link>
                       );
@@ -600,6 +658,56 @@ const Dashboard: React.FC = () => {
 
               <Link to="/create/nft" className="btn-secondary w-full">
                 {myNFTDeployments.length > 0 ? 'Create Another NFT' : 'Create NFT'}
+              </Link>
+            </div>
+
+            <div className="bg-canvas-alt rounded-2xl border border-border p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-ink-muted" />
+                </div>
+                <div>
+                  <h3 className="font-display text-body text-ink">Owned NFTs</h3>
+                  <p className="text-body-sm text-ink-muted">
+                    {isNftHoldingsLoading ? 'Loading…' : `${totalOwnedNFTs.toString()} held · ${totalMintedNFTs.toString()} minted`}
+                  </p>
+                </div>
+              </div>
+
+              {isNftHoldingsLoading && myNftHoldings.length === 0 ? (
+                <p className="text-body-sm text-ink-muted">Loading your NFT holdings…</p>
+              ) : myNftHoldings.length === 0 ? (
+                <p className="text-body-sm text-ink-muted">
+                  No NFT holdings yet. Mint from the launchpad to build your collection.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-auto no-scrollbar">
+                  {myNftHoldings.slice(0, 8).map((holding) => (
+                    <Link
+                      key={`owned-${holding.address}`}
+                      to={`/nfts/${holding.address}`}
+                      className="flex items-center justify-between rounded-xl bg-canvas/40 px-3 py-2 text-body-sm text-ink hover:bg-canvas transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-canvas border border-border flex items-center justify-center overflow-hidden">
+                          {holding.metadataImage ? (
+                            <img src={holding.metadataImage} alt={holding.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Image className="w-3.5 h-3.5 text-ink-muted" />
+                          )}
+                        </span>
+                        <span>{holding.symbol}</span>
+                      </span>
+                      <span className="font-mono text-ink-muted">
+                        {holding.ownedCount.toString()} held
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              <Link to="/my-nfts" className="btn-secondary w-full">
+                View My NFTs
               </Link>
             </div>
           </div>

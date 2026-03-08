@@ -250,12 +250,26 @@ const RiseGlowOrbs: React.FC = () => (
 /* ─── Main Component ─── */
 
 const HomePage: React.FC = () => {
-  const { presales } = useLaunchpadPresales('all');
+  const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
   const reducedMotion = useReducedMotion();
 
   const livePresales = presales.filter((p) => p.status === 'live');
   const upcomingPresales = presales.filter((p) => p.status === 'upcoming');
-  const featuredPresales = [...livePresales, ...upcomingPresales].slice(0, 3);
+  const featuredPresales = [...livePresales, ...upcomingPresales]
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'live' ? -1 : 1;
+      return Number(a.startTime ?? 0n) - Number(b.startTime ?? 0n);
+    })
+    .slice(0, 3);
+  const fallbackFeaturedPresales = projects
+    .filter((project) => project.status === 'Live' || project.status === 'Upcoming')
+    .slice(0, 3);
+  const featuredItems =
+    featuredPresales.length > 0
+      ? featuredPresales
+      : isPresalesLoading
+      ? []
+      : fallbackFeaturedPresales;
 
   // Global Page Scroll
   const { scrollY } = useScroll();
@@ -514,8 +528,23 @@ const HomePage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {(featuredPresales.length > 0 ? featuredPresales : projects.filter((p) => p.status === 'Live' || p.status === 'Upcoming').slice(0, 3)).map((item: any, index) => {
+            {isPresalesLoading && featuredItems.length === 0
+              ? Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={`featured-skeleton-${index}`}
+                  className="rounded-[2.5rem] border border-white/5 bg-canvas-alt/70 overflow-hidden"
+                >
+                  <div className="h-48 bg-ink/10 animate-pulse" />
+                  <div className="p-8 space-y-4">
+                    <div className="h-6 w-3/4 rounded bg-ink/10 animate-pulse" />
+                    <div className="h-4 w-1/3 rounded bg-ink/10 animate-pulse" />
+                    <div className="h-20 rounded-2xl bg-ink/10 animate-pulse" />
+                  </div>
+                </div>
+              ))
+              : (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                featuredItems.map((item: any, index) => {
               const isLive = item.status === 'live' || item.status === 'Live';
               const symbol = item.saleTokenSymbol || item.symbol || 'UNK';
               const name = item.saleTokenName || item.name || 'Unknown Project';
@@ -565,7 +594,8 @@ const HomePage: React.FC = () => {
                   </Link>
                 </PresaleCard>
               );
-            })}
+                })
+              )}
           </div>
         </motion.section>
 

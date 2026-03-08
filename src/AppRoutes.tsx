@@ -24,6 +24,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminPresalesPage from './pages/admin/AdminPresalesPage';
 import AdminWhitelistPage from './pages/admin/AdminWhitelistPage';
 import TokensPage from './pages/TokensPage';
+import MyNFTsPage from './pages/MyNFTsPage';
 
 type AppRoutesProps = {
   themeMode: 'dark' | 'light';
@@ -55,6 +56,7 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
           <Route path="/staking" element={<Staking />} />
           <Route path="/project/:address" element={<ProjectPage />} />
           <Route path="/tokens" element={<TokensPage />} />
+          <Route path="/my-nfts" element={<MyNFTsPage />} />
         </Route>
 
         {/* Admin routes */}

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { decodeEventLog, parseUnits, type Address } from 'viem';
-import { TokenFactory, getContractAddresses, getExplorerUrl } from '@/config';
+import { TokenFactory, getContractAddresses } from '@/config';
 import {
   Coins,
   Flame,
@@ -12,8 +12,6 @@ import {
   Ban,
   Loader2,
   CheckCircle2,
-  ExternalLink,
-  Copy,
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -93,7 +91,6 @@ const CreateTokenPage: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
   const chainId = useChainId();
   const contracts = getContractAddresses(chainId);
-  const explorerUrl = getExplorerUrl(chainId);
 
   const [selectedType, setSelectedType] = useState<TokenType>('plain');
   const [name, setName] = useState('');
@@ -104,7 +101,6 @@ const CreateTokenPage: React.FC = () => {
   const [taxWallet, setTaxWallet] = useState('');
   const [taxBps, setTaxBps] = useState('');
   const [createdTokenAddress, setCreatedTokenAddress] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const lastToastHash = useRef<string | null>(null);
   const lastErrorMessage = useRef<string | null>(null);
@@ -117,7 +113,6 @@ const CreateTokenPage: React.FC = () => {
     writeContract,
     isPending,
     error: writeError,
-    reset,
   } = useWriteContract();
 
   const {
@@ -299,29 +294,6 @@ const CreateTokenPage: React.FC = () => {
         ],
       });
     }
-  };
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleReset = () => {
-    reset();
-    setName('');
-    setSymbol('');
-    setDecimals('18');
-    setInitialSupply('');
-    setRecipient(userAddress || '');
-    setTaxWallet('');
-    setTaxBps('');
-    setCreatedTokenAddress(null);
-    setSelectedType('plain');
-    setShowSuccessModal(false);
-    lastToastHash.current = null;
-    lastErrorMessage.current = null;
-    hasHandledSuccess.current = false;
   };
 
   return (
@@ -514,65 +486,14 @@ const CreateTokenPage: React.FC = () => {
             {createdTokenAddress && (
               <div className="bg-ink/[0.08] rounded-2xl p-4 space-y-2">
                 <p className="text-body-sm text-ink-muted">Token Address</p>
-                <div className="flex items-center gap-2 justify-center">
-                  <code className="text-body font-mono text-ink break-all">
-                    {createdTokenAddress}
-                  </code>
-                  <button
-                    onClick={() => handleCopy(createdTokenAddress)}
-                    className="p-1.5 rounded-lg hover:bg-ink/10 transition-colors"
-                  >
-                    <Copy className="w-4 h-4 text-ink-muted" />
-                  </button>
-                </div>
-                {copied && <p className="text-xs text-status-live">Copied!</p>}
+                <code className="text-body font-mono text-ink break-all block">
+                  {createdTokenAddress}
+                </code>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {createdTokenAddress && (
-                <a
-                  href={`${explorerUrl}/token/${createdTokenAddress}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary inline-flex items-center gap-2 justify-center"
-                >
-                  View on Explorer <ExternalLink className="w-4 h-4" />
-                </a>
-              )}
-              {hash && (
-                <a
-                  href={`${explorerUrl}/tx/${hash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary inline-flex items-center gap-2 justify-center"
-                >
-                  View Tx <ExternalLink className="w-4 h-4" />
-                </a>
-              )}
-            </div>
-            <button
-              onClick={handleReset}
-              className="btn-primary w-full"
-            >
-              Create Another
-            </button>
-            <button
-              onClick={() => setShowSuccessModal(false)}
-              className="btn-secondary w-full"
-            >
-              Back to Form
-            </button>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Link to="/dashboard" className="btn-ghost border border-border">
-                Go to Dashboard
-              </Link>
-              <Link to="/create/presale" className="btn-ghost border border-border">
-                Launch Presale
-              </Link>
-              <Link to="/tools" className="btn-ghost border border-border">
-                Airdrop / Lock
-              </Link>
-            </div>
+            <Link to="/dashboard" className="btn-primary w-full">
+              Go to Dashboard
+            </Link>
           </motion.div>
         </div>
       )}

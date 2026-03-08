@@ -232,7 +232,8 @@ const ManagePresalePage: React.FC = () => {
   useEffect(() => {
     if (isOwnerSuccess && activeOwnerAction) {
       const labels: Record<string, string> = {
-        finalize: 'Presale finalized',
+        finalize: 'Presale finalized. Enable claims when ready.',
+        enableClaims: 'Claims enabled',
         cancel: 'Presale cancelled',
         withdrawProceeds: 'Proceeds withdrawn',
         withdrawTokens: 'Unsold tokens withdrawn',
@@ -285,7 +286,8 @@ const ManagePresalePage: React.FC = () => {
     return contractBalance >= saleAmount;
   }, [contractBalance, saleAmount]);
 
-  const presaleHasEnded = presale?.claimEnabled || presale?.refundsEnabled;
+  const presaleHasEnded =
+    presale?.claimEnabled || presale?.refundsEnabled || presale?.successfulFinalization;
 
   const handleApproveTokens = () => {
     if (!presale?.saleToken || !presaleAddress) return;
@@ -329,6 +331,15 @@ const ManagePresalePage: React.FC = () => {
     });
   };
 
+  const handleEnableClaims = () => {
+    if (!presaleAddress) return;
+    runOwnerAction('enableClaims', {
+      abi: LaunchpadPresaleContract,
+      address: presaleAddress,
+      functionName: 'enableClaims',
+    });
+  };
+
   const handleCancel = () => {
     if (!presaleAddress) return;
     runOwnerAction('cancel', {
@@ -341,7 +352,7 @@ const ManagePresalePage: React.FC = () => {
   const handleWithdrawProceeds = () => {
     if (!presaleAddress) return;
     if (!presale?.claimEnabled) {
-      toast.error('Finalize the presale before withdrawing proceeds.');
+      toast.error('Enable claims before withdrawing proceeds.');
       return;
     }
     runOwnerAction('withdrawProceeds', {
@@ -355,7 +366,7 @@ const ManagePresalePage: React.FC = () => {
   const handleWithdrawTokens = () => {
     if (!presaleAddress) return;
     if (!presale?.claimEnabled) {
-      toast.error('Finalize the presale before withdrawing unsold tokens.');
+      toast.error('Enable claims before withdrawing unsold tokens.');
       return;
     }
     runOwnerAction('withdrawTokens', {
@@ -528,7 +539,7 @@ const ManagePresalePage: React.FC = () => {
           <Coins className="w-5 h-5 text-accent" />
           Sale Status
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="stat-card p-4">
             <p className="text-body-sm text-ink-muted">Total Raised</p>
             <p className="font-display text-display-sm text-ink">
@@ -570,7 +581,7 @@ const ManagePresalePage: React.FC = () => {
         <p className="text-body-sm text-ink-muted">
           Approve and deposit {saleTokenSymbol} tokens so contributors can claim after finalization.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="stat-card p-4">
             <p className="text-body-sm text-ink-muted">Sale Amount</p>
             <p className="text-body font-semibold text-ink">
@@ -639,18 +650,37 @@ const ManagePresalePage: React.FC = () => {
           <Shield className="w-5 h-5 text-accent" />
           Presale Actions
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={handleFinalize}
-            disabled={isOwnerPending || isOwnerConfirming}
+            disabled={
+              isOwnerPending ||
+              isOwnerConfirming ||
+              Boolean(presale.successfulFinalization || presale.claimEnabled || presale.refundsEnabled)
+            }
             className="btn-primary inline-flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
             Finalize Presale
           </button>
           <button
+            onClick={handleEnableClaims}
+            disabled={
+              isOwnerPending ||
+              isOwnerConfirming ||
+              Boolean(!presale.successfulFinalization || presale.claimEnabled || presale.refundsEnabled)
+            }
+            className="btn-secondary inline-flex items-center justify-center gap-2"
+          >
+            Enable Claims
+          </button>
+          <button
             onClick={handleCancel}
-            disabled={isOwnerPending || isOwnerConfirming}
+            disabled={
+              isOwnerPending ||
+              isOwnerConfirming ||
+              Boolean(presale.successfulFinalization || presale.claimEnabled || presale.refundsEnabled)
+            }
             className="btn-secondary inline-flex items-center justify-center gap-2 border-status-error text-status-error hover:bg-status-error/10"
           >
             <Ban className="w-4 h-4" />

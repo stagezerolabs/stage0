@@ -28,6 +28,7 @@ export interface PresaleData {
   totalRaised: bigint;
   committedTokens: bigint;
   totalTokensDeposited: bigint;
+  successfulFinalization?: boolean;
   claimEnabled: boolean;
   refundsEnabled: boolean;
   owner: Address;
@@ -236,6 +237,7 @@ export const useLaunchpadPresaleStore = create<LaunchpadPresaleStore>()(
 
         if (presale.refundsEnabled) return 'cancelled';
         if (presale.claimEnabled) return 'finalized';
+        if (presale.successfulFinalization) return 'ended';
         if (now < presale.startTime) return 'upcoming';
         if (now > presale.endTime) return 'ended';
         return 'live';

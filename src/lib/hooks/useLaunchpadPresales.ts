@@ -206,6 +206,7 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
         'totalRaised',
         'committedTokens',
         'totalTokensDeposited',
+        'successfulFinalization',
         'claimEnabled',
         'refundsEnabled',
         'owner',
@@ -232,7 +233,7 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
   const parsedPresales = useMemo(() => {
     if (!presaleDataResults || addressesToFetch.length === 0) return [];
 
-    const FIELDS_PER_PRESALE = 16;
+    const FIELDS_PER_PRESALE = 17;
     const parsed: PresaleData[] = [];
 
     for (let i = 0; i < addressesToFetch.length; i++) {
@@ -256,9 +257,10 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
         totalRaised: presaleDataResults[baseIdx + 10]?.result as bigint,
         committedTokens: presaleDataResults[baseIdx + 11]?.result as bigint,
         totalTokensDeposited: presaleDataResults[baseIdx + 12]?.result as bigint,
-        claimEnabled: presaleDataResults[baseIdx + 13]?.result as boolean,
-        refundsEnabled: presaleDataResults[baseIdx + 14]?.result as boolean,
-        owner: presaleDataResults[baseIdx + 15]?.result as Address,
+        successfulFinalization: presaleDataResults[baseIdx + 13]?.result as boolean,
+        claimEnabled: presaleDataResults[baseIdx + 14]?.result as boolean,
+        refundsEnabled: presaleDataResults[baseIdx + 15]?.result as boolean,
+        owner: presaleDataResults[baseIdx + 16]?.result as Address,
       };
 
       parsed.push(presale);
@@ -446,6 +448,7 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
       { abi: launchpadPresaleAbi, address: presaleAddress, functionName: 'totalRaised' },
       { abi: launchpadPresaleAbi, address: presaleAddress, functionName: 'committedTokens' },
       { abi: launchpadPresaleAbi, address: presaleAddress, functionName: 'totalTokensDeposited' },
+      { abi: launchpadPresaleAbi, address: presaleAddress, functionName: 'successfulFinalization' },
       { abi: launchpadPresaleAbi, address: presaleAddress, functionName: 'claimEnabled' },
       { abi: launchpadPresaleAbi, address: presaleAddress, functionName: 'refundsEnabled' },
       { abi: launchpadPresaleAbi, address: presaleAddress, functionName: 'owner' },
@@ -497,9 +500,10 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
       totalRaised: (presaleDataResults[10]?.result ?? cachedPresale?.totalRaised ?? 0n) as bigint,
       committedTokens: (presaleDataResults[11]?.result ?? cachedPresale?.committedTokens ?? 0n) as bigint,
       totalTokensDeposited: (presaleDataResults[12]?.result ?? cachedPresale?.totalTokensDeposited ?? 0n) as bigint,
-      claimEnabled: (presaleDataResults[13]?.result ?? cachedPresale?.claimEnabled ?? false) as boolean,
-      refundsEnabled: (presaleDataResults[14]?.result ?? cachedPresale?.refundsEnabled ?? false) as boolean,
-      owner: (presaleDataResults[15]?.result ?? cachedPresale?.owner) as Address,
+      successfulFinalization: (presaleDataResults[13]?.result ?? cachedPresale?.successfulFinalization ?? false) as boolean,
+      claimEnabled: (presaleDataResults[14]?.result ?? cachedPresale?.claimEnabled ?? false) as boolean,
+      refundsEnabled: (presaleDataResults[15]?.result ?? cachedPresale?.refundsEnabled ?? false) as boolean,
+      owner: (presaleDataResults[16]?.result ?? cachedPresale?.owner) as Address,
     };
   }, [presaleAddress, presaleDataResults, cachedPresale, requiresWhitelist]);
 

@@ -102,7 +102,7 @@ export const CONTRACT_ADDRESSES: Record<number, ContractAddressMap> = {
     tokenLocker: "0xb225cb8Ea90E0ab1F9f5011d31fD217083c31fc7",
     nftFactory: "0x6DDca710993C91402d52061868bE76043a4C5888",
     nftFactoryLens: "0x36D6383774631565AB0D8F3710748610631A675d",
-    presaleFactory: "0x40Dc4C9655f6273803E0C5F049cFdB1Db026486B",
+    presaleFactory: "0x67064a9236050D3d947d7F5Bd3448BD4b5D947FC",
     tokenFactory: "0xa0b761A94013FF721fD682eEB7e57709C0e03f42",
     airdropMultisender: "0x8DB306030Cf163A6C809fB3599500DBE28Df2CC6",
   },
@@ -603,6 +603,13 @@ export const PresaleContract = [
   },
   {
     type: "function",
+    name: "successfulFinalization",
+    inputs: [],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "claimEnabled",
     inputs: [],
     outputs: [{ name: "", type: "bool", internalType: "bool" }],
@@ -681,6 +688,20 @@ export const PresaleContract = [
   {
     type: "function",
     name: "finalize",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "endAfterSoftcapReached",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "enableClaims",
     inputs: [],
     outputs: [],
     stateMutability: "nonpayable",

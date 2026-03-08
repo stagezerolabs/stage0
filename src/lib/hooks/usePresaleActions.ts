@@ -219,6 +219,17 @@ export function usePresaleOwnerActions() {
     [writeContract]
   );
 
+  const enableClaims = useCallback(
+    (presaleAddress: Address) => {
+      writeContract({
+        abi: LaunchpadPresaleContract,
+        address: presaleAddress,
+        functionName: 'enableClaims',
+      });
+    },
+    [writeContract]
+  );
+
   const cancelPresale = useCallback(
     (presaleAddress: Address) => {
       writeContract({
@@ -266,6 +277,7 @@ export function usePresaleOwnerActions() {
   return {
     depositSaleTokens,
     finalize,
+    enableClaims,
     cancelPresale,
     withdrawProceeds,
     withdrawUnusedTokens,

@@ -22,20 +22,19 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.3,
+      staggerChildren: 0.05,
+      delayChildren: 0.05,
     },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 40, filter: 'blur(4px)' },
+  hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,
     y: 0,
-    filter: 'blur(0px)',
     transition: {
-      duration: 1,
+      duration: 0.28,
       ease: [0.16, 1, 0.3, 1] as const,
     },
   },
@@ -207,8 +206,8 @@ const PresalesPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visiblePresales.map((presale, index) => (
-              <motion.div key={presale.address} variants={itemVariants} custom={index}>
+            {visiblePresales.map((presale) => (
+              <div key={presale.address}>
                 <Link to={`/presales/${presale.address}`}>
                   <div className="project-card rounded-3xl p-6 space-y-4 h-full">
                     {/* Header */}
@@ -278,23 +277,19 @@ const PresalesPage: React.FC = () => {
                     </div>
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             ))}
 
-            {visibleNFTDeployments.map((deployment, index) => {
+            {visibleNFTDeployments.map((deployment) => {
               const mintedPercent =
                 deployment.maxSupply > 0n
                   ? Math.min(Number((deployment.totalMinted * 100n) / deployment.maxSupply), 100)
                   : 0;
               const collectionImage =
-                NFT_COLLECTION_IMAGES[deployment.address.toLowerCase()];
+                deployment.metadataImage || NFT_COLLECTION_IMAGES[deployment.address.toLowerCase()];
 
               return (
-                <motion.div
-                  key={deployment.address}
-                  variants={itemVariants}
-                  custom={visiblePresales.length + index}
-                >
+                <div key={deployment.address}>
                   <Link to={`/nfts/${deployment.address}`} className="block h-full">
                     <div className="project-card rounded-3xl overflow-hidden space-y-0 h-full flex flex-col">
                       {/* Collection image */}
@@ -317,6 +312,9 @@ const PresalesPage: React.FC = () => {
                               {deployment.symbol || 'NFT'}
                             </h3>
                             <p className="text-body-sm text-ink-muted">{deployment.name}</p>
+                            <p className="text-body-sm text-ink-faint line-clamp-2">
+                              {deployment.metadataDescription || 'Onchain NFT collection.'}
+                            </p>
                           </div>
                           {getStatusBadge(deployment.status)}
                         </div>
@@ -381,7 +379,7 @@ const PresalesPage: React.FC = () => {
                       </div>
                     </div>
                   </Link>
-                </motion.div>
+                </div>
               );
             })}
           </div>

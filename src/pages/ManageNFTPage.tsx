@@ -45,7 +45,7 @@ const ManageNFTPage: React.FC = () => {
   const { address: connectedAddress } = useAccount();
   const chainId = useChainId();
   const explorerUrl = getExplorerUrl(chainId);
-  const isValidAddress = Boolean(collectionParam && isAddress(collectionParam));
+  const isValidAddress = Boolean(collectionParam && isAddress(collectionParam, { strict: false }));
   const collectionAddress = (isValidAddress ? collectionParam : undefined) as Address | undefined;
   const collectionImage = collectionAddress
     ? NFT_COLLECTION_IMAGES[collectionAddress.toLowerCase()]
@@ -90,6 +90,7 @@ const ManageNFTPage: React.FC = () => {
   const {
     data: collectionResults,
     isLoading: isCollectionLoading,
+    error: collectionReadError,
     refetch: refetchCollection,
   } = useReadContracts({
     contracts: collectionQueries as readonly any[],
@@ -99,6 +100,11 @@ const ManageNFTPage: React.FC = () => {
       refetchOnReconnect: true,
     },
   });
+
+  const hasSuccessfulCollectionRead = useMemo(() => {
+    if (!collectionResults || collectionResults.length === 0) return false;
+    return collectionResults.some((entry) => entry.status === 'success');
+  }, [collectionResults]);
 
   const { data: contractBalance, refetch: refetchBalance } = useBalance({
     address: collectionAddress,
@@ -110,21 +116,35 @@ const ManageNFTPage: React.FC = () => {
   });
 
   const collection = useMemo(() => {
-    if (!collectionAddress || !collectionResults || collectionResults.length < 6) return null;
+    if (
+      !collectionAddress ||
+      !collectionResults ||
+      collectionResults.length < 10 ||
+      !hasSuccessfulCollectionRead
+    ) {
+      return null;
+    }
+
+    const readAt = <T,>(index: number, fallback: T): T => {
+      const entry = collectionResults[index];
+      if (!entry || entry.status !== 'success' || entry.result === undefined) return fallback;
+      return entry.result as T;
+    };
+
     return {
       address: collectionAddress,
-      name: (collectionResults[0]?.result as string | undefined) ?? 'NFT Collection',
-      symbol: (collectionResults[1]?.result as string | undefined) ?? 'NFT',
-      owner: collectionResults[2]?.result as Address | undefined,
-      maxSupply: (collectionResults[3]?.result as bigint | undefined) ?? 0n,
-      totalMinted: (collectionResults[4]?.result as bigint | undefined) ?? 0n,
-      mintPrice: (collectionResults[5]?.result as bigint | undefined) ?? 0n,
-      walletLimitRaw: collectionResults[6]?.result as bigint | number | undefined,
-      saleStart: (collectionResults[7]?.result as bigint | undefined) ?? 0n,
-      saleEnd: (collectionResults[8]?.result as bigint | undefined) ?? 0n,
-      payoutWallet: collectionResults[9]?.result as Address | undefined,
+      name: readAt<string>(0, 'NFT Collection'),
+      symbol: readAt<string>(1, 'NFT'),
+      owner: readAt<Address | undefined>(2, undefined),
+      maxSupply: readAt<bigint>(3, 0n),
+      totalMinted: readAt<bigint>(4, 0n),
+      mintPrice: readAt<bigint>(5, 0n),
+      walletLimitRaw: readAt<bigint | number | undefined>(6, undefined),
+      saleStart: readAt<bigint>(7, 0n),
+      saleEnd: readAt<bigint>(8, 0n),
+      payoutWallet: readAt<Address | undefined>(9, undefined),
     };
-  }, [collectionAddress, collectionResults]);
+  }, [collectionAddress, collectionResults, hasSuccessfulCollectionRead]);
 
   const isOwner = useMemo(() => {
     if (!connectedAddress || !collection?.owner) return false;
@@ -269,8 +289,21 @@ const ManageNFTPage: React.FC = () => {
         <motion.div variants={itemVariants} className="glass-card rounded-3xl p-8 text-center space-y-4">
           <h1 className="font-display text-display-md text-ink">Failed to Load Collection</h1>
           <p className="text-body text-ink-muted">
-            Could not fetch data for this collection. Check the address and your network connection.
+            Could not fetch data for this collection. Ensure the address is correct and your wallet is on RISE Testnet.
           </p>
+          {collectionReadError && (
+            <p className="text-body-sm text-status-error">
+              {getFriendlyTxErrorMessage(collectionReadError, 'Read collection')}
+            </p>
+          )}
+          <a
+            href={collectionAddress ? `${explorerUrl}/address/${collectionAddress}` : explorerUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary inline-flex items-center gap-2"
+          >
+            Check on Explorer <ExternalLink className="w-4 h-4" />
+          </a>
           <Link to="/dashboard" className="btn-primary inline-flex">Back to Dashboard</Link>
         </motion.div>
       </motion.div>

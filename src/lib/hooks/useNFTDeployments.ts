@@ -1,11 +1,17 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useReadContract } from 'wagmi';
 import { type Address } from 'viem';
 import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
+import { contractUriToHttp, ipfsUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const AUTO_REFRESH_INTERVAL = 10000;
+
+type NFTContractMetadata = {
+  image?: string;
+  description?: string;
+};
 
 export type NFTDeploymentStatus = 'live' | 'upcoming' | 'ended';
 
@@ -26,6 +32,8 @@ export interface NFTDeploymentWithMetadata {
   saleStart: bigint;
   saleEnd: bigint;
   status: NFTDeploymentStatus;
+  metadataImage?: string;
+  metadataDescription?: string;
 }
 
 type UseNFTDeploymentsOptions = {
@@ -69,6 +77,26 @@ function getNFTStatus(
   return 'live';
 }
 
+function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
+  const normalized = imageUri.trim();
+  if (!normalized) return '';
+
+  if (
+    normalized.startsWith('ipfs://') ||
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://')
+  ) {
+    return ipfsUriToHttp(normalized);
+  }
+
+  const metadataHttpUri = `${contractUriToHttp(metadataUri).replace(/\/+$/, '')}/`;
+  try {
+    return new URL(normalized, metadataHttpUri).toString();
+  } catch {
+    return ipfsUriToHttp(normalized);
+  }
+}
+
 function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
   return {
     address: info.nft,
@@ -78,7 +106,7 @@ function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
     is721A: info.is721A,
     name: info.name || 'NFT Collection',
     symbol: info.symbol || 'NFT',
-    contractURI: info.contractURI || '',
+    contractURI: normalizeContractURI(info.contractURI || ''),
     maxSupply: info.maxSupply,
     totalMinted: info.totalMinted,
     remaining: info.remaining,
@@ -149,6 +177,8 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
 export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   const { creator, enabled = true } = options;
   const { nftFactoryLens } = useChainContracts();
+  const [metadataByAddress, setMetadataByAddress] = useState<Record<string, NFTContractMetadata | null>>({});
+  const [isMetadataLoading, setIsMetadataLoading] = useState(false);
 
   const hasLens = Boolean(nftFactoryLens && nftFactoryLens !== ZERO_ADDRESS);
   const canRead = Boolean(enabled && hasLens);
@@ -181,7 +211,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     },
   });
 
-  const deployments = useMemo((): NFTDeploymentWithMetadata[] => {
+  const rawDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
     const raw = (creator ? creatorData : allData) as RawCollectionInfo[] | undefined;
     if (!raw || raw.length === 0) return [];
     // Newest first — the factory appends, so reverse gives newest-first
@@ -192,11 +222,85 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       .map(toDeployment);
   }, [creator, creatorData, allData]);
 
+  useEffect(() => {
+    const pending = rawDeployments.filter((deployment) => {
+      const key = deployment.address.toLowerCase();
+      return deployment.contractURI.trim().length > 0 && metadataByAddress[key] === undefined;
+    });
+
+    if (pending.length === 0) {
+      setIsMetadataLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsMetadataLoading(true);
+
+    (async () => {
+      const results = await Promise.all(
+        pending.map(async (deployment) => {
+          const key = deployment.address.toLowerCase();
+          try {
+            const metadataUri = normalizeContractURI(deployment.contractURI);
+            if (!metadataUri) return [key, null] as const;
+
+            const response = await fetch(contractUriToHttp(metadataUri));
+            if (!response.ok) throw new Error(`Metadata fetch failed: ${response.status}`);
+
+            const json = (await response.json()) as Record<string, unknown>;
+            const image =
+              typeof json.image === 'string' && json.image.trim().length > 0
+                ? resolveMetadataImageUri(json.image, metadataUri)
+                : undefined;
+            const description =
+              typeof json.description === 'string' && json.description.trim().length > 0
+                ? json.description.trim()
+                : undefined;
+
+            return [key, { image, description } as NFTContractMetadata | null] as const;
+          } catch {
+            return [key, null] as const;
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      setMetadataByAddress((previous) => {
+        const next = { ...previous };
+        for (const [key, value] of results) {
+          next[key] = value;
+        }
+        return next;
+      });
+      setIsMetadataLoading(false);
+    })().catch(() => {
+      if (!cancelled) {
+        setIsMetadataLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawDeployments, metadataByAddress]);
+
+  const deployments = useMemo((): NFTDeploymentWithMetadata[] => {
+    return rawDeployments.map((deployment) => {
+      const metadata = metadataByAddress[deployment.address.toLowerCase()];
+      return {
+        ...deployment,
+        metadataImage: metadata?.image,
+        metadataDescription: metadata?.description,
+      };
+    });
+  }, [rawDeployments, metadataByAddress]);
+
   return {
     deployments,
     totalDeployments: deployments.length,
     isLoading: creator ? isCreatorLoading : isAllLoading,
     isLogsLoading: creator ? isCreatorLoading : isAllLoading,
-    isMetadataLoading: false,
+    isMetadataLoading,
   };
 }

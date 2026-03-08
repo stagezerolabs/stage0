@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { NFTCollectionContract, NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
+import { contractUriToHttp, ipfsUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -83,6 +84,26 @@ function computeStatus(
   return 'live';
 }
 
+function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
+  const normalized = imageUri.trim();
+  if (!normalized) return '';
+
+  if (
+    normalized.startsWith('ipfs://') ||
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://')
+  ) {
+    return ipfsUriToHttp(normalized);
+  }
+
+  const metadataHttpUri = `${contractUriToHttp(metadataUri).replace(/\/+$/, '')}/`;
+  try {
+    return new URL(normalized, metadataHttpUri).toString();
+  } catch {
+    return ipfsUriToHttp(normalized);
+  }
+}
+
 const NFTDetailPage: React.FC = () => {
   const { address: collectionParam } = useParams<{ address: string }>();
   const { address: userAddress, isConnected } = useAccount();
@@ -95,6 +116,7 @@ const NFTDetailPage: React.FC = () => {
     collectionAddress ? NFT_COLLECTION_IMAGES[collectionAddress.toLowerCase()] : undefined;
 
   const [mintQty, setMintQty] = useState(1);
+  const [contractMetadata, setContractMetadata] = useState<{ image?: string; description?: string } | null>(null);
 
   const queries = useMemo(() => {
     if (!collectionAddress) return [];
@@ -107,6 +129,7 @@ const NFTDetailPage: React.FC = () => {
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'walletLimit' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleStart' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleEnd' },
+      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'contractURI' },
     ] as const;
   }, [collectionAddress]);
 
@@ -150,10 +173,64 @@ const NFTDetailPage: React.FC = () => {
     const walletLimit = Number((collectionData[5]?.result as bigint | number | undefined) ?? 0);
     const saleStart = (collectionData[6]?.result as bigint | undefined) ?? 0n;
     const saleEnd = (collectionData[7]?.result as bigint | undefined) ?? 0n;
+    const contractURI = (collectionData[8]?.result as string | undefined) ?? '';
     const status = computeStatus(saleStart, saleEnd, totalMinted, maxSupply);
     const remaining = maxSupply > 0n ? maxSupply - totalMinted : 0n;
-    return { name, symbol, maxSupply, totalMinted, mintPrice, walletLimit, saleStart, saleEnd, status, remaining };
+    return {
+      name,
+      symbol,
+      maxSupply,
+      totalMinted,
+      mintPrice,
+      walletLimit,
+      saleStart,
+      saleEnd,
+      contractURI,
+      status,
+      remaining,
+    };
   }, [collectionAddress, collectionData]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const rawContractURI = collection?.contractURI?.trim() ?? '';
+    const metadataUri = normalizeContractURI(rawContractURI);
+
+    if (!metadataUri) {
+      setContractMetadata(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const response = await fetch(contractUriToHttp(metadataUri));
+        if (!response.ok) throw new Error(`Failed metadata fetch: ${response.status}`);
+
+        const metadata = (await response.json()) as Record<string, unknown>;
+        const image =
+          typeof metadata.image === 'string' && metadata.image.trim().length > 0
+            ? resolveMetadataImageUri(metadata.image, metadataUri)
+            : undefined;
+        const description =
+          typeof metadata.description === 'string' && metadata.description.trim().length > 0
+            ? metadata.description.trim()
+            : undefined;
+
+        if (!cancelled) {
+          setContractMetadata({ image, description });
+        }
+      } catch {
+        if (!cancelled) {
+          setContractMetadata(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [collection?.contractURI]);
 
   const userMinted = useMemo(() => {
     if (!userMintedData || userMintedData.length === 0) return 0n;
@@ -219,6 +296,8 @@ const NFTDetailPage: React.FC = () => {
     return Math.min(Number((collection.totalMinted * 100n) / collection.maxSupply), 100);
   }, [collection]);
 
+  const resolvedCollectionImage = contractMetadata?.image || collectionImage;
+
   if (!isValidAddress) {
     return (
       <div className="flex flex-col items-center justify-center py-32 space-y-4">
@@ -268,6 +347,9 @@ const NFTDetailPage: React.FC = () => {
               </span>
             </div>
             <p className="text-body text-ink-muted">{collection.symbol}</p>
+            {contractMetadata?.description && (
+              <p className="text-body-sm text-ink-faint max-w-2xl">{contractMetadata.description}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {getStatusBadge(collection.status)}
@@ -280,9 +362,9 @@ const NFTDetailPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Collection image */}
           <motion.div variants={itemVariants} className="glass-card rounded-3xl overflow-hidden">
-            {collectionImage ? (
+            {resolvedCollectionImage ? (
               <img
-                src={collectionImage}
+                src={resolvedCollectionImage}
                 alt={collection.name}
                 className="w-full object-cover max-h-80"
               />

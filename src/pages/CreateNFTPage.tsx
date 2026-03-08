@@ -7,6 +7,7 @@ import { NFTFactory, getContractAddresses, getExplorerUrl } from '@/config';
 import { AlertTriangle, CheckCircle2, ExternalLink, Image, Layers, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
+import { normalizeContractURI } from '@/lib/utils/ipfs';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -136,6 +137,11 @@ const CreateNFTPage: React.FC = () => {
 
     const functionName: 'createETHNFT' | 'create721AETHnFT' =
       mode === 'erc721a' ? 'create721AETHnFT' : 'createETHNFT';
+    const normalizedContractURI = contractURI.trim() ? normalizeContractURI(contractURI) : '';
+    if (contractURI.trim() && !normalizedContractURI) {
+      toast.error('Enter a valid contract URI (example: ipfs://CID).');
+      return;
+    }
 
     try {
       writeContract({
@@ -147,7 +153,7 @@ const CreateNFTPage: React.FC = () => {
             name: name.trim(),
             symbol: symbol.trim(),
             baseURI: baseURI.trim(),
-            contractURI: contractURI.trim(),
+            contractURI: normalizedContractURI,
             maxSupply: BigInt(maxSupply),
             payoutWallet: payoutWallet ? (payoutWallet as Address) : ZERO_ADDRESS,
             mintConfig: {
@@ -332,12 +338,12 @@ const CreateNFTPage: React.FC = () => {
             />
           </div>
           <div className="space-y-1.5 md:col-span-2">
-            <label className="text-body-sm text-ink-muted font-medium">Contract URI (optional)</label>
+            <label className="text-body-sm text-ink-muted font-medium">Contract URI (optional, ipfs://CID)</label>
             <input
               type="text"
               value={contractURI}
               onChange={(e) => setContractURI(e.target.value)}
-              placeholder="ipfs://.../contract.json"
+              placeholder="ipfs://CID"
               className="input-field w-full"
             />
           </div>

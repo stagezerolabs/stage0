@@ -269,6 +269,24 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
     return parsed;
   }, [presaleDataResults, addressesToFetch, whitelistMap]);
 
+  // Cache base presale data as soon as contract reads return so cards can render quickly.
+  useEffect(() => {
+    if (parsedPresales.length === 0 || isLoadingPresaleData) return;
+
+    for (const presale of parsedPresales) {
+      const cached = getPresale(presale.address);
+      setPresale(presale.address, {
+        ...(cached ?? {}),
+        ...presale,
+        paymentTokenSymbol: presale.isPaymentETH
+          ? getNativeTokenLabel(chainId)
+          : cached?.paymentTokenSymbol,
+        paymentTokenName: presale.isPaymentETH ? 'Native' : cached?.paymentTokenName,
+        paymentTokenDecimals: presale.isPaymentETH ? 18 : cached?.paymentTokenDecimals,
+      });
+    }
+  }, [parsedPresales, isLoadingPresaleData, getPresale, setPresale, chainId]);
+
   // Get unique token addresses for fetching token info
   const uniqueTokenAddresses = useMemo(() => {
     const tokens = new Set<Address>();

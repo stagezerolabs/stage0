@@ -34,7 +34,7 @@ export function usePresaleApproval({
     useWriteContract();
 
   const needsApproval = useMemo(() => {
-    if (isPaymentETH || !allowance) return false;
+    if (isPaymentETH || amount === 0n || allowance === undefined) return false;
     return allowance < amount;
   }, [allowance, amount, isPaymentETH]);
 

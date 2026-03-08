@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, Link } from 'react-router-dom';
 import { useAccount, useChainId } from 'wagmi';
@@ -107,6 +107,8 @@ const PresaleDetailPage: React.FC = () => {
   );
 
   const [contributeAmount, setContributeAmount] = useState('');
+  const [amountNeedsAttention, setAmountNeedsAttention] = useState(false);
+  const contributeInputRef = useRef<HTMLInputElement | null>(null);
 
   const paymentDecimals = presale?.paymentTokenDecimals ?? 18;
   const parsedAmount = useMemo(() => {
@@ -185,7 +187,14 @@ const PresaleDetailPage: React.FC = () => {
   }, [presale?.hardCap, presale?.totalRaised]);
 
   const handleContribute = () => {
-    if (!presaleAddress || parsedAmount === 0n) return;
+    if (!presaleAddress) return;
+    if (parsedAmount === 0n) {
+      setAmountNeedsAttention(true);
+      contributeInputRef.current?.focus();
+      return;
+    }
+
+    setAmountNeedsAttention(false);
     contribute({
       presaleAddress,
       amount: parsedAmount,
@@ -483,14 +492,21 @@ const PresaleDetailPage: React.FC = () => {
                     Amount ({presale.paymentTokenSymbol || 'Token'})
                   </label>
                   <input
+                    ref={contributeInputRef}
                     type="text"
                     value={contributeAmount}
                     onChange={(e) => {
                       resetContribute();
+                      setAmountNeedsAttention(false);
                       setContributeAmount(e.target.value);
                     }}
+                    onFocus={() => setAmountNeedsAttention(false)}
                     placeholder="0.0"
-                    className="input-field w-full"
+                    className={`input-field w-full transition-all duration-200 ${
+                      amountNeedsAttention
+                        ? 'border-2 border-accent ring-2 ring-accent/45 shadow-[0_0_0_3px_rgba(255,138,0,0.16)]'
+                        : 'border border-accent/55 focus:border-accent focus:ring-2 focus:ring-accent/35'
+                    }`}
                   />
                 </div>
                 <div className="text-body-sm text-ink-muted space-y-1">
@@ -531,8 +547,7 @@ const PresaleDetailPage: React.FC = () => {
                     onClick={handleContribute}
                     disabled={
                       isContributing ||
-                      isContributeConfirming ||
-                      parsedAmount === 0n
+                      isContributeConfirming
                     }
                     className="btn-primary w-full"
                   >

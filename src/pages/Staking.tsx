@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Wallet, TrendingUp, Zap, Loader2 } from 'lucide-react';
 import { useAccount, useChainId, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
@@ -26,10 +26,13 @@ const itemVariants = {
 };
 
 const RISE_ICON_URL = 'https://assets.coingecko.com/coins/images/68442/standard/rise.png?1755750505';
+type TxAction = 'idle' | 'approveForStake' | 'stake' | 'unstake' | 'claim';
 
 const Staking: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'stake' | 'unstake'>('stake');
   const [amount, setAmount] = useState('');
+  const [txAction, setTxAction] = useState<TxAction>('idle');
+  const [stakeAmountToSubmit, setStakeAmountToSubmit] = useState<bigint | null>(null);
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const stakingAddress = getStakingContractAddress(chainId);
@@ -64,64 +67,139 @@ const Staking: React.FC = () => {
   const stakedBalance = balanceData?.[stakingToken ? 3 : 0]?.result as bigint ?? 0n;
   const pendingReward = balanceData?.[stakingToken ? 4 : 1]?.result as bigint ?? 0n;
 
-  const needsApproval = amount && allowance < parseUnits(amount || '0', 18);
+  const parsedAmount = useMemo(() => {
+    if (!amount) return null;
+    try {
+      const value = parseUnits(amount, 18);
+      return value > 0n ? value : null;
+    } catch {
+      return null;
+    }
+  }, [amount]);
+
+  const needsApproval = Boolean(
+    activeTab === 'stake' &&
+    parsedAmount &&
+    allowance < parsedAmount
+  );
+  const hasValidAmount = Boolean(parsedAmount);
 
   // Write contract
   const { data: hash, writeContract, isPending, error, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   useEffect(() => {
-    if (isSuccess) {
-      toast.success('Transaction confirmed!');
-      setAmount('');
-      reset();
-      refetchBalances();
+    if (!isSuccess) return;
+
+    if (txAction === 'approveForStake') {
+      if (!stakeAmountToSubmit) {
+        setTxAction('idle');
+        reset();
+        return;
+      }
+
+      setTxAction('stake');
+      writeContract({
+        address: stakingAddress,
+        abi: StakingContract,
+        functionName: 'stake',
+        args: [stakeAmountToSubmit],
+      });
+      return;
     }
-  }, [isSuccess, reset, refetchBalances]);
+
+    if (txAction === 'stake') {
+      toast.success('Stake transaction confirmed!');
+      setAmount('');
+    } else if (txAction === 'unstake') {
+      toast.success('Unstake transaction confirmed!');
+      setAmount('');
+    } else if (txAction === 'claim') {
+      toast.success('Rewards claimed successfully!');
+    } else {
+      toast.success('Transaction confirmed!');
+    }
+
+    setStakeAmountToSubmit(null);
+    setTxAction('idle');
+    reset();
+    refetchBalances();
+  }, [isSuccess, txAction, stakeAmountToSubmit, writeContract, stakingAddress, reset, refetchBalances]);
 
   useEffect(() => {
     if (error) {
       toast.error(getFriendlyTxErrorMessage(error));
+      setStakeAmountToSubmit(null);
+      setTxAction('idle');
       reset();
     }
   }, [error, reset]);
 
-  const handleApprove = () => {
-    if (!stakingToken) return;
-    writeContract({
-      address: stakingToken,
-      abi: erc20Abi,
-      functionName: 'approve',
-      args: [stakingAddress, maxUint256],
-    });
-  };
+  const handleStakeFlow = () => {
+    if (!stakingToken || !parsedAmount) {
+      toast.error('Enter a valid amount to stake.');
+      return;
+    }
 
-  const handleStake = () => {
-    if (!amount) return;
+    setStakeAmountToSubmit(parsedAmount);
+
+    if (allowance < parsedAmount) {
+      setTxAction('approveForStake');
+      writeContract({
+        address: stakingToken,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [stakingAddress, maxUint256],
+      });
+      return;
+    }
+
+    setTxAction('stake');
     writeContract({
       address: stakingAddress,
       abi: StakingContract,
       functionName: 'stake',
-      args: [parseUnits(amount, 18)],
+      args: [parsedAmount],
     });
   };
 
   const handleUnstake = () => {
-    if (!amount) return;
+    if (!parsedAmount) {
+      toast.error('Enter a valid amount to unstake.');
+      return;
+    }
+    setTxAction('unstake');
     writeContract({
       address: stakingAddress,
       abi: StakingContract,
       functionName: 'withdraw',
-      args: [parseUnits(amount, 18)],
+      args: [parsedAmount],
     });
   };
 
   const handleClaim = () => {
+    setTxAction('claim');
     writeContract({
       address: stakingAddress,
       abi: StakingContract,
       functionName: 'getReward',
     });
+  };
+
+  const getStakeButtonLabel = () => {
+    if (txAction === 'approveForStake') {
+      if (isPending) return `Confirm ${tokenSymbol} approval...`;
+      if (isConfirming) return 'Waiting for approval confirmation...';
+      return `Approve ${tokenSymbol}`;
+    }
+
+    if (txAction === 'stake') {
+      if (isPending) return 'Confirm stake in wallet...';
+      if (isConfirming) return 'Waiting for stake confirmation...';
+      return 'Stake';
+    }
+
+    return needsApproval ? `Approve + Stake` : 'Stake';
   };
 
   const isLoading = isPending || isConfirming;
@@ -254,19 +332,23 @@ const Staking: React.FC = () => {
                   </div>
                 </div>
 
-                {activeTab === 'stake' && needsApproval ? (
-                  <button onClick={handleApprove} disabled={isLoading} className="btn-secondary w-full">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Approve {tokenSymbol}
-                  </button>
-                ) : (
+                {activeTab === 'stake' ? (
                   <button
-                    onClick={activeTab === 'stake' ? handleStake : handleUnstake}
-                    disabled={isLoading || !amount}
+                    onClick={handleStakeFlow}
+                    disabled={isLoading || !hasValidAmount}
                     className="btn-primary w-full"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    {activeTab === 'stake' ? 'Stake' : 'Unstake'}
+                    {getStakeButtonLabel()}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleUnstake}
+                    disabled={isLoading || !hasValidAmount}
+                    className="btn-primary w-full"
+                  >
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Unstake
                   </button>
                 )}
               </div>

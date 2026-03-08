@@ -46,6 +46,7 @@ const CreateNFTPage: React.FC = () => {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [baseURI, setBaseURI] = useState('');
+  const [contractURI, setContractURI] = useState('');
   const [maxSupply, setMaxSupply] = useState('');
   const [mintPrice, setMintPrice] = useState('');
   const [walletLimit, setWalletLimit] = useState('');
@@ -146,6 +147,7 @@ const CreateNFTPage: React.FC = () => {
             name: name.trim(),
             symbol: symbol.trim(),
             baseURI: baseURI.trim(),
+            contractURI: contractURI.trim(),
             maxSupply: BigInt(maxSupply),
             payoutWallet: payoutWallet ? (payoutWallet as Address) : ZERO_ADDRESS,
             mintConfig: {
@@ -326,6 +328,16 @@ const CreateNFTPage: React.FC = () => {
               value={baseURI}
               onChange={(e) => setBaseURI(e.target.value)}
               placeholder="ipfs://.../"
+              className="input-field w-full"
+            />
+          </div>
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="text-body-sm text-ink-muted font-medium">Contract URI (optional)</label>
+            <input
+              type="text"
+              value={contractURI}
+              onChange={(e) => setContractURI(e.target.value)}
+              placeholder="ipfs://.../contract.json"
               className="input-field w-full"
             />
           </div>

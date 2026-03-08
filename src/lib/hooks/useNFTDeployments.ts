@@ -17,6 +17,7 @@ export interface NFTDeploymentWithMetadata {
   is721A: boolean;
   name: string;
   symbol: string;
+  contractURI: string;
   maxSupply: bigint;
   totalMinted: bigint;
   remaining: bigint;
@@ -39,6 +40,7 @@ interface CollectionInfo {
   is721A: boolean;
   name: string;
   symbol: string;
+  contractURI: string;
   maxSupply: bigint;
   totalMinted: bigint;
   remaining: bigint;
@@ -76,6 +78,7 @@ function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
     is721A: info.is721A,
     name: info.name || 'NFT Collection',
     symbol: info.symbol || 'NFT',
+    contractURI: info.contractURI || '',
     maxSupply: info.maxSupply,
     totalMinted: info.totalMinted,
     remaining: info.remaining,
@@ -93,15 +96,16 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
   const is721A = (raw.is721A ?? raw[2]) as boolean | undefined;
   const name = (raw.name ?? raw[3]) as string | undefined;
   const symbol = (raw.symbol ?? raw[4]) as string | undefined;
-  const maxSupply = (raw.maxSupply ?? raw[5]) as bigint | undefined;
-  const totalMinted = (raw.totalMinted ?? raw[6]) as bigint | undefined;
-  const remaining = (raw.remaining ?? raw[7]) as bigint | undefined;
-  const mintPrice = (raw.mintPrice ?? raw[8]) as bigint | undefined;
-  const walletLimitRaw = (raw.walletLimit ?? raw[9]) as bigint | number | undefined;
-  const saleStart = (raw.saleStart ?? raw[10]) as bigint | undefined;
-  const saleEnd = (raw.saleEnd ?? raw[11]) as bigint | undefined;
-  const owner = (raw.owner ?? raw[12]) as Address | undefined;
-  const payoutWallet = (raw.payoutWallet ?? raw[13]) as Address | undefined;
+  const contractURI = (raw.contractURI ?? raw[5]) as string | undefined;
+  const maxSupply = (raw.maxSupply ?? raw[6]) as bigint | undefined;
+  const totalMinted = (raw.totalMinted ?? raw[7]) as bigint | undefined;
+  const remaining = (raw.remaining ?? raw[8]) as bigint | undefined;
+  const mintPrice = (raw.mintPrice ?? raw[9]) as bigint | undefined;
+  const walletLimitRaw = (raw.walletLimit ?? raw[10]) as bigint | number | undefined;
+  const saleStart = (raw.saleStart ?? raw[11]) as bigint | undefined;
+  const saleEnd = (raw.saleEnd ?? raw[12]) as bigint | undefined;
+  const owner = (raw.owner ?? raw[13]) as Address | undefined;
+  const payoutWallet = (raw.payoutWallet ?? raw[14]) as Address | undefined;
 
   if (
     !nft ||
@@ -109,6 +113,7 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     typeof is721A !== 'boolean' ||
     typeof name !== 'string' ||
     typeof symbol !== 'string' ||
+    typeof contractURI !== 'string' ||
     maxSupply === undefined ||
     totalMinted === undefined ||
     remaining === undefined ||
@@ -128,6 +133,7 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     is721A,
     name,
     symbol,
+    contractURI,
     maxSupply,
     totalMinted,
     remaining,

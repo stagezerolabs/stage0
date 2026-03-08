@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_SEPOLIA_RPC_URL?: string;
   readonly VITE_OWNER_ADDRESS?: string;
+  readonly VITE_GOLDSKY_RISE_SUBGRAPH_URL?: string;
 }
 
 interface ImportMeta {

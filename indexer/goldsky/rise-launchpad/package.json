@@ -1,0 +1,15 @@
+{
+  "name": "risepad-rise-launchpad-indexer",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "goldsky subgraph deploy risepad-rise-launchpad/1.0.1 --path . --tag latest",
+    "logs": "goldsky subgraph log risepad-rise-launchpad/1.0.1"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.98.1",
+    "@graphprotocol/graph-ts": "^0.38.2"
+  }
+}

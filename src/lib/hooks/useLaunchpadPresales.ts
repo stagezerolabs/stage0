@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useChainId, usePublicClient, useReadContract, useReadContracts } from 'wagmi';
 import { erc20Abi, parseAbiItem, type Abi, type Address, type PublicClient } from 'viem';
 import { PresaleFactoryContract, LaunchpadPresaleContract, getNativeTokenLabel } from '@/config';
+import { fetchIndexedPresales, isGoldskyIndexerConfigured } from '@/lib/indexer/goldsky';
 import {
   useLaunchpadPresaleStore,
   type PresaleData,
@@ -79,15 +81,53 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
   const publicClient = usePublicClient();
   const { presaleFactory } = useChainContracts();
   const [whitelistMap, setWhitelistMap] = useState<WhitelistMap>({});
+  const isIndexerConfigured = isGoldskyIndexerConfigured();
+
+  const {
+    data: indexedPresaleData = [],
+    isLoading: isIndexerLoading,
+    isError: isIndexerError,
+    refetch: refetchIndexer,
+  } = useQuery({
+    queryKey: ['goldsky', 'presales'],
+    queryFn: fetchIndexedPresales,
+    enabled: isIndexerConfigured,
+    staleTime: AUTO_REFRESH_INTERVAL,
+    refetchInterval: isIndexerConfigured ? AUTO_REFRESH_INTERVAL : false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+
+  const useIndexer =
+    isIndexerConfigured &&
+    !isIndexerError &&
+    (isIndexerLoading || indexedPresaleData.length > 0);
 
   useEffect(() => {
     setWhitelistMap({});
   }, [presaleFactory]);
 
+  const indexedPresales = useMemo((): PresaleWithStatus[] => {
+    if (!useIndexer) return [];
+
+    return indexedPresaleData.map((presale) => {
+      const status = getPresaleStatus(presale);
+      const progress = presale.hardCap && presale.hardCap > 0n
+        ? Number((presale.totalRaised * 100n) / presale.hardCap)
+        : 0;
+
+      return {
+        ...presale,
+        status,
+        progress: Math.min(progress, 100),
+      };
+    });
+  }, [indexedPresaleData, getPresaleStatus, useIndexer]);
+
   const cachedAddresses = getPresaleAddresses();
   const shouldFetchAddresses = Boolean(
     presaleFactory && presaleFactory !== "0x0000000000000000000000000000000000000000"
-  );
+  ) && !useIndexer;
 
   // Fetch total number of presales
   const { data: totalPresales, isLoading: isLoadingTotal, refetch: refetchTotal } = useReadContract({
@@ -104,6 +144,7 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
 
   // Build queries to fetch all presale addresses
   const addressQueries = useMemo(() => {
+    if (!shouldFetchAddresses) return [];
     if (!totalPresales || totalPresales === 0n) return [];
     const count = Number(totalPresales);
     return Array.from({ length: count }, (_, i) => ({
@@ -112,7 +153,7 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
       functionName: 'allPresales',
       args: [BigInt(i)],
     } as const));
-  }, [presaleFactory, totalPresales]);
+  }, [presaleFactory, shouldFetchAddresses, totalPresales]);
 
   const { data: addressResults, isLoading: isLoadingAddresses, refetch: refetchAddresses } = useReadContracts({
     contracts: addressQueries,
@@ -133,11 +174,12 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
   }, [addressResults, cachedAddresses]);
 
   const unknownWhitelistCount = useMemo(() => {
+    if (useIndexer) return 0;
     if (!presaleAddresses || presaleAddresses.length === 0) return 0;
     return presaleAddresses.reduce((count, addr) => {
       return count + (whitelistMap[addr.toLowerCase()] === undefined ? 1 : 0);
     }, 0);
-  }, [presaleAddresses, whitelistMap]);
+  }, [presaleAddresses, useIndexer, whitelistMap]);
 
   useEffect(() => {
     if (!publicClient) return;
@@ -185,7 +227,10 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
   }, [shouldFetchAddresses, isLoadingTotal, isLoadingAddresses]);
 
   // Filter addresses that need fresh data
-  const addressesToFetch = useMemo(() => presaleAddresses, [presaleAddresses]);
+  const addressesToFetch = useMemo(
+    () => (useIndexer ? [] : presaleAddresses),
+    [presaleAddresses, useIndexer]
+  );
 
   // Build queries for presale data
   const presaleDataQueries = useMemo(() => {
@@ -379,14 +424,32 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
     return allPresales.filter((p) => p.status === filter);
   }, [allPresales, filter]);
 
+  const indexedFilteredPresales = useMemo(() => {
+    if (filter === 'all') return indexedPresales;
+    return indexedPresales.filter((p) => p.status === filter);
+  }, [filter, indexedPresales]);
+
   const refetch = useCallback(async () => {
+    if (useIndexer) {
+      await refetchIndexer();
+      return;
+    }
     setPresaleAddressesLoading(true);
     await refetchTotal();
     await refetchAddresses();
     await refetchPresaleData();
-  }, [refetchAddresses, refetchPresaleData, refetchTotal, setPresaleAddressesLoading]);
+  }, [
+    refetchAddresses,
+    refetchIndexer,
+    refetchPresaleData,
+    refetchTotal,
+    setPresaleAddressesLoading,
+    useIndexer,
+  ]);
 
-  const isLoading = isLoadingTotal || isLoadingAddresses || isLoadingPresaleData || isLoadingTokenInfo;
+  const isLoading = useIndexer
+    ? isIndexerLoading
+    : isLoadingTotal || isLoadingAddresses || isLoadingPresaleData || isLoadingTokenInfo;
 
   useEffect(() => {
     if (forceRefetch) {
@@ -395,9 +458,9 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
   }, [forceRefetch, refetch]);
 
   return {
-    presales: filteredPresales,
-    allPresales,
-    presaleAddresses,
+    presales: useIndexer ? indexedFilteredPresales : filteredPresales,
+    allPresales: useIndexer ? indexedPresales : allPresales,
+    presaleAddresses: useIndexer ? indexedPresales.map((presale) => presale.address) : presaleAddresses,
     isLoading,
     refetch,
   };

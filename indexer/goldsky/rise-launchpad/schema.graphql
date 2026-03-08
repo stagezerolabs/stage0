@@ -1,0 +1,56 @@
+type Presale @entity(immutable: false) {
+  id: ID!
+  address: Bytes!
+  creator: Bytes!
+  saleToken: Bytes!
+  paymentToken: Bytes!
+  isPaymentETH: Boolean!
+  requiresWhitelist: Boolean!
+  startTime: BigInt!
+  endTime: BigInt!
+  rate: BigInt!
+  softCap: BigInt!
+  hardCap: BigInt!
+  minContribution: BigInt!
+  maxContribution: BigInt!
+  totalRaised: BigInt!
+  committedTokens: BigInt!
+  totalTokensDeposited: BigInt!
+  successfulFinalization: Boolean!
+  claimEnabled: Boolean!
+  refundsEnabled: Boolean!
+  owner: Bytes!
+  saleTokenSymbol: String
+  saleTokenName: String
+  saleTokenDecimals: Int
+  paymentTokenSymbol: String
+  paymentTokenName: String
+  paymentTokenDecimals: Int
+  createdAtBlock: BigInt!
+  createdAtTimestamp: BigInt!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+}
+
+type NftCollection @entity(immutable: false) {
+  id: ID!
+  address: Bytes!
+  creator: Bytes!
+  owner: Bytes!
+  payoutWallet: Bytes!
+  is721A: Boolean!
+  name: String!
+  symbol: String!
+  contractURI: String!
+  maxSupply: BigInt!
+  totalMinted: BigInt!
+  remaining: BigInt!
+  mintPrice: BigInt!
+  walletLimit: Int!
+  saleStart: BigInt!
+  saleEnd: BigInt!
+  createdAtBlock: BigInt!
+  createdAtTimestamp: BigInt!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+}

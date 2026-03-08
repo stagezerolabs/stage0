@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useReadContract } from 'wagmi';
 import { type Address } from 'viem';
 import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { contractUriToHttp, ipfsUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
+import {
+  fetchIndexedNftCollections,
+  isGoldskyIndexerConfigured,
+  type IndexedNftCollection,
+} from '@/lib/indexer/goldsky';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const AUTO_REFRESH_INTERVAL = 10000;
@@ -182,6 +188,28 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
 
   const hasLens = Boolean(nftFactoryLens && nftFactoryLens !== ZERO_ADDRESS);
   const canRead = Boolean(enabled && hasLens);
+  const isIndexerConfigured = isGoldskyIndexerConfigured();
+
+  const {
+    data: indexedCollections = [],
+    isLoading: isIndexerLoading,
+    isError: isIndexerError,
+  } = useQuery({
+    queryKey: ['goldsky', 'nftCollections', creator?.toLowerCase() ?? 'all'],
+    queryFn: () => fetchIndexedNftCollections(creator),
+    enabled: canRead && isIndexerConfigured,
+    staleTime: AUTO_REFRESH_INTERVAL,
+    refetchInterval: canRead && isIndexerConfigured ? AUTO_REFRESH_INTERVAL : false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+
+  const useIndexer =
+    canRead &&
+    isIndexerConfigured &&
+    !isIndexerError &&
+    (isIndexerLoading || indexedCollections.length > 0);
+  const canReadFromChain = canRead && !useIndexer;
 
   // When a creator is specified use the targeted lens call
   const { data: creatorData, isLoading: isCreatorLoading } = useReadContract({
@@ -190,8 +218,8 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     functionName: 'getCollectionsByCreator',
     args: creator ? [creator] : undefined,
     query: {
-      enabled: canRead && Boolean(creator),
-      refetchInterval: canRead && Boolean(creator) ? AUTO_REFRESH_INTERVAL : false,
+      enabled: canReadFromChain && Boolean(creator),
+      refetchInterval: canReadFromChain && Boolean(creator) ? AUTO_REFRESH_INTERVAL : false,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
     },
@@ -204,14 +232,46 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     functionName: 'getAllCollections',
     args: [0n, 0n],
     query: {
-      enabled: canRead && !creator,
-      refetchInterval: canRead && !creator ? AUTO_REFRESH_INTERVAL : false,
+      enabled: canReadFromChain && !creator,
+      refetchInterval: canReadFromChain && !creator ? AUTO_REFRESH_INTERVAL : false,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
     },
   });
 
+  const indexedDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
+    if (!useIndexer) return [];
+
+    return indexedCollections.map((deployment: IndexedNftCollection) => ({
+      address: deployment.address,
+      creator: deployment.creator,
+      owner: deployment.owner,
+      payoutWallet: deployment.payoutWallet,
+      is721A: deployment.is721A,
+      name: deployment.name || 'NFT Collection',
+      symbol: deployment.symbol || 'NFT',
+      contractURI: normalizeContractURI(deployment.contractURI || ''),
+      maxSupply: deployment.maxSupply,
+      totalMinted: deployment.totalMinted,
+      remaining: deployment.remaining,
+      mintPrice: deployment.mintPrice,
+      walletLimit: Number(deployment.walletLimit),
+      saleStart: deployment.saleStart,
+      saleEnd: deployment.saleEnd,
+      status: getNFTStatus(
+        deployment.saleStart,
+        deployment.saleEnd,
+        deployment.totalMinted,
+        deployment.maxSupply
+      ),
+    }));
+  }, [indexedCollections, useIndexer]);
+
   const rawDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
+    if (useIndexer) {
+      return indexedDeployments;
+    }
+
     const raw = (creator ? creatorData : allData) as RawCollectionInfo[] | undefined;
     if (!raw || raw.length === 0) return [];
     // Newest first — the factory appends, so reverse gives newest-first
@@ -220,7 +280,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       .map(normalizeCollectionInfo)
       .filter((entry): entry is CollectionInfo => entry !== null)
       .map(toDeployment);
-  }, [creator, creatorData, allData]);
+  }, [allData, creator, creatorData, indexedDeployments, useIndexer]);
 
   useEffect(() => {
     const pending = rawDeployments.filter((deployment) => {
@@ -296,11 +356,14 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     });
   }, [rawDeployments, metadataByAddress]);
 
+  const isChainLoading = creator ? isCreatorLoading : isAllLoading;
+  const isLoading = useIndexer ? isIndexerLoading : isChainLoading;
+
   return {
     deployments,
     totalDeployments: deployments.length,
-    isLoading: creator ? isCreatorLoading : isAllLoading,
-    isLogsLoading: creator ? isCreatorLoading : isAllLoading,
+    isLoading,
+    isLogsLoading: isLoading,
     isMetadataLoading,
   };
 }

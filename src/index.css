@@ -410,28 +410,31 @@
     box-shadow: var(--shadow-float-hover);
   }
 
+  /* Total Raised - blue icon */
   .ambient-stat-card--orange {
-    border-color: rgba(255, 138, 0, 0.3);
-  }
-
-  .ambient-stat-card--orange:hover {
-    border-color: rgba(255, 138, 0, 0.6);
-    box-shadow:
-      var(--shadow-float-hover),
-      0 0 0 1px rgba(255, 138, 0, 0.3);
-  }
-
-  .ambient-stat-card--blue {
     border-color: rgba(59, 130, 246, 0.3);
   }
 
-  .ambient-stat-card--blue:hover {
+  .ambient-stat-card--orange:hover {
     border-color: rgba(59, 130, 246, 0.6);
     box-shadow:
       var(--shadow-float-hover),
       0 0 0 1px rgba(59, 130, 246, 0.3);
   }
 
+  /* Projects Launched - green icon */
+  .ambient-stat-card--blue {
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  .ambient-stat-card--blue:hover {
+    border-color: rgba(34, 197, 94, 0.6);
+    box-shadow:
+      var(--shadow-float-hover),
+      0 0 0 1px rgba(34, 197, 94, 0.3);
+  }
+
+  /* Active Participants - purple icon */
   .ambient-stat-card--purple {
     border-color: rgba(139, 124, 255, 0.3);
   }

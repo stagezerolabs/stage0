@@ -304,8 +304,8 @@ const HomePage: React.FC = () => {
 
   // Hero section parallax values
   const heroBgY = useTransform(scrollY, [0, 800], [0, 200]);
-  const heroContentY = useTransform(scrollY, [0, 500], [0, 100]);
-  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
+  const heroContentY = useTransform(scrollY, [0, 700], [0, 150]);
+  const heroOpacity = useTransform(scrollY, [0, 800], [1, 0]);
 
   // Tilt for stat cards
   const stat1 = useTiltCard(12);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import CircularText from '../animated/CircularText';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -39,8 +40,12 @@ const Footer: React.FC = () => {
           {/* Logo & Copyright */}
           <div className="flex flex-col items-center md:items-start gap-4">
             <Link to="/" className="inline-flex items-center">
-              <span className="text-lg font-bold tracking-[0.16em] text-ink leading-none text-engraved">STAGE</span>
-              <span className="font-black text-accent leading-none" style={{ fontSize: '1.575rem', marginLeft: '-0.05em' }}>ZERO</span>
+              <CircularText
+                text="STAGE*ZERO*"
+                onHover="speedUp"
+                spinDuration={20}
+                className="scale-50 -ml-12 -mr-8"
+              />
             </Link>
             <p className="text-body-sm text-ink-faint">
               {currentYear} StageZero Labs. All rights reserved.

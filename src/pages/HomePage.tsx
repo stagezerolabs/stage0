@@ -1,3 +1,4 @@
+import Dither from '@/components/animated/Dither';
 import CountUp from '@/components/ui/CountUp';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { projects } from '@/lib/projects';
@@ -24,7 +25,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits } from 'viem';
 
@@ -252,6 +253,33 @@ const RiseGlowOrbs: React.FC = () => (
 const HomePage: React.FC = () => {
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
   const reducedMotion = useReducedMotion();
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+
+  React.useEffect(() => {
+    // Initial check
+    if (document.documentElement.dataset.theme === 'light') {
+      setThemeMode('light');
+    }
+
+    // Observe changes to the html element's dataset
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'data-theme') {
+          const newTheme = document.documentElement.dataset.theme as 'dark' | 'light';
+          if (newTheme) {
+            setThemeMode(newTheme);
+          }
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const livePresales = presales.filter((p) => p.status === 'live');
   const upcomingPresales = presales.filter((p) => p.status === 'upcoming');
@@ -268,8 +296,8 @@ const HomePage: React.FC = () => {
     featuredPresales.length > 0
       ? featuredPresales
       : isPresalesLoading
-      ? []
-      : fallbackFeaturedPresales;
+        ? []
+        : fallbackFeaturedPresales;
 
   // Global Page Scroll
   const { scrollY } = useScroll();
@@ -307,13 +335,19 @@ const HomePage: React.FC = () => {
           <div className="absolute inset-0 bg-canvas/25" />
 
           <div className="absolute inset-x-3 top-3 bottom-3 md:inset-x-8 md:top-6 md:bottom-6 rounded-[2.4rem] overflow-hidden border border-border/35 shadow-float">
-            <motion.div className="absolute -inset-y-8 inset-x-0" style={{ y: heroBgY }}>
-              <img
-                src="https://res.cloudinary.com/dma1c8i6n/image/upload/v1760355735/8E0E699B-A13D-4070-88B3-95CFB47DBB1F_hexjo9.jpg"
-                alt="Hero abstract background"
-                className="w-full h-full object-cover object-center scale-[1.05]"
-                style={{ opacity: 'var(--hero-image-opacity)' }}
-              />
+            <motion.div className="absolute -inset-y-8 inset-x-0 pointer-events-auto" style={{ y: heroBgY }}>
+              <div className="relative w-full h-full scale-[1.05]" style={{ opacity: 'var(--hero-image-opacity)' }}>
+                <Dither
+                  waveColor={themeMode === 'light' ? [0.8, 0.8, 0.8] : [0.5, 0.5, 0.5]}
+                  disableAnimation={false}
+                  enableMouseInteraction
+                  mouseRadius={0.3}
+                  colorNum={4}
+                  waveAmplitude={0.3}
+                  waveFrequency={3}
+                  waveSpeed={0.05}
+                />
+              </div>
             </motion.div>
 
             <div
@@ -470,15 +504,23 @@ const HomePage: React.FC = () => {
                 <motion.div
                   key={stat.label}
                   ref={ref}
-                  className={`ambient-stat-card ${stat.cardClass} text-center relative overflow-hidden bg-canvas-alt border border-border/50 rounded-3xl p-8`}
+                  className={`ambient-stat-card ${stat.cardClass} text-center relative overflow-hidden border border-border/50 rounded-3xl p-8`}
                   style={{
                     rotateX: reducedMotion ? 0 : springX,
                     rotateY: reducedMotion ? 0 : springY,
                     transformPerspective: 800,
+                    backgroundColor: themeMode === 'light'
+                      ? 'rgba(220, 215, 205, 1)'
+                      : 'rgba(14, 14, 26, 1)',
                   }}
                   onMouseMove={reducedMotion ? undefined : handleMouseMove}
                   onMouseLeave={reducedMotion ? undefined : handleMouseLeave}
-                  whileHover={reducedMotion ? {} : { scale: 1.02, backgroundColor: 'rgba(255,255,255,0.02)' }}
+                  whileHover={reducedMotion ? {} : {
+                    scale: 1.02,
+                    backgroundColor: themeMode === 'light'
+                      ? 'rgba(228, 222, 212, 1)'
+                      : 'rgba(20, 20, 36, 1)',
+                  }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 >
                   <span className="absolute -top-12 -right-8 text-[10rem] font-bold text-white/5 select-none pointer-events-none" aria-hidden="true">
@@ -545,55 +587,55 @@ const HomePage: React.FC = () => {
               : (
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 featuredItems.map((item: any, index) => {
-              const isLive = item.status === 'live' || item.status === 'Live';
-              const symbol = item.saleTokenSymbol || item.symbol || 'UNK';
-              const name = item.saleTokenName || item.name || 'Unknown Project';
-              const progress = item.progress || item.raisePercentage || 0;
-              const link = item.address ? `/presales/${item.address}` : `/project/${item.id}`;
+                  const isLive = item.status === 'live' || item.status === 'Live';
+                  const symbol = item.saleTokenSymbol || item.symbol || 'UNK';
+                  const name = item.saleTokenName || item.name || 'Unknown Project';
+                  const progress = item.progress || item.raisePercentage || 0;
+                  const link = item.address ? `/presales/${item.address}` : `/project/${item.id}`;
 
-              return (
-                <PresaleCard key={item.address || item.id} index={index} reducedMotion={!!reducedMotion}>
-                  <Link to={link}>
-                    <div className="group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-white/5 transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
-                      {/* Presale Card Image Header */}
-                      <div className="relative h-48 w-full overflow-hidden">
-                        <img
-                          src={`https://placehold.co/600x400/111/444?text=${symbol}`}
-                          alt={name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
-                        <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${isLive
-                          ? 'bg-status-live-bg text-status-live border border-status-live/20'
-                          : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
-                          }`}>
-                          {isLive ? 'Live Now' : 'Upcoming'}
-                        </span>
-                      </div>
-
-                      {/* Presale Details */}
-                      <div className="p-8 pt-4 flex-1 flex flex-col justify-between space-y-6 relative z-10">
-                        <div>
-                          <h3 className="font-display text-2xl font-bold text-ink">{name}</h3>
-                          <p className="text-sm font-semibold text-accent mt-1">${symbol}</p>
-                        </div>
-
-                        <div className="space-y-3 bg-white/5 rounded-2xl p-5 border border-white/5">
-                          <div className="flex justify-between text-sm font-semibold">
-                            <span className="text-ink-muted">Progress</span>
-                            <span className="text-accent">{progress}%</span>
+                  return (
+                    <PresaleCard key={item.address || item.id} index={index} reducedMotion={!!reducedMotion}>
+                      <Link to={link}>
+                        <div className="group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-white/5 transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
+                          {/* Presale Card Image Header */}
+                          <div className="relative h-48 w-full overflow-hidden">
+                            <img
+                              src={`https://placehold.co/600x400/111/444?text=${symbol}`}
+                              alt={name}
+                              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
+                            <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${isLive
+                              ? 'bg-status-live-bg text-status-live border border-status-live/20'
+                              : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
+                              }`}>
+                              {isLive ? 'Live Now' : 'Upcoming'}
+                            </span>
                           </div>
-                          <ProgressBar progress={progress} />
-                          <div className="flex justify-between text-xs font-medium text-ink-muted">
-                            <span>Raised: {item.totalRaised ? formatUnits(item.totalRaised, item.paymentTokenDecimals ?? 18) : (item.raised || '0')}</span>
-                            <span>Cap: {item.hardCap ? formatUnits(item.hardCap, item.paymentTokenDecimals ?? 18) : (item.targetRaise || '0')}</span>
+
+                          {/* Presale Details */}
+                          <div className="p-8 pt-4 flex-1 flex flex-col justify-between space-y-6 relative z-10">
+                            <div>
+                              <h3 className="font-display text-2xl font-bold text-ink">{name}</h3>
+                              <p className="text-sm font-semibold text-accent mt-1">${symbol}</p>
+                            </div>
+
+                            <div className="space-y-3 bg-white/5 rounded-2xl p-5 border border-white/5">
+                              <div className="flex justify-between text-sm font-semibold">
+                                <span className="text-ink-muted">Progress</span>
+                                <span className="text-accent">{progress}%</span>
+                              </div>
+                              <ProgressBar progress={progress} />
+                              <div className="flex justify-between text-xs font-medium text-ink-muted">
+                                <span>Raised: {item.totalRaised ? formatUnits(item.totalRaised, item.paymentTokenDecimals ?? 18) : (item.raised || '0')}</span>
+                                <span>Cap: {item.hardCap ? formatUnits(item.hardCap, item.paymentTokenDecimals ?? 18) : (item.targetRaise || '0')}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </Link>
-                </PresaleCard>
-              );
+                      </Link>
+                    </PresaleCard>
+                  );
                 })
               )}
           </div>

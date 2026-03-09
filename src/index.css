@@ -393,7 +393,8 @@
   .ambient-stat-card::after {
     content: '';
     position: absolute;
-    inset: 0;
+    inset: 2px;
+    border-radius: inherit;
     background:
       radial-gradient(72% 72% at 0% 0%, rgba(5, 10, 18, 0.14), transparent 72%),
       radial-gradient(72% 72% at 100% 0%, rgba(5, 10, 18, 0.1), transparent 72%),
@@ -406,10 +407,40 @@
 
   .ambient-stat-card:hover {
     transform: translateY(-5px);
-    border-color: rgb(var(--color-accent) / 0.38);
+    box-shadow: var(--shadow-float-hover);
+  }
+
+  .ambient-stat-card--orange {
+    border-color: rgba(255, 138, 0, 0.3);
+  }
+
+  .ambient-stat-card--orange:hover {
+    border-color: rgba(255, 138, 0, 0.6);
     box-shadow:
       var(--shadow-float-hover),
-      0 0 0 1px rgb(var(--color-accent) / 0.2);
+      0 0 0 1px rgba(255, 138, 0, 0.3);
+  }
+
+  .ambient-stat-card--blue {
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .ambient-stat-card--blue:hover {
+    border-color: rgba(59, 130, 246, 0.6);
+    box-shadow:
+      var(--shadow-float-hover),
+      0 0 0 1px rgba(59, 130, 246, 0.3);
+  }
+
+  .ambient-stat-card--purple {
+    border-color: rgba(139, 124, 255, 0.3);
+  }
+
+  .ambient-stat-card--purple:hover {
+    border-color: rgba(139, 124, 255, 0.6);
+    box-shadow:
+      var(--shadow-float-hover),
+      0 0 0 1px rgba(139, 124, 255, 0.3);
   }
 
   /* Project card styling */

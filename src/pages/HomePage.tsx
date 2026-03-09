@@ -504,7 +504,7 @@ const HomePage: React.FC = () => {
                 <motion.div
                   key={stat.label}
                   ref={ref}
-                  className={`ambient-stat-card ${stat.cardClass} text-center relative overflow-hidden border border-border/50 rounded-3xl p-8`}
+                  className={`ambient-stat-card ${stat.cardClass} text-center relative overflow-hidden rounded-3xl p-8`}
                   style={{
                     rotateX: reducedMotion ? 0 : springX,
                     rotateY: reducedMotion ? 0 : springY,
@@ -521,7 +521,7 @@ const HomePage: React.FC = () => {
                       ? 'rgba(228, 222, 212, 1)'
                       : 'rgba(20, 20, 36, 1)',
                   }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20, duration: 0.7 }}
                 >
                   <span className="absolute -top-12 -right-8 text-[10rem] font-bold text-white/5 select-none pointer-events-none" aria-hidden="true">
                     {stat.ghost}

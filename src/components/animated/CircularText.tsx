@@ -5,6 +5,10 @@ interface CircularTextProps {
     spinDuration?: number;
     onHover?: 'slowDown' | 'speedUp' | 'pause' | 'goBonkers';
     className?: string;
+    /** Diameter in pixels. Default is 200. */
+    size?: number;
+    /** Substring within text whose characters will be rendered in accent color */
+    accentWord?: string;
 }
 
 const getRotationTransition = (duration: number, from: number, loop: boolean = true) => ({
@@ -29,7 +33,9 @@ const CircularText: React.FC<CircularTextProps> = ({
     text,
     spinDuration = 20,
     onHover = 'speedUp',
-    className = ''
+    className = '',
+    size = 200,
+    accentWord
 }) => {
     const letters = Array.from(text);
     const controls = useAnimation();
@@ -89,10 +95,23 @@ const CircularText: React.FC<CircularTextProps> = ({
         });
     };
 
+    const fontSize = Math.max(10, Math.round(size * 0.12));
+
+    // Determine which character indices are part of the accentWord
+    const accentIndices = new Set<number>();
+    if (accentWord) {
+        const accentStart = text.indexOf(accentWord);
+        if (accentStart !== -1) {
+            for (let j = accentStart; j < accentStart + accentWord.length; j++) {
+                accentIndices.add(j);
+            }
+        }
+    }
+
     return (
         <motion.div
-            className={`m-0 mx-auto rounded-full w-[200px] h-[200px] relative font-black text-white text-center cursor-pointer origin-center ${className}`}
-            style={{ rotate: rotation }}
+            className={`m-0 mx-auto rounded-full relative font-black text-ink text-center cursor-pointer origin-center ${className}`}
+            style={{ rotate: rotation, width: size, height: size }}
             initial={{ rotate: 0 }}
             animate={controls}
             onMouseEnter={handleHoverStart}
@@ -104,12 +123,18 @@ const CircularText: React.FC<CircularTextProps> = ({
                 const x = factor * i;
                 const y = factor * i;
                 const transform = `rotateZ(${rotationDeg}deg) translate3d(${x}px, ${y}px, 0)`;
+                const isAccent = accentIndices.has(i);
 
                 return (
                     <span
                         key={i}
-                        className="absolute inline-block inset-0 text-2xl transition-all duration-500 ease-[cubic-bezier(0,0,0,1)]"
-                        style={{ transform, WebkitTransform: transform }}
+                        className="absolute inline-block inset-0 text-center transition-all duration-500 ease-[cubic-bezier(0,0,0,1)]"
+                        style={{
+                            transform,
+                            WebkitTransform: transform,
+                            fontSize,
+                            color: isAccent ? 'rgb(var(--color-accent))' : undefined
+                        }}
                     >
                         {letter}
                     </span>

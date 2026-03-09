@@ -44,7 +44,8 @@ const Footer: React.FC = () => {
                 text="STAGE*ZERO*"
                 onHover="speedUp"
                 spinDuration={20}
-                className="scale-50 -ml-12 -mr-8"
+                size={120}
+                accentWord="ZERO"
               />
             </Link>
             <p className="text-body-sm text-ink-faint">

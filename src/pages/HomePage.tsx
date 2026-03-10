@@ -47,15 +47,20 @@ import { formatUnits } from 'viem';
 //   return { mouseX: x, mouseY: y };
 // }
 
-function useTiltCard(strength: number = 12) {
+function useTiltCard(strength: number = 6) {
   const ref = useRef<HTMLDivElement>(null);
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
-  const springX = useSpring(rotateX, { stiffness: 200, damping: 20 });
-  const springY = useSpring(rotateY, { stiffness: 200, damping: 20 });
+  const springX = useSpring(rotateX, { stiffness: 150, damping: 25 });
+  const springY = useSpring(rotateY, { stiffness: 150, damping: 25 });
+  const lastUpdate = useRef(0);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      const now = performance.now();
+      if (now - lastUpdate.current < 16) return; // Throttle to ~60fps
+      lastUpdate.current = now;
+      
       const el = ref.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -87,17 +92,22 @@ const MagneticButton: React.FC<{
   const reducedMotion = useReducedMotion();
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const springX = useSpring(x, { stiffness: 300, damping: 20 });
-  const springY = useSpring(y, { stiffness: 300, damping: 20 });
+  const springX = useSpring(x, { stiffness: 250, damping: 25 });
+  const springY = useSpring(y, { stiffness: 250, damping: 25 });
+  const lastUpdate = useRef(0);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (reducedMotion) return;
+      const now = performance.now();
+      if (now - lastUpdate.current < 16) return; // Throttle to ~60fps
+      lastUpdate.current = now;
+      
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      x.set((e.clientX - cx) * 0.25);
-      y.set((e.clientY - cy) * 0.25);
+      x.set((e.clientX - cx) * 0.15);
+      y.set((e.clientY - cy) * 0.15);
     },
     [reducedMotion, x, y]
   );
@@ -177,14 +187,12 @@ const containerVariants = {
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 40, scale: 0.98, filter: 'blur(4px)' },
+  hidden: { opacity: 0, y: 30 },
   visible: {
     opacity: 1,
     y: 0,
-    scale: 1,
-    filter: 'blur(0px)',
     transition: {
-      duration: 1,
+      duration: 0.7,
       ease: [0.16, 1, 0.3, 1] as const,
     },
   },
@@ -203,19 +211,16 @@ const creatorTools = [
 /* ─── Rise Glow Orbs (dark mode only) ─── */
 
 const riseOrbs = [
-  { color: 'rgba(255, 138, 0, 0.45)', size: 32, blur: 14, left: '10%', top: '20%', x: [0, 18, -12, 8, -18, 4, 0], y: [0, -14, 10, -18, 6, 14, 0], duration: 7.2, scale: [1, 1.35, 0.85, 1.25, 0.9, 1.15, 1] },
-  { color: 'rgba(139, 124, 255, 0.38)', size: 38, blur: 16, left: '78%', top: '12%', x: [0, -14, 20, -10, 14, -6, 0], y: [0, 12, -16, 14, -10, 8, 0], duration: 9.8, scale: [1, 0.9, 1.3, 0.88, 1.2, 0.95, 1] },
-  { color: 'rgba(255, 170, 50, 0.32)', size: 26, blur: 12, left: '42%', top: '72%', x: [0, 14, -20, 16, -10, 8, 0], y: [0, -18, 8, -12, 16, -6, 0], duration: 6.4, scale: [1, 1.2, 0.9, 1.35, 0.85, 1.1, 1] },
-  { color: 'rgba(244, 152, 88, 0.35)', size: 30, blur: 13, left: '88%', top: '58%', x: [0, -10, 16, -14, 12, -8, 0], y: [0, 14, -12, 18, -14, 6, 0], duration: 8.6, scale: [1, 1.15, 0.92, 1.28, 0.88, 1.05, 1] },
-  { color: 'rgba(120, 200, 255, 0.28)', size: 22, blur: 11, left: '28%', top: '38%', x: [0, 20, -10, 14, -20, 6, 0], y: [0, -10, 16, -14, 8, -12, 0], duration: 10.2, scale: [1, 0.88, 1.3, 0.9, 1.22, 0.95, 1] },
-  { color: 'rgba(255, 138, 0, 0.30)', size: 24, blur: 12, left: '58%', top: '80%', x: [0, -16, 12, -8, 18, -10, 0], y: [0, 10, -14, 16, -12, 8, 0], duration: 7.8, scale: [1, 1.25, 0.88, 1.18, 0.92, 1.1, 1] },
-  { color: 'rgba(139, 124, 255, 0.22)', size: 20, blur: 10, left: '50%', top: '10%', x: [0, 12, -18, 10, -14, 16, 0], y: [0, -16, 12, -8, 14, -10, 0], duration: 11.5, scale: [1, 1.1, 0.92, 1.3, 0.86, 1.05, 1] },
+  { color: 'rgba(255, 138, 0, 0.35)', size: 28, blur: 12, left: '15%', top: '25%', x: [0, 12, -8, 0], y: [0, -10, 8, 0], duration: 12, scale: [1, 1.2, 0.9, 1] },
+  { color: 'rgba(139, 124, 255, 0.28)', size: 32, blur: 14, left: '75%', top: '18%', x: [0, -10, 14, 0], y: [0, 8, -12, 0], duration: 14, scale: [1, 1.15, 0.92, 1] },
+  { color: 'rgba(255, 170, 50, 0.25)', size: 22, blur: 10, left: '50%', top: '65%', x: [0, 10, -12, 0], y: [0, -14, 10, 0], duration: 11, scale: [1, 1.1, 0.95, 1] },
+  { color: 'rgba(120, 200, 255, 0.20)', size: 18, blur: 9, left: '82%', top: '55%', x: [0, -8, 10, 0], y: [0, 10, -8, 0], duration: 13, scale: [1, 1.08, 0.96, 1] },
 ];
 
 const RiseGlowOrbs: React.FC = () => (
   <span
     className="hero-rise-orbs"
-    style={{ position: 'absolute', inset: '-0.3em -0.4em', zIndex: -1, pointerEvents: 'none' }}
+    style={{ position: 'absolute', inset: '-0.3em -0.4em', zIndex: -1, pointerEvents: 'none', willChange: 'transform' }}
     aria-hidden="true"
   >
     {riseOrbs.map((orb, i) => (
@@ -232,6 +237,7 @@ const RiseGlowOrbs: React.FC = () => (
           filter: `blur(${orb.blur}px)`,
           mixBlendMode: 'screen',
           transform: 'translate(-50%, -50%)',
+          willChange: 'transform',
         }}
         animate={{
           x: orb.x,
@@ -254,6 +260,9 @@ const HomePage: React.FC = () => {
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
   const reducedMotion = useReducedMotion();
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const prefersReducedMotion = typeof window !== 'undefined' && 
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const shouldDisableAnimations = reducedMotion || prefersReducedMotion;
 
   React.useEffect(() => {
     // Initial check
@@ -330,6 +339,7 @@ const HomePage: React.FC = () => {
       {/* ─── Hero Section ─── */}
       <motion.section
         className="relative pt-24 pb-40 md:pt-20 md:pb-56 overflow-hidden rounded-[3rem] mb-20"
+        style={{ willChange: 'transform' }}
       >
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-canvas/25" />
@@ -341,11 +351,11 @@ const HomePage: React.FC = () => {
                   waveColor={themeMode === 'light' ? [0.8, 0.8, 0.8] : [0.5, 0.5, 0.5]}
                   disableAnimation={false}
                   enableMouseInteraction
-                  mouseRadius={0.3}
-                  colorNum={4}
-                  waveAmplitude={0.3}
-                  waveFrequency={3}
-                  waveSpeed={0.05}
+                  mouseRadius={0.5}
+                  colorNum={3}
+                  waveAmplitude={0.25}
+                  waveFrequency={2}
+                  waveSpeed={0.03}
                 />
               </div>
             </motion.div>
@@ -387,7 +397,7 @@ const HomePage: React.FC = () => {
 
         <motion.div
           className="relative z-20 max-w-5xl mx-auto px-4 text-center space-y-8"
-          style={{ y: heroContentY, opacity: heroOpacity }}
+          style={{ y: heroContentY, opacity: heroOpacity, willChange: 'transform, opacity' }}
         >
 
           <h1 className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-8xl text-ink leading-[1.1] tracking-tight">
@@ -408,7 +418,7 @@ const HomePage: React.FC = () => {
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               transition={{ duration: 0.8, delay: 0.2 + titleWords.length * 0.05, ease: [0.16, 1, 0.3, 1] }}
             >
-              <RiseGlowOrbs />
+              {!shouldDisableAnimations && <RiseGlowOrbs />}
               Rise
             </motion.span>{' '}
             <motion.span
@@ -451,6 +461,7 @@ const HomePage: React.FC = () => {
         whileInView="visible"
         viewport={{ once: true, margin: '-10% 0px' }}
         className="max-w-[1400px] mx-auto px-4 md:px-8 space-y-32"
+        style={{ willChange: 'transform' }}
       >
         {/* ─── Stats Section ─── */}
         <motion.section variants={itemVariants}>
@@ -506,16 +517,16 @@ const HomePage: React.FC = () => {
                   ref={ref}
                   className={`ambient-stat-card ${stat.cardClass} text-center relative overflow-hidden rounded-3xl p-8`}
                   style={{
-                    rotateX: reducedMotion ? 0 : springX,
-                    rotateY: reducedMotion ? 0 : springY,
+                    rotateX: shouldDisableAnimations ? 0 : springX,
+                    rotateY: shouldDisableAnimations ? 0 : springY,
                     transformPerspective: 800,
                     backgroundColor: themeMode === 'light'
                       ? 'rgba(220, 215, 205, 1)'
                       : 'rgba(14, 14, 26, 1)',
                   }}
-                  onMouseMove={reducedMotion ? undefined : handleMouseMove}
-                  onMouseLeave={reducedMotion ? undefined : handleMouseLeave}
-                  whileHover={reducedMotion ? {} : {
+                  onMouseMove={shouldDisableAnimations ? undefined : handleMouseMove}
+                  onMouseLeave={shouldDisableAnimations ? undefined : handleMouseLeave}
+                  whileHover={shouldDisableAnimations ? {} : {
                     scale: 1.02,
                     backgroundColor: themeMode === 'light'
                       ? 'rgba(228, 222, 212, 1)'
@@ -594,7 +605,7 @@ const HomePage: React.FC = () => {
                   const link = item.address ? `/presales/${item.address}` : `/project/${item.id}`;
 
                   return (
-                    <PresaleCard key={item.address || item.id} index={index} reducedMotion={!!reducedMotion}>
+                    <PresaleCard key={item.address || item.id} index={index} reducedMotion={!!shouldDisableAnimations}>
                       <Link to={link}>
                         <div className="group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-white/5 transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
                           {/* Presale Card Image Header */}
@@ -693,10 +704,9 @@ const HomePage: React.FC = () => {
                 >
                   <div className="relative w-36 h-36 flex items-center justify-center">
                     <div className="absolute inset-0 bg-canvas-alt rounded-full border border-white/10" />
-                    <motion.div
+                    <div
                       className="absolute inset-2 rounded-full bg-accent/10 border border-accent/20"
-                      whileInView={reducedMotion ? {} : { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                      style={{ willChange: 'transform' }}
                     />
                     <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-canvas to-canvas-alt shadow-inner flex items-center justify-center border border-white/5 text-accent">
                       <item.icon className="w-8 h-8" />
@@ -754,7 +764,7 @@ const HomePage: React.FC = () => {
                       ? 'hover:border-purple-500'
                       : 'hover:border-amber-700'
                   }`}
-                  whileHover={reducedMotion ? {} : { scale: 0.99 }}
+                  whileHover={shouldDisableAnimations ? {} : { scale: 0.99 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
                   <Link to={tool.href} className="block w-full h-full relative">

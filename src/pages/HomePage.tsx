@@ -749,7 +749,11 @@ const HomePage: React.FC = () => {
               return (
                 <motion.div
                   key={tool.href}
-                  className={`relative overflow-hidden rounded-3xl group border border-white/5 bg-canvas-alt min-h-[220px] transition-transform duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]}`}
+                  className={`relative overflow-hidden rounded-3xl group border border-white/5 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${
+                    themeMode === 'light'
+                      ? 'hover:border-purple-500'
+                      : 'hover:border-amber-700'
+                  }`}
                   whileHover={reducedMotion ? {} : { scale: 0.99 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >

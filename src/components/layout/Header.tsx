@@ -96,7 +96,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
         {/* Logo */}
         <Link to="/" className="group inline-flex items-center">
           <span className="text-xl font-bold tracking-[0.18em] text-ink leading-none text-engraved">STAGE</span>
-          <span className="font-black text-accent leading-none" style={{ fontSize: '1.75rem', marginLeft: '-0.05em', filter: 'drop-shadow(0 0 8px rgba(255,138,0,0.30))' }}>ZERO</span>
+          <span className="font-black text-accent leading-none" style={{ fontSize: '1.75rem', marginLeft: '-0.05em', filter: 'drop-shadow(0 0 8px rgba(255,138,0,0.30))' }}>0</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -109,8 +109,8 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
             >
               <span
                 className={`relative z-10 ${location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                    ? 'text-ink'
-                    : 'text-ink-muted hover:text-ink'
+                  ? 'text-ink'
+                  : 'text-ink-muted hover:text-ink'
                   }`}
               >
                 {item.label}
@@ -342,8 +342,8 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                 <button
                   onClick={handleMobileChainSwitch}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${chainInfo.unsupported
-                      ? 'text-status-error bg-status-error/10'
-                      : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
+                    ? 'text-status-error bg-status-error/10'
+                    : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
                     }`}
                 >
                   {chainInfo.unsupported ? (
@@ -367,8 +367,8 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                   key={item.path}
                   to={item.path}
                   className={`block px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${location.pathname === item.path
-                      ? 'bg-canvas-alt text-ink'
-                      : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
+                    ? 'bg-canvas-alt text-ink'
+                    : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
                     }`}
                 >
                   {item.label}

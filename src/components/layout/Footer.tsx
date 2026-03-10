@@ -50,15 +50,15 @@ const Footer: React.FC = () => {
           <div className="flex flex-col items-center md:items-start gap-4">
             <Link to="/" className="inline-flex items-center">
               <CircularText
-                text="STAGE*ZERO*"
+                text="STAGE*0*"
                 onHover="speedUp"
                 spinDuration={20}
                 size={120}
-                accentWord="ZERO"
+                accentWord="0"
               />
             </Link>
             <p className="text-body-sm text-ink-faint">
-              {currentYear} StageZero Labs. All rights reserved.
+              {currentYear} Stage0 Labs. All rights reserved.
             </p>
           </div>
 

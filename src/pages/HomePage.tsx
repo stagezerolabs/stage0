@@ -426,7 +426,7 @@ const HomePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            StageZero is the ultimate launchpad for high-conviction onchain projects. Discover promising
+            Stage0 is the ultimate launchpad for high-conviction onchain projects. Discover promising
             teams, join fair launches, and ship faster with integrated creator tooling.
           </motion.p>
           <motion.div
@@ -648,7 +648,7 @@ const HomePage: React.FC = () => {
           className="space-y-16 py-10"
         >
           <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <h2 className="font-display text-3xl md:text-5xl text-ink">How StageZero Works</h2>
+            <h2 className="font-display text-3xl md:text-5xl text-ink">How Stage0 Works</h2>
             <p className="text-lg text-ink-muted">
               Participating in early-stage IDOs on Rise Chain is seamless. Connect, discover, and build with us.
             </p>
@@ -781,16 +781,13 @@ const HomePage: React.FC = () => {
         >
           <div className="relative z-10 p-12 md:p-20 flex flex-col lg:flex-row items-center justify-between gap-12">
             <div className="space-y-6 max-w-2xl text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/30 text-accent text-sm font-bold uppercase tracking-widest shadow-[0_0_20px_rgba(255,138,0,0.2)]">
-                Tier Access Engine
-              </div>
               <h3 className="font-display text-4xl md:text-6xl text-ink leading-tight font-bold">
                 Stake to unlock <br />
                 <span className="text-accent">exclusive allocations</span>
               </h3>
               <p className="text-lg text-ink-muted max-w-xl mx-auto lg:mx-0">
                 Level up your tier status for guaranteed allocations and priority access to the most
-                anticipated launches on StageZero.
+                anticipated launches on Stage0.
               </p>
             </div>
 

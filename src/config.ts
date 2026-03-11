@@ -100,8 +100,8 @@ export type ContractAddressMap = {
 export const CONTRACT_ADDRESSES: Record<number, ContractAddressMap> = {
   [riseTestnet.id]: {
     tokenLocker: "0xb225cb8Ea90E0ab1F9f5011d31fD217083c31fc7",
-    nftFactory: "0x6DDca710993C91402d52061868bE76043a4C5888",
-    nftFactoryLens: "0x36D6383774631565AB0D8F3710748610631A675d",
+    nftFactory: "0x288Ab2e2d8ABCe7dccC22a8B19D83FFE141Eb5FC",
+    nftFactoryLens: "0xf87f2dd3437Be3738f36759856Fbd1FB38e1C308",
     presaleFactory: "0x67064a9236050D3d947d7F5Bd3448BD4b5D947FC",
     tokenFactory: "0xa0b761A94013FF721fD682eEB7e57709C0e03f42",
     airdropMultisender: "0x8DB306030Cf163A6C809fB3599500DBE28Df2CC6",
@@ -1119,6 +1119,16 @@ export const NFTFactory = [
           { internalType: "string", name: "symbol", type: "string" },
           { internalType: "string", name: "baseURI", type: "string" },
           { internalType: "string", name: "contractURI", type: "string" },
+          {
+            internalType: "struct NFTFactory.WhitelistParams",
+            name: "whitelistConfig",
+            type: "tuple",
+            components: [
+              { internalType: "bool", name: "enabled", type: "bool" },
+              { internalType: "uint64", name: "whitelistStart", type: "uint64" },
+              { internalType: "uint128", name: "whitelistPrice", type: "uint128" },
+            ],
+          },
           { internalType: "uint256", name: "maxSupply", type: "uint256" },
           { internalType: "address", name: "payoutWallet", type: "address" },
           {
@@ -1151,6 +1161,16 @@ export const NFTFactory = [
           { internalType: "string", name: "symbol", type: "string" },
           { internalType: "string", name: "baseURI", type: "string" },
           { internalType: "string", name: "contractURI", type: "string" },
+          {
+            internalType: "struct NFTFactory.WhitelistParams",
+            name: "whitelistConfig",
+            type: "tuple",
+            components: [
+              { internalType: "bool", name: "enabled", type: "bool" },
+              { internalType: "uint64", name: "whitelistStart", type: "uint64" },
+              { internalType: "uint128", name: "whitelistPrice", type: "uint128" },
+            ],
+          },
           { internalType: "uint256", name: "maxSupply", type: "uint256" },
           { internalType: "address", name: "payoutWallet", type: "address" },
           {
@@ -1293,6 +1313,27 @@ export const NFTCollectionContract = [
   },
   {
     inputs: [],
+    name: "whitelistEnabled",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "whitelistStart",
+    outputs: [{ internalType: "uint64", name: "", type: "uint64" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "whitelistPrice",
+    outputs: [{ internalType: "uint128", name: "", type: "uint128" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "payoutWallet",
     outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "view",
@@ -1329,6 +1370,45 @@ export const NFTCollectionContract = [
   {
     inputs: [{ internalType: "address", name: "newWallet", type: "address" }],
     name: "setPayoutWallet",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "bool", name: "enabled", type: "bool" },
+      { internalType: "uint64", name: "whitelistStart_", type: "uint64" },
+      { internalType: "uint128", name: "whitelistPrice_", type: "uint128" },
+    ],
+    name: "setWhitelistConfig",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "account", type: "address" }],
+    name: "addToWhitelist",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "account", type: "address" }],
+    name: "removeFromWhitelist",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address[]", name: "accounts", type: "address[]" }],
+    name: "addManyToWhitelist",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address[]", name: "accounts", type: "address[]" }],
+    name: "removeManyFromWhitelist",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -1377,6 +1457,13 @@ export const NFTCollectionContract = [
     inputs: [{ internalType: "address", name: "wallet", type: "address" }],
     name: "mintedPerWallet",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "", type: "address" }],
+    name: "whitelist",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
@@ -1532,6 +1619,9 @@ const COLLECTION_INFO_COMPONENTS = [
   { internalType: "uint32", name: "walletLimit", type: "uint32" },
   { internalType: "uint64", name: "saleStart", type: "uint64" },
   { internalType: "uint64", name: "saleEnd", type: "uint64" },
+  { internalType: "bool", name: "whitelistEnabled", type: "bool" },
+  { internalType: "uint64", name: "whitelistStart", type: "uint64" },
+  { internalType: "uint128", name: "whitelistPrice", type: "uint128" },
   { internalType: "address", name: "owner", type: "address" },
   { internalType: "address", name: "payoutWallet", type: "address" },
 ] as const;

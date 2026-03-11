@@ -54,6 +54,9 @@ type RawNftCollection = {
   walletLimit: number;
   saleStart: string;
   saleEnd: string;
+  whitelistEnabled?: boolean | null;
+  whitelistStart?: string | null;
+  whitelistPrice?: string | null;
 };
 
 export type IndexedPresale = {
@@ -101,6 +104,9 @@ export type IndexedNftCollection = {
   walletLimit: number;
   saleStart: bigint;
   saleEnd: bigint;
+  whitelistEnabled?: boolean;
+  whitelistStart?: bigint;
+  whitelistPrice?: bigint;
 };
 
 const PRESALES_QUERY = /* GraphQL */ `
@@ -304,5 +310,8 @@ export async function fetchIndexedNftCollections(creator?: Address): Promise<Ind
     walletLimit: Number(row.walletLimit ?? 0),
     saleStart: toBigInt(row.saleStart),
     saleEnd: toBigInt(row.saleEnd),
+    whitelistEnabled: row.whitelistEnabled ?? undefined,
+    whitelistStart: row.whitelistStart ? toBigInt(row.whitelistStart) : undefined,
+    whitelistPrice: row.whitelistPrice ? toBigInt(row.whitelistPrice) : undefined,
   }));
 }

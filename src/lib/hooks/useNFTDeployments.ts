@@ -6,6 +6,12 @@ import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { contractUriToHttp, ipfsUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
 import {
+  getNFTSalePhase,
+  getNFTSaleStatus,
+  type NFTSalePhase,
+  type NFTSaleStatus,
+} from '@/lib/utils/nft-sales';
+import {
   fetchIndexedNftCollections,
   isGoldskyIndexerConfigured,
   type IndexedNftCollection,
@@ -18,8 +24,6 @@ type NFTContractMetadata = {
   image?: string;
   description?: string;
 };
-
-export type NFTDeploymentStatus = 'live' | 'upcoming' | 'ended';
 
 export interface NFTDeploymentWithMetadata {
   address: Address;
@@ -37,7 +41,11 @@ export interface NFTDeploymentWithMetadata {
   walletLimit: number;
   saleStart: bigint;
   saleEnd: bigint;
-  status: NFTDeploymentStatus;
+  whitelistEnabled: boolean;
+  whitelistStart: bigint;
+  whitelistPrice: bigint;
+  salePhase: NFTSalePhase;
+  status: NFTSaleStatus;
   metadataImage?: string;
   metadataDescription?: string;
 }
@@ -47,7 +55,6 @@ type UseNFTDeploymentsOptions = {
   enabled?: boolean;
 };
 
-// Raw CollectionInfo tuple returned by the Lens
 interface CollectionInfo {
   nft: Address;
   creator: Address;
@@ -62,6 +69,9 @@ interface CollectionInfo {
   walletLimit: number;
   saleStart: bigint;
   saleEnd: bigint;
+  whitelistEnabled: boolean;
+  whitelistStart: bigint;
+  whitelistPrice: bigint;
   owner: Address;
   payoutWallet: Address;
 }
@@ -69,19 +79,6 @@ interface CollectionInfo {
 type RawCollectionInfo = Partial<CollectionInfo> & {
   [key: number]: unknown;
 };
-
-function getNFTStatus(
-  saleStart: bigint,
-  saleEnd: bigint,
-  totalMinted: bigint,
-  maxSupply: bigint
-): NFTDeploymentStatus {
-  if (maxSupply > 0n && totalMinted >= maxSupply) return 'ended';
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  if (saleStart > now) return 'upcoming';
-  if (saleEnd !== 0n && saleEnd <= now) return 'ended';
-  return 'live';
-}
 
 function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
   const normalized = imageUri.trim();
@@ -104,6 +101,15 @@ function resolveMetadataImageUri(imageUri: string, metadataUri: string): string 
 }
 
 function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
+  const salePhase = getNFTSalePhase({
+    maxSupply: info.maxSupply,
+    totalMinted: info.totalMinted,
+    saleStart: info.saleStart,
+    saleEnd: info.saleEnd,
+    whitelistEnabled: info.whitelistEnabled,
+    whitelistStart: info.whitelistStart,
+  });
+
   return {
     address: info.nft,
     creator: info.creator,
@@ -120,7 +126,18 @@ function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
     walletLimit: Number(info.walletLimit),
     saleStart: info.saleStart,
     saleEnd: info.saleEnd,
-    status: getNFTStatus(info.saleStart, info.saleEnd, info.totalMinted, info.maxSupply),
+    whitelistEnabled: info.whitelistEnabled,
+    whitelistStart: info.whitelistStart,
+    whitelistPrice: info.whitelistPrice,
+    salePhase,
+    status: getNFTSaleStatus({
+      maxSupply: info.maxSupply,
+      totalMinted: info.totalMinted,
+      saleStart: info.saleStart,
+      saleEnd: info.saleEnd,
+      whitelistEnabled: info.whitelistEnabled,
+      whitelistStart: info.whitelistStart,
+    }),
   };
 }
 
@@ -138,8 +155,11 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
   const walletLimitRaw = (raw.walletLimit ?? raw[10]) as bigint | number | undefined;
   const saleStart = (raw.saleStart ?? raw[11]) as bigint | undefined;
   const saleEnd = (raw.saleEnd ?? raw[12]) as bigint | undefined;
-  const owner = (raw.owner ?? raw[13]) as Address | undefined;
-  const payoutWallet = (raw.payoutWallet ?? raw[14]) as Address | undefined;
+  const whitelistEnabled = (raw.whitelistEnabled ?? raw[13]) as boolean | undefined;
+  const whitelistStart = (raw.whitelistStart ?? raw[14]) as bigint | undefined;
+  const whitelistPrice = (raw.whitelistPrice ?? raw[15]) as bigint | undefined;
+  const owner = (raw.owner ?? raw[16]) as Address | undefined;
+  const payoutWallet = (raw.payoutWallet ?? raw[17]) as Address | undefined;
 
   if (
     !nft ||
@@ -155,6 +175,9 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     walletLimitRaw === undefined ||
     saleStart === undefined ||
     saleEnd === undefined ||
+    typeof whitelistEnabled !== 'boolean' ||
+    whitelistStart === undefined ||
+    whitelistPrice === undefined ||
     !owner ||
     !payoutWallet
   ) {
@@ -175,8 +198,56 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     walletLimit: Number(walletLimitRaw),
     saleStart,
     saleEnd,
+    whitelistEnabled,
+    whitelistStart,
+    whitelistPrice,
     owner,
     payoutWallet,
+  };
+}
+
+function toIndexedDeployment(deployment: IndexedNftCollection): NFTDeploymentWithMetadata {
+  const whitelistEnabled = deployment.whitelistEnabled ?? false;
+  const whitelistStart = deployment.whitelistStart ?? 0n;
+  const whitelistPrice = deployment.whitelistPrice ?? deployment.mintPrice;
+
+  const salePhase = getNFTSalePhase({
+    maxSupply: deployment.maxSupply,
+    totalMinted: deployment.totalMinted,
+    saleStart: deployment.saleStart,
+    saleEnd: deployment.saleEnd,
+    whitelistEnabled,
+    whitelistStart,
+  });
+
+  return {
+    address: deployment.address,
+    creator: deployment.creator,
+    owner: deployment.owner,
+    payoutWallet: deployment.payoutWallet,
+    is721A: deployment.is721A,
+    name: deployment.name || 'NFT Collection',
+    symbol: deployment.symbol || 'NFT',
+    contractURI: normalizeContractURI(deployment.contractURI || ''),
+    maxSupply: deployment.maxSupply,
+    totalMinted: deployment.totalMinted,
+    remaining: deployment.remaining,
+    mintPrice: deployment.mintPrice,
+    walletLimit: Number(deployment.walletLimit),
+    saleStart: deployment.saleStart,
+    saleEnd: deployment.saleEnd,
+    whitelistEnabled,
+    whitelistStart,
+    whitelistPrice,
+    salePhase,
+    status: getNFTSaleStatus({
+      maxSupply: deployment.maxSupply,
+      totalMinted: deployment.totalMinted,
+      saleStart: deployment.saleStart,
+      saleEnd: deployment.saleEnd,
+      whitelistEnabled,
+      whitelistStart,
+    }),
   };
 }
 
@@ -187,8 +258,10 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   const [isMetadataLoading, setIsMetadataLoading] = useState(false);
 
   const hasLens = Boolean(nftFactoryLens && nftFactoryLens !== ZERO_ADDRESS);
-  const canRead = Boolean(enabled && hasLens);
+  const canRead = Boolean(enabled);
   const isIndexerConfigured = isGoldskyIndexerConfigured();
+  const canReadFromChain = Boolean(canRead && hasLens);
+  const canReadFromIndexer = Boolean(canRead && !hasLens && isIndexerConfigured);
 
   const {
     data: indexedCollections = [],
@@ -197,21 +270,18 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   } = useQuery({
     queryKey: ['goldsky', 'nftCollections', creator?.toLowerCase() ?? 'all'],
     queryFn: () => fetchIndexedNftCollections(creator),
-    enabled: canRead && isIndexerConfigured,
+    enabled: canReadFromIndexer,
     staleTime: AUTO_REFRESH_INTERVAL,
-    refetchInterval: canRead && isIndexerConfigured ? AUTO_REFRESH_INTERVAL : false,
+    refetchInterval: canReadFromIndexer ? AUTO_REFRESH_INTERVAL : false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });
 
   const useIndexer =
-    canRead &&
-    isIndexerConfigured &&
+    canReadFromIndexer &&
     !isIndexerError &&
     (isIndexerLoading || indexedCollections.length > 0);
-  const canReadFromChain = canRead && !useIndexer;
 
-  // When a creator is specified use the targeted lens call
   const { data: creatorData, isLoading: isCreatorLoading } = useReadContract({
     abi: NFTFactoryLens,
     address: nftFactoryLens,
@@ -225,7 +295,6 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     },
   });
 
-  // When no creator filter, fetch all collections (offset=0, limit=0 → all)
   const { data: allData, isLoading: isAllLoading } = useReadContract({
     abi: NFTFactoryLens,
     address: nftFactoryLens,
@@ -241,30 +310,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
 
   const indexedDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
     if (!useIndexer) return [];
-
-    return indexedCollections.map((deployment: IndexedNftCollection) => ({
-      address: deployment.address,
-      creator: deployment.creator,
-      owner: deployment.owner,
-      payoutWallet: deployment.payoutWallet,
-      is721A: deployment.is721A,
-      name: deployment.name || 'NFT Collection',
-      symbol: deployment.symbol || 'NFT',
-      contractURI: normalizeContractURI(deployment.contractURI || ''),
-      maxSupply: deployment.maxSupply,
-      totalMinted: deployment.totalMinted,
-      remaining: deployment.remaining,
-      mintPrice: deployment.mintPrice,
-      walletLimit: Number(deployment.walletLimit),
-      saleStart: deployment.saleStart,
-      saleEnd: deployment.saleEnd,
-      status: getNFTStatus(
-        deployment.saleStart,
-        deployment.saleEnd,
-        deployment.totalMinted,
-        deployment.maxSupply
-      ),
-    }));
+    return indexedCollections.map(toIndexedDeployment);
   }, [indexedCollections, useIndexer]);
 
   const rawDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
@@ -274,7 +320,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
 
     const raw = (creator ? creatorData : allData) as RawCollectionInfo[] | undefined;
     if (!raw || raw.length === 0) return [];
-    // Newest first — the factory appends, so reverse gives newest-first
+
     return [...raw]
       .reverse()
       .map(normalizeCollectionInfo)
@@ -356,7 +402,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     });
   }, [rawDeployments, metadataByAddress]);
 
-  const isChainLoading = creator ? isCreatorLoading : isAllLoading;
+  const isChainLoading = canReadFromChain ? (creator ? isCreatorLoading : isAllLoading) : false;
   const isLoading = useIndexer ? isIndexerLoading : isChainLoading;
 
   return {

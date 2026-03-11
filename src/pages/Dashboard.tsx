@@ -621,7 +621,13 @@ const Dashboard: React.FC = () => {
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <Badge variant={statusVariant}>{collection.status}</Badge>
+                            <Badge variant={statusVariant}>
+                              {collection.status === 'live'
+                                ? collection.salePhase === 'whitelist'
+                                  ? 'whitelist live'
+                                  : 'public live'
+                                : collection.status}
+                            </Badge>
                             <span className="inline-flex rounded-full bg-ink/10 px-2 py-1 text-xs font-medium text-ink-muted">
                               {collection.is721A ? 'ERC721A' : 'ERC721'}
                             </span>
@@ -636,6 +642,12 @@ const Dashboard: React.FC = () => {
                           <span className="font-mono text-ink">
                             {collection.maxSupply.toLocaleString()}
                           </span>
+                        </p>
+                        <p className="text-body-sm text-ink-muted">
+                          Public {collection.mintPrice ? `${formatUnits(collection.mintPrice, 18)} ETH` : '0 ETH'}
+                          {collection.whitelistEnabled
+                            ? ` · WL ${formatUnits(collection.whitelistPrice, 18)} ETH`
+                            : ''}
                         </p>
                         <div className="flex items-center gap-2">
                           <Link to={`/nfts/manage/${collection.address}`} className="btn-secondary">

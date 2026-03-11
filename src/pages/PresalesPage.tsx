@@ -15,6 +15,7 @@ import {
   Loader2,
   Search,
   Image,
+  Shield,
 } from 'lucide-react';
 
 const containerVariants = {
@@ -287,6 +288,16 @@ const PresalesPage: React.FC = () => {
                   : 0;
               const collectionImage =
                 deployment.metadataImage || NFT_COLLECTION_IMAGES[deployment.address.toLowerCase()];
+              const activePrice = deployment.salePhase === 'whitelist'
+                ? deployment.whitelistPrice
+                : deployment.mintPrice;
+              const primaryTimelineLabel = deployment.status === 'upcoming'
+                ? deployment.whitelistEnabled
+                  ? `Whitelist starts ${new Date(Number(deployment.whitelistStart) * 1000).toLocaleDateString()}`
+                  : `Public starts ${new Date(Number(deployment.saleStart) * 1000).toLocaleDateString()}`
+                : deployment.saleEnd === 0n
+                ? 'No end date'
+                : formatTimeRemaining(deployment.saleEnd);
 
               return (
                 <div key={deployment.address}>
@@ -316,7 +327,14 @@ const PresalesPage: React.FC = () => {
                               {deployment.metadataDescription || 'Onchain NFT collection.'}
                             </p>
                           </div>
-                          {getStatusBadge(deployment.status)}
+                          {deployment.status === 'live' && deployment.salePhase === 'whitelist' ? (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-accent/10 text-accent">
+                              <Shield className="w-3 h-3" />
+                              Whitelist Live
+                            </span>
+                          ) : (
+                            getStatusBadge(deployment.status)
+                          )}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -349,21 +367,32 @@ const PresalesPage: React.FC = () => {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-ink-muted">Price</p>
-                            <p className="text-ink font-medium">{formatEther(deployment.mintPrice)} ETH</p>
+                            <p className="text-ink-muted">
+                              {deployment.salePhase === 'whitelist' ? 'Active Price' : 'Public Price'}
+                            </p>
+                            <p className="text-ink font-medium">{formatEther(activePrice)} ETH</p>
                           </div>
                         </div>
+
+                        {deployment.whitelistEnabled && (
+                          <div className="rounded-2xl bg-accent/5 border border-accent/10 px-3 py-2 text-body-sm">
+                            <div className="flex justify-between gap-4">
+                              <span className="text-ink-muted">Whitelist</span>
+                              <span className="font-medium text-ink">
+                                {formatEther(deployment.whitelistPrice)} ETH
+                              </span>
+                            </div>
+                            <div className="flex justify-between gap-4 text-ink-muted">
+                              <span>Starts</span>
+                              <span>{new Date(Number(deployment.whitelistStart) * 1000).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        )}
 
                         <div className="pt-2 border-t border-ink/5">
                           <div className="flex items-center gap-2 text-body-sm text-ink-muted">
                             <Clock className="w-3.5 h-3.5" />
-                            <span>
-                              {deployment.status === 'upcoming'
-                                ? `Starts ${new Date(Number(deployment.saleStart) * 1000).toLocaleDateString()}`
-                                : deployment.saleEnd === 0n
-                                ? 'No end date'
-                                : formatTimeRemaining(deployment.saleEnd)}
-                            </span>
+                            <span>{primaryTimelineLabel}</span>
                           </div>
                         </div>
 

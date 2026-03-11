@@ -43,5 +43,26 @@ export const getFriendlyTxErrorMessage = (
   if (text.includes("insufficient funds")) {
     return "Insufficient funds for gas.";
   }
+  if (text.includes("notwhitelisted") || text.includes("not whitelisted")) {
+    return "This wallet is not on the whitelist for the current mint phase.";
+  }
+  if (text.includes("salenotstarted") || text.includes("sale not started")) {
+    return "Minting has not started yet.";
+  }
+  if (text.includes("saleended") || text.includes("sale ended")) {
+    return "This mint window has ended.";
+  }
+  if (text.includes("walletlimitreached") || text.includes("wallet limit")) {
+    return "This wallet has reached the mint limit for the collection.";
+  }
+  if (text.includes("soldout") || text.includes("sold out")) {
+    return "This collection is sold out.";
+  }
+  if (text.includes("whitelistupdateslocked") || text.includes("whitelist updates locked")) {
+    return "Whitelist edits are locked because the whitelist phase has already started.";
+  }
+  if (text.includes("invalidconfig") || text.includes("invalid config")) {
+    return "The sale configuration is invalid. Check your prices and dates.";
+  }
   return `${actionLabel} failed. Please try again.`;
 };

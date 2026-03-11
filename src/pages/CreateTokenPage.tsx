@@ -467,12 +467,16 @@ const CreateTokenPage: React.FC = () => {
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setShowSuccessModal(false)}
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="w-full max-w-xl glass-card rounded-3xl p-8 text-center space-y-6"
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="w-16 h-16 rounded-full bg-status-live-bg text-status-live mx-auto flex items-center justify-center">
               <CheckCircle2 className="w-8 h-8" />

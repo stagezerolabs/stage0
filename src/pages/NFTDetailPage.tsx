@@ -17,13 +17,14 @@ import {
   ExternalLink,
   Image,
   Loader2,
-  Users,
   Shield,
+  Users,
   Layers,
 } from 'lucide-react';
 import { NFTCollectionContract, NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import { contractUriToHttp, ipfsUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
+import { getNFTActiveMintPrice, getNFTSalePhase, getNFTSaleStatus } from '@/lib/utils/nft-sales';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -43,45 +44,40 @@ const itemVariants = {
   },
 };
 
-function getStatusBadge(status: string) {
-  switch (status) {
-    case 'live':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-live-bg text-status-live">
-          <span className="w-2 h-2 rounded-full bg-status-live animate-pulse" />
-          Live
-        </span>
-      );
-    case 'upcoming':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-upcoming-bg text-status-upcoming">
-          <Clock className="w-3.5 h-3.5" />
-          Upcoming
-        </span>
-      );
-    case 'ended':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-closed-bg text-status-closed">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          Ended
-        </span>
-      );
-    default:
-      return null;
+function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'whitelist' | 'public' | 'upcoming' | 'ended') {
+  if (status === 'live' && salePhase === 'whitelist') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-accent/10 text-accent">
+        <Shield className="w-3.5 h-3.5" />
+        Whitelist Live
+      </span>
+    );
   }
-}
 
-function computeStatus(
-  saleStart: bigint,
-  saleEnd: bigint,
-  totalMinted: bigint,
-  maxSupply: bigint
-): 'live' | 'upcoming' | 'ended' {
-  if (maxSupply > 0n && totalMinted >= maxSupply) return 'ended';
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  if (saleStart > now) return 'upcoming';
-  if (saleEnd !== 0n && saleEnd <= now) return 'ended';
-  return 'live';
+  if (status === 'live') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-live-bg text-status-live">
+        <span className="w-2 h-2 rounded-full bg-status-live animate-pulse" />
+        Public Live
+      </span>
+    );
+  }
+
+  if (status === 'upcoming') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-upcoming-bg text-status-upcoming">
+        <Clock className="w-3.5 h-3.5" />
+        Upcoming
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-closed-bg text-status-closed">
+      <CheckCircle2 className="w-3.5 h-3.5" />
+      Ended
+    </span>
+  );
 }
 
 function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
@@ -102,6 +98,11 @@ function resolveMetadataImageUri(imageUri: string, metadataUri: string): string 
   } catch {
     return ipfsUriToHttp(normalized);
   }
+}
+
+function formatTimestamp(ts: bigint): string {
+  if (!ts || ts === 0n) return 'Not set';
+  return new Date(Number(ts) * 1000).toLocaleString();
 }
 
 const NFTDetailPage: React.FC = () => {
@@ -130,10 +131,13 @@ const NFTDetailPage: React.FC = () => {
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleStart' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleEnd' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'contractURI' },
+      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistEnabled' },
+      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistStart' },
+      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistPrice' },
     ] as const;
   }, [collectionAddress]);
 
-  const userMintedQuery = useMemo(() => {
+  const userStateQueries = useMemo(() => {
     if (!collectionAddress || !userAddress) return [];
     return [
       {
@@ -148,6 +152,12 @@ const NFTDetailPage: React.FC = () => {
         functionName: 'mintedPerWallet',
         args: [userAddress],
       },
+      {
+        abi: NFTCollectionContract,
+        address: collectionAddress,
+        functionName: 'whitelist',
+        args: [userAddress],
+      },
     ] as const;
   }, [collectionAddress, userAddress]);
 
@@ -160,10 +170,10 @@ const NFTDetailPage: React.FC = () => {
     },
   });
 
-  const { data: userMintedData, refetch: refetchUserMinted } = useReadContracts({
-    contracts: userMintedQuery as readonly any[],
+  const { data: userStateData, refetch: refetchUserState } = useReadContracts({
+    contracts: userStateQueries as readonly any[],
     query: {
-      enabled: userMintedQuery.length > 0,
+      enabled: userStateQueries.length > 0,
       refetchInterval: 10000,
       refetchOnWindowFocus: true,
     },
@@ -171,6 +181,7 @@ const NFTDetailPage: React.FC = () => {
 
   const collection = useMemo(() => {
     if (!collectionAddress || !collectionData || collectionData.length === 0) return null;
+
     const name = (collectionData[0]?.result as string | undefined) ?? 'NFT Collection';
     const symbol = (collectionData[1]?.result as string | undefined) ?? 'NFT';
     const maxSupply = (collectionData[2]?.result as bigint | undefined) ?? 0n;
@@ -180,8 +191,27 @@ const NFTDetailPage: React.FC = () => {
     const saleStart = (collectionData[6]?.result as bigint | undefined) ?? 0n;
     const saleEnd = (collectionData[7]?.result as bigint | undefined) ?? 0n;
     const contractURI = (collectionData[8]?.result as string | undefined) ?? '';
-    const status = computeStatus(saleStart, saleEnd, totalMinted, maxSupply);
+    const whitelistEnabled = (collectionData[9]?.result as boolean | undefined) ?? false;
+    const whitelistStart = (collectionData[10]?.result as bigint | undefined) ?? 0n;
+    const whitelistPrice = (collectionData[11]?.result as bigint | undefined) ?? 0n;
     const remaining = maxSupply > 0n ? maxSupply - totalMinted : 0n;
+    const salePhase = getNFTSalePhase({
+      maxSupply,
+      totalMinted,
+      saleStart,
+      saleEnd,
+      whitelistEnabled,
+      whitelistStart,
+    });
+    const status = getNFTSaleStatus({
+      maxSupply,
+      totalMinted,
+      saleStart,
+      saleEnd,
+      whitelistEnabled,
+      whitelistStart,
+    });
+
     return {
       name,
       symbol,
@@ -192,8 +222,12 @@ const NFTDetailPage: React.FC = () => {
       saleStart,
       saleEnd,
       contractURI,
-      status,
+      whitelistEnabled,
+      whitelistStart,
+      whitelistPrice,
       remaining,
+      salePhase,
+      status,
     };
   }, [collectionAddress, collectionData]);
 
@@ -239,10 +273,10 @@ const NFTDetailPage: React.FC = () => {
   }, [collection?.contractURI]);
 
   const userMinted = useMemo(() => {
-    if (!userMintedData || userMintedData.length === 0) return 0n;
+    if (!userStateData || userStateData.length === 0) return 0n;
 
-    const mintedBy = userMintedData[0];
-    const mintedPerWallet = userMintedData[1];
+    const mintedBy = userStateData[0];
+    const mintedPerWallet = userStateData[1];
 
     if (mintedBy?.status === 'success' && typeof mintedBy.result === 'bigint') {
       return mintedBy.result;
@@ -251,24 +285,43 @@ const NFTDetailPage: React.FC = () => {
       return mintedPerWallet.result;
     }
     return 0n;
-  }, [userMintedData]);
+  }, [userStateData]);
+
+  const isUserWhitelisted = useMemo(() => {
+    const whitelistEntry = userStateData?.[2];
+    return whitelistEntry?.status === 'success' && Boolean(whitelistEntry.result);
+  }, [userStateData]);
 
   const maxMintable = useMemo(() => {
     if (!collection) return 0;
-    const walletLimit = collection.walletLimit;
     const remaining = Number(collection.remaining);
-    if (walletLimit === 0) {
-      // No per-wallet limit, can mint up to remaining supply
-      return remaining;
-    }
-    const leftForWallet = Math.max(0, walletLimit - Number(userMinted));
+    if (collection.walletLimit === 0) return remaining;
+    const leftForWallet = Math.max(0, collection.walletLimit - Number(userMinted));
     return Math.min(leftForWallet, remaining);
   }, [collection, userMinted]);
 
-  const totalCost = useMemo(() => {
+  const unitPrice = useMemo(() => {
     if (!collection) return 0n;
-    return collection.mintPrice * BigInt(mintQty);
-  }, [collection, mintQty]);
+    return getNFTActiveMintPrice({
+      maxSupply: collection.maxSupply,
+      totalMinted: collection.totalMinted,
+      saleStart: collection.saleStart,
+      saleEnd: collection.saleEnd,
+      whitelistEnabled: collection.whitelistEnabled,
+      whitelistStart: collection.whitelistStart,
+      mintPrice: collection.mintPrice,
+      whitelistPrice: collection.whitelistPrice,
+    });
+  }, [collection]);
+
+  const totalCost = useMemo(() => unitPrice * BigInt(mintQty), [unitPrice, mintQty]);
+
+  const userCanMintCurrentPhase = useMemo(() => {
+    if (!collection) return false;
+    if (collection.salePhase === 'public') return true;
+    if (collection.salePhase === 'whitelist') return isUserWhitelisted;
+    return false;
+  }, [collection, isUserWhitelisted]);
 
   const {
     data: txHash,
@@ -283,21 +336,21 @@ const NFTDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!writeError) return;
-    toast.error(getFriendlyTxErrorMessage(writeError, 'mint'));
+    toast.error(getFriendlyTxErrorMessage(writeError, 'Mint'));
   }, [writeError]);
 
   useEffect(() => {
     if (!txHash || !isSuccess) return;
     if (handledHashRef.current === txHash) return;
     handledHashRef.current = txHash;
-    toast.success(`Minted ${mintQty} NFT${mintQty > 1 ? 's' : ''} successfully!`);
+    toast.success(`Minted ${mintQty} NFT${mintQty > 1 ? 's' : ''} successfully.`);
     setMintQty(1);
     resetWrite();
-    void Promise.all([refetch(), refetchUserMinted()]);
-  }, [txHash, isSuccess, mintQty, refetch, refetchUserMinted, resetWrite]);
+    void Promise.all([refetch(), refetchUserState()]);
+  }, [txHash, isSuccess, mintQty, refetch, refetchUserState, resetWrite]);
 
   const handleMint = () => {
-    if (!collectionAddress || mintQty < 1) return;
+    if (!collectionAddress || mintQty < 1 || !userCanMintCurrentPhase) return;
     writeContract({
       abi: NFTCollectionContract,
       address: collectionAddress,
@@ -341,7 +394,6 @@ const NFTDetailPage: React.FC = () => {
       animate="visible"
       className="space-y-8"
     >
-      {/* Back */}
       <motion.div variants={itemVariants}>
         <Link
           to="/presales"
@@ -352,7 +404,6 @@ const NFTDetailPage: React.FC = () => {
         </Link>
       </motion.div>
 
-      {/* Header */}
       <motion.section variants={itemVariants} className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 space-y-1">
@@ -368,15 +419,13 @@ const NFTDetailPage: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {getStatusBadge(collection.status)}
+            {getStatusBadge(collection.status, collection.salePhase)}
           </div>
         </div>
       </motion.section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Collection image */}
           <motion.div variants={itemVariants} className="glass-card rounded-3xl overflow-hidden">
             {resolvedCollectionImage ? (
               <img
@@ -391,7 +440,6 @@ const NFTDetailPage: React.FC = () => {
             )}
           </motion.div>
 
-          {/* Mint Progress */}
           <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-4">
             <h2 className="font-display text-display-sm text-ink">Mint Progress</h2>
             <div className="space-y-3">
@@ -414,54 +462,60 @@ const NFTDetailPage: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Collection Details */}
           <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-4">
-            <h2 className="font-display text-display-sm text-ink">Collection Details</h2>
+            <h2 className="font-display text-display-sm text-ink">Sale Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 {
-                  label: 'Mint Price',
+                  label: 'Public Price',
                   value: `${formatEther(collection.mintPrice)} ETH`,
                   icon: Layers,
                 },
                 {
-                  label: 'Max Supply',
-                  value: collection.maxSupply.toString(),
-                  icon: Layers,
-                },
-                {
-                  label: 'Wallet Limit',
-                  value: collection.walletLimit === 0 ? 'Unlimited' : collection.walletLimit.toString(),
+                  label: 'Whitelist Price',
+                  value: collection.whitelistEnabled ? `${formatEther(collection.whitelistPrice)} ETH` : 'Disabled',
                   icon: Shield,
                 },
                 {
-                  label: 'Sale Start',
-                  value:
-                    collection.saleStart && collection.saleStart > 0n
-                      ? new Date(Number(collection.saleStart) * 1000).toLocaleString()
-                      : 'Immediately',
+                  label: 'Whitelist Start',
+                  value: collection.whitelistEnabled ? formatTimestamp(collection.whitelistStart) : 'Disabled',
+                  icon: Clock,
+                },
+                {
+                  label: 'Public Start',
+                  value: formatTimestamp(collection.saleStart),
                   icon: Clock,
                 },
                 {
                   label: 'Sale End',
-                  value:
-                    collection.saleEnd && collection.saleEnd > 0n
-                      ? new Date(Number(collection.saleEnd) * 1000).toLocaleString()
-                      : 'No end date',
+                  value: formatTimestamp(collection.saleEnd),
                   icon: Clock,
                 },
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-ink/[0.02]">
+                {
+                  label: 'Wallet Limit',
+                  value: collection.walletLimit === 0 ? 'Unlimited' : collection.walletLimit.toString(),
+                  icon: Users,
+                },
+              ].map((item) => (
+                <div key={item.label} className="flex items-start gap-3 p-3 rounded-2xl bg-ink/[0.02]">
                   <div className="w-8 h-8 rounded-xl bg-accent-muted text-accent flex items-center justify-center flex-shrink-0">
                     <item.icon className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-body-sm text-ink-muted">{item.label}</p>
-                    <p className="text-body font-medium text-ink truncate">{item.value}</p>
+                    <p className="text-body font-medium text-ink">{item.value}</p>
                   </div>
                 </div>
               ))}
             </div>
+
+            {collection.salePhase === 'whitelist' && (
+              <div className="rounded-2xl border border-accent/20 bg-accent/5 p-4 text-body-sm text-ink-muted">
+                Whitelist mint is currently active. Public mint opens at{' '}
+                <span className="font-medium text-ink">{formatTimestamp(collection.saleStart)}</span>.
+              </div>
+            )}
+
             {collectionAddress && (
               <a
                 href={`${explorerUrl}/address/${collectionAddress}`}
@@ -475,12 +529,10 @@ const NFTDetailPage: React.FC = () => {
           </motion.div>
         </div>
 
-        {/* Right column: Mint */}
         <div className="space-y-6">
-          {/* User stats */}
           {isConnected && (
             <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-3">
-              <h3 className="font-display text-display-sm text-ink">Your Mints</h3>
+              <h3 className="font-display text-display-sm text-ink">Your Access</h3>
               <div className="space-y-2">
                 <div className="flex justify-between text-body-sm">
                   <span className="text-ink-muted">Minted so far</span>
@@ -496,14 +548,30 @@ const NFTDetailPage: React.FC = () => {
                   <span className="text-ink-muted">Can still mint</span>
                   <span className="text-ink font-medium">{maxMintable}</span>
                 </div>
+                {collection.whitelistEnabled && (
+                  <div className="flex justify-between text-body-sm">
+                    <span className="text-ink-muted">Whitelist status</span>
+                    <span className="text-ink font-medium">{isUserWhitelisted ? 'Approved' : 'Not approved'}</span>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
 
-          {/* Mint form */}
           {collection.status === 'live' && isConnected && (
             <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-4">
               <h3 className="font-display text-display-sm text-ink">Mint NFT</h3>
+
+              <div className="rounded-2xl border border-border bg-canvas-alt p-4 space-y-1">
+                <p className="text-body-sm text-ink-muted">Active phase</p>
+                <p className="text-body font-medium text-ink">
+                  {collection.salePhase === 'whitelist' ? 'Whitelist mint' : 'Public mint'}
+                </p>
+                <p className="text-body-sm text-ink-muted">
+                  Current price: <span className="font-medium text-ink">{formatEther(unitPrice)} ETH</span>
+                </p>
+              </div>
+
               <div className="space-y-4">
                 <div>
                   <label className="text-body-sm text-ink-muted font-medium mb-1 block">
@@ -515,23 +583,23 @@ const NFTDetailPage: React.FC = () => {
                       disabled={mintQty <= 1}
                       className="w-9 h-9 rounded-xl bg-ink/5 hover:bg-ink/10 text-ink font-bold disabled:opacity-30 transition-colors"
                     >
-                      −
+                      -
                     </button>
                     <input
                       type="number"
                       min={1}
-                      max={maxMintable}
+                      max={Math.max(1, maxMintable)}
                       value={mintQty}
                       onChange={(e) => {
-                        const v = Math.max(1, Math.min(maxMintable, Number(e.target.value) || 1));
+                        const v = Math.max(1, Math.min(Math.max(1, maxMintable), Number(e.target.value) || 1));
                         setMintQty(v);
                         resetWrite();
                       }}
                       className="input-field w-20 text-center"
                     />
                     <button
-                      onClick={() => setMintQty((q) => Math.min(maxMintable, q + 1))}
-                      disabled={mintQty >= maxMintable}
+                      onClick={() => setMintQty((q) => Math.min(Math.max(1, maxMintable), q + 1))}
+                      disabled={mintQty >= Math.max(1, maxMintable)}
                       className="w-9 h-9 rounded-xl bg-ink/5 hover:bg-ink/10 text-ink font-bold disabled:opacity-30 transition-colors"
                     >
                       +
@@ -540,16 +608,17 @@ const NFTDetailPage: React.FC = () => {
                 </div>
 
                 <div className="text-body-sm text-ink-muted space-y-1">
-                  <p>Price per NFT: {formatEther(collection.mintPrice)} ETH</p>
-                  <p className="font-medium text-ink">
-                    Total: {formatEther(totalCost)} ETH
-                  </p>
-                  {collection.walletLimit > 0 && (
-                    <p>Max per wallet: {collection.walletLimit}</p>
-                  )}
+                  <p>Price per NFT: {formatEther(unitPrice)} ETH</p>
+                  <p className="font-medium text-ink">Total: {formatEther(totalCost)} ETH</p>
+                  {collection.walletLimit > 0 && <p>Max per wallet: {collection.walletLimit}</p>}
                 </div>
 
-                {maxMintable === 0 ? (
+                {!userCanMintCurrentPhase ? (
+                  <div className="p-3 rounded-xl bg-status-upcoming-bg text-status-upcoming text-sm">
+                    Only whitelisted wallets can mint during the current phase. Public mint opens{' '}
+                    {formatTimestamp(collection.saleStart)}.
+                  </div>
+                ) : maxMintable === 0 ? (
                   <div className="p-3 rounded-xl bg-status-closed-bg text-status-closed text-sm text-center">
                     {Number(userMinted) >= collection.walletLimit && collection.walletLimit > 0
                       ? 'You have reached the wallet limit for this collection.'
@@ -578,12 +647,11 @@ const NFTDetailPage: React.FC = () => {
           {collection.status === 'upcoming' && (
             <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 text-center space-y-3">
               <Clock className="w-8 h-8 text-status-upcoming mx-auto" />
-              <p className="text-body font-medium text-ink">Sale Not Started</p>
+              <p className="text-body font-medium text-ink">Mint Has Not Started Yet</p>
               <p className="text-body-sm text-ink-muted">
-                Starts{' '}
-                {collection.saleStart > 0n
-                  ? new Date(Number(collection.saleStart) * 1000).toLocaleString()
-                  : 'soon'}
+                {collection.whitelistEnabled
+                  ? `Whitelist opens ${formatTimestamp(collection.whitelistStart)}`
+                  : `Public mint opens ${formatTimestamp(collection.saleStart)}`}
               </p>
             </motion.div>
           )}
@@ -597,13 +665,10 @@ const NFTDetailPage: React.FC = () => {
           )}
 
           {!isConnected && (
-            <motion.div
-              variants={itemVariants}
-              className="glass-card rounded-3xl p-6 text-center space-y-3"
-            >
+            <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 text-center space-y-3">
               <Users className="w-8 h-8 text-accent mx-auto" />
               <p className="text-body text-ink-muted">
-                Connect your wallet to mint from this collection.
+                Connect your wallet to mint from this collection and verify whitelist access.
               </p>
             </motion.div>
           )}

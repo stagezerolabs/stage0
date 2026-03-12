@@ -1,4 +1,5 @@
 export const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
+const CONTRACT_METADATA_FILENAMES = ['contract.json', 'collection.json', 'metadata.json'] as const;
 
 function stripQueryAndHash(value: string): string {
   return value.split('#')[0].split('?')[0];
@@ -21,10 +22,10 @@ function extractIpfsPath(raw: string): string {
         const path = pathname.replace(/^\/+/, '');
         value = path ? `${cidFromHost}/${path}` : cidFromHost;
       } else {
-        value = pathname.replace(/^\/+/, '');
+        return '';
       }
     } catch {
-      value = value.replace(/^https?:\/\//i, '');
+      return '';
     }
   }
 
@@ -40,26 +41,34 @@ function extractIpfsPath(raw: string): string {
   return stripQueryAndHash(value);
 }
 
-function extractContractCid(raw: string): string {
-  let path = extractIpfsPath(raw);
-  if (!path) return '';
-
-  path = path
-    .replace(/\/(?:contract|collection|metadata)\.json$/i, '')
-    .replace(/\/+$/, '');
-
-  const [cid] = path.split('/');
-  return cid || '';
-}
-
 export function normalizeContractURI(raw: string): string {
-  const cid = extractContractCid(raw);
-  return cid ? `ipfs://${cid}` : '';
+  const normalized = stripQueryAndHash(raw.trim());
+  if (!normalized) return '';
+
+  if (/^https?:\/\//i.test(normalized)) {
+    const ipfsPath = extractIpfsPath(normalized);
+    return ipfsPath ? `ipfs://${ipfsPath}` : normalized;
+  }
+
+  if (/^ipfs:\/\//i.test(normalized)) {
+    const ipfsPath = extractIpfsPath(normalized);
+    return ipfsPath ? `ipfs://${ipfsPath}` : '';
+  }
+
+  const ipfsPath = extractIpfsPath(normalized);
+  return ipfsPath ? `ipfs://${ipfsPath}` : '';
 }
 
 export function contractUriToHttp(raw: string): string {
-  const cid = extractContractCid(raw);
-  return cid ? `${IPFS_GATEWAY}${cid}` : '';
+  const normalized = stripQueryAndHash(raw.trim());
+  if (!normalized) return '';
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
+
+  const ipfsPath = extractIpfsPath(normalized);
+  return ipfsPath ? `${IPFS_GATEWAY}${ipfsPath}` : '';
 }
 
 export function ipfsUriToHttp(raw: string): string {
@@ -72,4 +81,32 @@ export function ipfsUriToHttp(raw: string): string {
 
   const path = extractIpfsPath(normalized);
   return path ? `${IPFS_GATEWAY}${path}` : normalized;
+}
+
+function looksLikeJsonPath(pathname: string): boolean {
+  return /\.json$/i.test(pathname.replace(/\/+$/, ''));
+}
+
+export function getContractMetadataCandidateUrls(raw: string): string[] {
+  const base = contractUriToHttp(raw).replace(/\/+$/, '');
+  if (!base) return [];
+
+  const candidates = [base];
+
+  try {
+    const url = new URL(base);
+    if (!looksLikeJsonPath(url.pathname)) {
+      for (const filename of CONTRACT_METADATA_FILENAMES) {
+        candidates.push(`${base}/${filename}`);
+      }
+    }
+  } catch {
+    if (!looksLikeJsonPath(base)) {
+      for (const filename of CONTRACT_METADATA_FILENAMES) {
+        candidates.push(`${base}/${filename}`);
+      }
+    }
+  }
+
+  return Array.from(new Set(candidates));
 }

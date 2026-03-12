@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -8,6 +8,8 @@ import {
 import { formatEther, formatUnits } from 'viem';
 import { NFT_COLLECTION_IMAGES } from '@/config';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
+import PhaseCountdown from '@/components/ui/PhaseCountdown';
+import { resolveNFTSaleCountdown } from '@/lib/utils/nft-sales';
 import {
   Clock,
   CheckCircle2,
@@ -93,24 +95,38 @@ function getStatusBadge(status: string) {
   }
 }
 
-function formatTimeRemaining(endTime: bigint | undefined): string {
-  if (!endTime) return '--';
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  if (endTime <= now) return 'Ended';
+function formatCountdown(targetTime: bigint | undefined, nowSec: number): string {
+  if (!targetTime || targetTime <= 0n) return '--';
 
-  const diff = Number(endTime - now);
+  const diff = Number(targetTime) - nowSec;
+  if (diff <= 0) return '00h 00m 00s';
+
   const days = Math.floor(diff / 86400);
   const hours = Math.floor((diff % 86400) / 3600);
   const minutes = Math.floor((diff % 3600) / 60);
+  const seconds = diff % 60;
 
-  if (days > 0) return `${days}d ${hours}h remaining`;
-  if (hours > 0) return `${hours}h ${minutes}m remaining`;
-  return `${minutes}m remaining`;
+  if (days > 0) {
+    return `${days}d ${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+  }
+
+  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds
+    .toString()
+    .padStart(2, '0')}s`;
 }
 
 const PresalesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
   const [activeLaunchType, setActiveLaunchType] = useState<LaunchTypeFilter>('all');
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowSec(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const filterMap: Record<TabFilter, LaunchpadPresaleFilter> = {
     all: 'all',
@@ -270,9 +286,13 @@ const PresalesPage: React.FC = () => {
                         <span>
                           {presale.status === 'upcoming'
                             ? presale.startTime
-                              ? `Starts ${new Date(Number(presale.startTime) * 1000).toLocaleDateString()}`
+                              ? `Starts in ${formatCountdown(presale.startTime, nowSec)}`
                               : 'Start date TBD'
-                            : formatTimeRemaining(presale.endTime)}
+                            : presale.status === 'live'
+                            ? presale.endTime
+                              ? `Ends in ${formatCountdown(presale.endTime, nowSec)}`
+                              : 'End date TBD'
+                            : 'Ended'}
                         </span>
                       </div>
                     </div>
@@ -288,16 +308,14 @@ const PresalesPage: React.FC = () => {
                   : 0;
               const collectionImage =
                 deployment.metadataImage || NFT_COLLECTION_IMAGES[deployment.address.toLowerCase()];
-              const activePrice = deployment.salePhase === 'whitelist'
-                ? deployment.whitelistPrice
-                : deployment.mintPrice;
-              const primaryTimelineLabel = deployment.status === 'upcoming'
-                ? deployment.whitelistEnabled
-                  ? `Whitelist starts ${new Date(Number(deployment.whitelistStart) * 1000).toLocaleDateString()}`
-                  : `Public starts ${new Date(Number(deployment.saleStart) * 1000).toLocaleDateString()}`
-                : deployment.saleEnd === 0n
-                ? 'No end date'
-                : formatTimeRemaining(deployment.saleEnd);
+              const saleCountdown = resolveNFTSaleCountdown({
+                status: deployment.status,
+                whitelistEnabled: deployment.whitelistEnabled,
+                whitelistStart: deployment.whitelistStart,
+                saleStart: deployment.saleStart,
+                saleEnd: deployment.saleEnd,
+                nowSec,
+              });
 
               return (
                 <div key={deployment.address}>
@@ -328,7 +346,7 @@ const PresalesPage: React.FC = () => {
                             </p>
                           </div>
                           {deployment.status === 'live' && deployment.salePhase === 'whitelist' ? (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-accent/10 text-accent">
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-accent/10 text-accent whitespace-nowrap shrink-0 self-start">
                               <Shield className="w-3 h-3" />
                               Whitelist Live
                             </span>
@@ -367,33 +385,36 @@ const PresalesPage: React.FC = () => {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-ink-muted">
-                              {deployment.salePhase === 'whitelist' ? 'Active Price' : 'Public Price'}
-                            </p>
-                            <p className="text-ink font-medium">{formatEther(activePrice)} ETH</p>
+                            <p className="text-ink-muted">Remaining</p>
+                            <p className="text-ink font-medium">{deployment.remaining.toString()}</p>
                           </div>
                         </div>
 
-                        {deployment.whitelistEnabled && (
-                          <div className="rounded-2xl bg-accent/5 border border-accent/10 px-3 py-2 text-body-sm">
+                        <div className="rounded-2xl bg-accent/5 border border-accent/10 px-3 py-2 text-body-sm space-y-1.5">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-ink-muted">Public Price</span>
+                            <span className="font-medium text-ink">{formatEther(deployment.mintPrice)} ETH</span>
+                          </div>
+                          {deployment.whitelistEnabled && (
                             <div className="flex justify-between gap-4">
-                              <span className="text-ink-muted">Whitelist</span>
+                              <span className="text-ink-muted">Whitelist Price</span>
                               <span className="font-medium text-ink">
                                 {formatEther(deployment.whitelistPrice)} ETH
                               </span>
                             </div>
-                            <div className="flex justify-between gap-4 text-ink-muted">
-                              <span>Starts</span>
-                              <span>{new Date(Number(deployment.whitelistStart) * 1000).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         <div className="pt-2 border-t border-ink/5">
-                          <div className="flex items-center gap-2 text-body-sm text-ink-muted">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>{primaryTimelineLabel}</span>
-                          </div>
+                          <PhaseCountdown
+                            compact
+                            label={saleCountdown.label}
+                            targetTime={saleCountdown.targetTime}
+                            nowSec={nowSec}
+                            fallbackLabel={saleCountdown.fallbackLabel}
+                            completedLabel={saleCountdown.completedLabel}
+                            stoppedMessage={saleCountdown.stoppedMessage}
+                          />
                         </div>
 
                         <div className="mt-auto pt-3 border-t border-ink/5">

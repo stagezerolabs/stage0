@@ -56,6 +56,31 @@ const itemVariants = {
   },
 };
 
+function formatTimestamp(timestamp?: bigint): string {
+  if (!timestamp || timestamp <= 0n) return '--';
+  return new Date(Number(timestamp) * 1000).toLocaleString();
+}
+
+function formatCountdown(targetTime: bigint | undefined, nowSec: number): string {
+  if (!targetTime || targetTime <= 0n) return '--';
+
+  const diff = Number(targetTime) - nowSec;
+  if (diff <= 0) return '00h 00m 00s';
+
+  const days = Math.floor(diff / 86400);
+  const hours = Math.floor((diff % 86400) / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  const seconds = diff % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+  }
+
+  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds
+    .toString()
+    .padStart(2, '0')}s`;
+}
+
 function getStatusBadge(status: string) {
   switch (status) {
     case 'live':
@@ -109,6 +134,7 @@ const PresaleDetailPage: React.FC = () => {
   const [contributeAmount, setContributeAmount] = useState('');
   const [amountNeedsAttention, setAmountNeedsAttention] = useState(false);
   const contributeInputRef = useRef<HTMLInputElement | null>(null);
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
   const paymentDecimals = presale?.paymentTokenDecimals ?? 18;
   const parsedAmount = useMemo(() => {
@@ -175,6 +201,14 @@ const PresaleDetailPage: React.FC = () => {
     }
   }, [isContributeSuccess, presaleAddress, invalidateContribute, refetch]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowSec(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   const isOwner =
     isConnected &&
     userAddress &&
@@ -186,6 +220,28 @@ const PresaleDetailPage: React.FC = () => {
     if (!presale?.hardCap || presale.hardCap === 0n) return 0;
     return Number((presale.totalRaised * 100n) / presale.hardCap);
   }, [presale?.hardCap, presale?.totalRaised]);
+  const startSec = Number(presale?.startTime ?? 0n);
+  const endSec = Number(presale?.endTime ?? 0n);
+
+  const startCountdown =
+    startSec === 0 ? '--' : startSec > nowSec ? `in ${formatCountdown(presale?.startTime, nowSec)}` : 'Started';
+  const endCountdown =
+    endSec === 0 ? '--' : endSec > nowSec ? `in ${formatCountdown(presale?.endTime, nowSec)}` : 'Ended';
+
+  const timelineRows: Array<{ label: string; value: string }> = [];
+  if (presaleStatus === 'upcoming') {
+    timelineRows.push({
+      label: 'Presale starts in',
+      value: formatCountdown(presale?.startTime, nowSec),
+    });
+  } else if (presaleStatus === 'live') {
+    timelineRows.push({
+      label: 'Presale ends in',
+      value: formatCountdown(presale?.endTime, nowSec),
+    });
+  } else {
+    timelineRows.push({ label: 'Status', value: presaleStatus });
+  }
 
   const handleContribute = () => {
     if (!presaleAddress) return;
@@ -344,16 +400,14 @@ const PresaleDetailPage: React.FC = () => {
                 },
                 {
                   label: 'Start Time',
-                  value: presale.startTime
-                    ? new Date(Number(presale.startTime) * 1000).toLocaleString()
-                    : '--',
+                  value: startCountdown,
+                  sub: formatTimestamp(presale.startTime),
                   icon: Calendar,
                 },
                 {
                   label: 'End Time',
-                  value: presale.endTime
-                    ? new Date(Number(presale.endTime) * 1000).toLocaleString()
-                    : '--',
+                  value: endCountdown,
+                  sub: formatTimestamp(presale.endTime),
                   icon: Calendar,
                 },
               ].map((item, idx) => (
@@ -371,6 +425,20 @@ const PresaleDetailPage: React.FC = () => {
                 </div>
               ))}
             </div>
+
+            {timelineRows.length > 0 && (
+              <div className="rounded-2xl border border-border bg-canvas-alt p-4 space-y-2">
+                {timelineRows.map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-3 text-body-sm">
+                    <span className="inline-flex items-center gap-2 text-ink-muted">
+                      <Clock className="w-3.5 h-3.5" />
+                      {row.label}
+                    </span>
+                    <span className="font-medium text-ink">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Explorer Link */}
             {presaleAddress && (

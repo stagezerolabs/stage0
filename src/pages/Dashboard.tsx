@@ -11,9 +11,10 @@ import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
+import { useAllLocks } from '@/lib/hooks/useAllLocks';
 import { motion } from 'framer-motion';
 import { ArrowRight, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
@@ -52,9 +53,42 @@ const ConnectWalletPlaceholder: React.FC<{ message: string }> = ({ message }) =>
   </div>
 );
 
+function formatCountdownFromSeconds(totalSeconds: number): string {
+  if (totalSeconds <= 0) return '00h 00m 00s';
+
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+  }
+
+  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds
+    .toString()
+    .padStart(2, '0')}s`;
+}
+
+function formatLockAmount(amount: string): string {
+  const parsed = Number(amount);
+  if (!Number.isFinite(parsed)) return amount;
+  return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+interface DashboardLockItem {
+  id: bigint;
+  tokenSymbol: string;
+  formattedAmount: string;
+  unlockDate: bigint;
+  withdrawn: boolean;
+  name: string;
+}
+
 const Dashboard: React.FC = () => {
   const { address, isConnected } = useAccount();
   const [nftTypeFilter, setNftTypeFilter] = useState<'all' | 'erc721' | 'erc721a'>('all');
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const safeAddress = (address ?? zeroAddress) as Address;
   const chainId = useChainId();
   const nativeToken = getNativeTokenLabel(chainId);
@@ -81,6 +115,14 @@ const Dashboard: React.FC = () => {
     totalMinted: totalMintedNFTs,
     isLoading: isNftHoldingsLoading,
   } = useUserNFTHoldings(address as Address | undefined, isConnected && Boolean(address));
+  const { locks: rawLocks, isLoading: isLocksLoading } = useAllLocks();
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowSec(Math.floor(Date.now() / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const { data: stakingTokenData } = useReadContracts({
     contracts: [
@@ -201,6 +243,14 @@ const Dashboard: React.FC = () => {
     if (!address) return [];
     return presales.filter((presale) => presale.owner?.toLowerCase() === address.toLowerCase());
   }, [address, presales]);
+
+  const myLocks = useMemo(() => {
+    const normalizedLocks = (rawLocks ?? []) as DashboardLockItem[];
+    return [...normalizedLocks].sort((a, b) => {
+      if (a.withdrawn !== b.withdrawn) return a.withdrawn ? 1 : -1;
+      return Number(a.unlockDate) - Number(b.unlockDate);
+    });
+  }, [rawLocks]);
 
   const filteredMyNFTDeployments = useMemo(() => {
     if (nftTypeFilter === 'all') return myNFTDeployments;
@@ -536,10 +586,72 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-display text-body text-ink">Token Locks</h3>
-                  <p className="text-body-sm text-ink-muted">Lock tokens for vesting or liquidity.</p>
+                  <p className="text-body-sm text-ink-muted">
+                    {isLocksLoading ? 'Loading…' : `${myLocks.length} total`}
+                  </p>
                 </div>
               </div>
-              <Link to="/tools/token-locker" className="btn-secondary w-full">Create Lock</Link>
+
+              {isLocksLoading && myLocks.length === 0 ? (
+                <p className="text-body-sm text-ink-muted">Loading your locks…</p>
+              ) : myLocks.length === 0 ? (
+                <p className="text-body-sm text-ink-muted">No token locks yet. Create one from the locker tool.</p>
+              ) : (
+                <div className="space-y-2 max-h-40 overflow-auto no-scrollbar">
+                  {myLocks.slice(0, 5).map((lock) => {
+                    const secondsUntilUnlock = Number(lock.unlockDate) - nowSec;
+                    const isUnlockable = !lock.withdrawn && secondsUntilUnlock <= 0;
+                    const statusLabel = lock.withdrawn ? 'withdrawn' : isUnlockable ? 'unlockable' : 'locked';
+                    const timerLabel = lock.withdrawn
+                      ? 'Withdrawn'
+                      : isUnlockable
+                      ? 'Ready now'
+                      : `in ${formatCountdownFromSeconds(secondsUntilUnlock)}`;
+
+                    return (
+                      <Link
+                        key={lock.id.toString()}
+                        to={`/locks/${lock.id.toString()}`}
+                        className="flex items-center justify-between rounded-xl bg-canvas/40 px-3 py-2 text-body-sm text-ink hover:bg-canvas transition-colors"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-ink">
+                            {lock.name?.trim() ? lock.name : `Lock #${lock.id.toString()}`}
+                          </span>
+                          <span className="block truncate text-ink-muted">
+                            {formatLockAmount(lock.formattedAmount)} {lock.tokenSymbol}
+                          </span>
+                        </span>
+                        <span className="text-right">
+                          <span
+                            className={`block text-[11px] uppercase tracking-wide ${
+                              lock.withdrawn
+                                ? 'text-ink-faint'
+                                : isUnlockable
+                                ? 'text-status-live'
+                                : 'text-status-upcoming'
+                            }`}
+                          >
+                            {statusLabel}
+                          </span>
+                          <span className="block text-[11px] text-ink-faint whitespace-nowrap">
+                            {timerLabel}
+                          </span>
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Link to="/tools/token-locker" className="btn-secondary w-full text-center">
+                  Create Lock
+                </Link>
+                <Link to="/tools/token-locker" className="btn-secondary w-full text-center">
+                  View All Locks
+                </Link>
+              </div>
             </div>
 
           </div>

@@ -4,7 +4,12 @@ import { useReadContract } from 'wagmi';
 import { type Address } from 'viem';
 import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
-import { contractUriToHttp, ipfsUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
+import {
+  contractUriToHttp,
+  getContractMetadataCandidateUrls,
+  ipfsUriToHttp,
+  normalizeContractURI,
+} from '@/lib/utils/ipfs';
 import {
   getNFTSalePhase,
   getNFTSaleStatus,
@@ -92,9 +97,25 @@ function resolveMetadataImageUri(imageUri: string, metadataUri: string): string 
     return ipfsUriToHttp(normalized);
   }
 
-  const metadataHttpUri = `${contractUriToHttp(metadataUri).replace(/\/+$/, '')}/`;
+  const metadataHttpUri = contractUriToHttp(metadataUri);
+  if (!metadataHttpUri) return ipfsUriToHttp(normalized);
+
+  let metadataBase = metadataHttpUri;
   try {
-    return new URL(normalized, metadataHttpUri).toString();
+    const url = new URL(metadataHttpUri);
+    const pathname = url.pathname;
+    const lastSegment = pathname.split('/').filter(Boolean).pop() ?? '';
+    const looksLikeFile = /\.[a-z0-9]+$/i.test(lastSegment);
+    if (!pathname.endsWith('/') && !looksLikeFile) {
+      url.pathname = `${pathname}/`;
+    }
+    metadataBase = url.toString();
+  } catch {
+    if (!metadataBase.endsWith('/')) metadataBase = `${metadataBase}/`;
+  }
+
+  try {
+    return new URL(normalized, metadataBase).toString();
   } catch {
     return ipfsUriToHttp(normalized);
   }
@@ -350,13 +371,31 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
             const metadataUri = normalizeContractURI(deployment.contractURI);
             if (!metadataUri) return [key, null] as const;
 
-            const response = await fetch(contractUriToHttp(metadataUri));
-            if (!response.ok) throw new Error(`Metadata fetch failed: ${response.status}`);
+            const candidateUrls = getContractMetadataCandidateUrls(metadataUri);
+            if (candidateUrls.length === 0) return [key, null] as const;
 
-            const json = (await response.json()) as Record<string, unknown>;
+            let json: Record<string, unknown> | null = null;
+            let resolvedMetadataUri = metadataUri;
+
+            for (const url of candidateUrls) {
+              try {
+                const response = await fetch(url);
+                if (!response.ok) continue;
+                const text = await response.text();
+                const parsed = JSON.parse(text) as Record<string, unknown>;
+                json = parsed;
+                resolvedMetadataUri = url;
+                break;
+              } catch {
+                continue;
+              }
+            }
+
+            if (!json) return [key, null] as const;
+
             const image =
               typeof json.image === 'string' && json.image.trim().length > 0
-                ? resolveMetadataImageUri(json.image, metadataUri)
+                ? resolveMetadataImageUri(json.image, resolvedMetadataUri)
                 : undefined;
             const description =
               typeof json.description === 'string' && json.description.trim().length > 0

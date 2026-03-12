@@ -607,9 +607,249 @@
     filter: drop-shadow(0 0 8px rgba(255, 138, 0, 0.35));
     transform: rotate(3deg);
   }
+
+  /* ─── Classic Flip Countdown ─── */
+  .flip-countdown {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid rgb(var(--color-border-strong) / 0.6);
+    background: rgb(var(--color-canvas-alt));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    padding: 1rem 1.25rem;
+  }
+
+  .flip-countdown--compact {
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+  }
+
+  .flip-countdown-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: rgb(var(--color-ink-muted));
+    margin-bottom: 0.75rem;
+  }
+
+  .flip-countdown--compact .flip-countdown-label {
+    font-size: 10px;
+    margin-bottom: 0.5rem;
+  }
+
+  .flip-countdown-status {
+    font-size: 11px;
+    color: rgb(var(--color-ink-muted));
+    margin-top: 0.25rem;
+  }
+
+  .flip-countdown--compact .flip-countdown-status {
+    font-size: 10px;
+  }
+
+  .flip-countdown-track {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* ─── Flip Unit (grouped 2-digit module) ─── */
+  .flip-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .flip-countdown--compact .flip-unit {
+    gap: 4px;
+  }
+
+  .flip-unit-card {
+    display: flex;
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.22),
+      inset 0 0 0 1px rgb(var(--color-border) / 0.5);
+  }
+
+  .flip-unit-card--compact {
+    border-radius: 7px;
+  }
+
+  .flip-unit-divider {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    z-index: 10;
+    transform: translateY(-50%);
+    background: rgb(var(--color-border) / 0.3);
+  }
+
+  .flip-unit-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: rgb(var(--color-ink-faint));
+    font-weight: 500;
+  }
+
+  .flip-countdown--compact .flip-unit-label {
+    font-size: 8px;
+  }
+
+  /* ─── Individual Flip Digit ─── */
+  .flip-digit {
+    position: relative;
+    width: 32px;
+    height: 50px;
+    overflow: hidden;
+    perspective: 400px;
+  }
+
+  @media (min-width: 640px) {
+    .flip-digit {
+      width: 38px;
+      height: 58px;
+    }
+  }
+
+  .flip-countdown--compact .flip-digit {
+    width: 22px;
+    height: 34px;
+  }
+
+  @media (min-width: 640px) {
+    .flip-countdown--compact .flip-digit {
+      width: 26px;
+      height: 38px;
+    }
+  }
+
+  .flip-digit-top,
+  .flip-digit-bottom {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(var(--color-canvas));
+  }
+
+  .flip-digit-top {
+    top: 0;
+    transform-origin: bottom center;
+  }
+
+  .flip-digit-bottom {
+    bottom: 0;
+    transform-origin: top center;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .flip-digit-value {
+    display: block;
+    font-family: 'Inconsolata', 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1;
+    color: rgb(var(--color-ink));
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (min-width: 640px) {
+    .flip-digit-value {
+      font-size: 28px;
+    }
+  }
+
+  .flip-countdown--compact .flip-digit-value {
+    font-size: 16px;
+  }
+
+  @media (min-width: 640px) {
+    .flip-countdown--compact .flip-digit-value {
+      font-size: 18px;
+    }
+  }
+
+  .flip-digit-top .flip-digit-value {
+    transform: translateY(50%);
+  }
+
+  .flip-digit-bottom .flip-digit-value {
+    transform: translateY(-50%);
+  }
+
+  /* ─── Flip Animation Flaps ─── */
+  .flip-flap-top {
+    z-index: 5;
+    animation: flipClockDown 200ms ease-in forwards;
+    backface-visibility: hidden;
+  }
+
+  .flip-flap-bottom {
+    z-index: 5;
+    transform: rotateX(90deg);
+    animation: flipClockUp 180ms ease-out 200ms forwards;
+    backface-visibility: hidden;
+  }
+
+  /* ─── Colon Separator ─── */
+  .flip-colon {
+    display: flex;
+    align-items: center;
+    height: 50px;
+    padding: 0 4px;
+    font-family: 'Inconsolata', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: rgb(var(--color-ink-faint));
+    user-select: none;
+  }
+
+  @media (min-width: 640px) {
+    .flip-colon {
+      height: 58px;
+      font-size: 28px;
+      padding: 0 6px;
+    }
+  }
+
+  .flip-countdown--compact .flip-colon {
+    height: 34px;
+    font-size: 16px;
+    padding: 0 2px;
+  }
+
+  @media (min-width: 640px) {
+    .flip-countdown--compact .flip-colon {
+      height: 38px;
+      font-size: 18px;
+      padding: 0 3px;
+    }
+  }
 }
 
 /* Keyframe animations */
+@keyframes flipClockDown {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(-90deg); }
+}
+
+@keyframes flipClockUp {
+  0% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); }
+}
+
 @keyframes skyDrift {
   0%, 100% { background-position: 0% 0%; }
   25% { background-position: 50% 20%; }
@@ -781,6 +1021,12 @@
 
   .progress-ring__circle {
     transition-duration: 0.01ms !important;
+  }
+
+  .flip-flap-top,
+  .flip-flap-bottom {
+    animation: none !important;
+    transform: none !important;
   }
 
   .hero-rise {

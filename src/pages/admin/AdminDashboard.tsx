@@ -7,8 +7,8 @@ import { toast } from 'sonner';
 import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from 'lucide-react';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
-import { useSetFeeRecipient } from '@/lib/hooks/useAdminActions';
-import { useFactoryOwner, useFeeRecipient } from '@/lib/utils/admin';
+import { useSetFeeRecipient, useSetNFTFactoryProceedsFeeBps } from '@/lib/hooks/useAdminActions';
+import { useFactoryOwner, useFeeRecipient, useProceedsFeeBps } from '@/lib/utils/admin';
 import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
 
 const containerVariants = {
@@ -36,25 +36,40 @@ const itemVariants = {
 
 const AdminDashboard: React.FC = () => {
   const { address } = useAccount();
-  const { presaleFactory, nftFactory, explorerUrl } = useChainContracts();
+  const { nftFactory, nftFactoryLens, explorerUrl } = useChainContracts();
   const { totalDeployments, isLoading: isLoadingNFTs } = useUserNFTs();
-  const { factoryOwner, isLoading: isLoadingOwner } = useFactoryOwner();
+  const { factoryOwner, isLoading: isLoadingOwner } = useFactoryOwner('nft');
   const {
     feeRecipient,
     isLoading: isLoadingFeeRecipient,
     refetch: refetchFeeRecipient,
-  } = useFeeRecipient();
+  } = useFeeRecipient('nft');
+  const {
+    proceedsFeeBps,
+    isLoading: isLoadingProceedsFeeBps,
+    refetch: refetchProceedsFeeBps,
+  } = useProceedsFeeBps();
   const { presales, isLoading: isLoadingPresales } = useLaunchpadPresales('all');
 
   const [newFeeRecipient, setNewFeeRecipient] = useState('');
+  const [newProceedsFeeBps, setNewProceedsFeeBps] = useState('');
+
   const {
     setFeeRecipient,
-    isBusy,
-    isSuccess,
-    isError,
-    error,
-    reset,
-  } = useSetFeeRecipient();
+    isBusy: isUpdatingFeeRecipient,
+    isSuccess: isFeeRecipientUpdateSuccess,
+    isError: isFeeRecipientUpdateError,
+    error: feeRecipientUpdateError,
+    reset: resetFeeRecipientUpdate,
+  } = useSetFeeRecipient('nft');
+  const {
+    setProceedsFeeBps,
+    isBusy: isUpdatingProceedsFee,
+    isSuccess: isProceedsFeeUpdateSuccess,
+    isError: isProceedsFeeUpdateError,
+    error: proceedsFeeUpdateError,
+    reset: resetProceedsFeeUpdate,
+  } = useSetNFTFactoryProceedsFeeBps();
 
   const totalPresales = presales?.length ?? 0;
   const livePresales = presales?.filter((p) => p.status === 'live').length ?? 0;
@@ -78,20 +93,36 @@ const AdminDashboard: React.FC = () => {
   }, [address, factoryOwner]);
 
   useEffect(() => {
-    if (isSuccess) {
-      toast.success('Fee recipient updated successfully.');
+    if (isFeeRecipientUpdateSuccess) {
+      toast.success('NFT factory fee recipient updated.');
       setNewFeeRecipient('');
-      reset();
+      resetFeeRecipientUpdate();
       refetchFeeRecipient();
     }
-  }, [isSuccess, reset, refetchFeeRecipient]);
+  }, [isFeeRecipientUpdateSuccess, refetchFeeRecipient, resetFeeRecipientUpdate]);
 
   useEffect(() => {
-    if (isError) {
-      toast.error(error?.message ?? 'Failed to update fee recipient.');
-      reset();
+    if (isFeeRecipientUpdateError) {
+      toast.error(feeRecipientUpdateError?.message ?? 'Failed to update NFT fee recipient.');
+      resetFeeRecipientUpdate();
     }
-  }, [isError, error, reset]);
+  }, [feeRecipientUpdateError, isFeeRecipientUpdateError, resetFeeRecipientUpdate]);
+
+  useEffect(() => {
+    if (isProceedsFeeUpdateSuccess) {
+      toast.success('NFT factory proceeds fee updated.');
+      setNewProceedsFeeBps('');
+      resetProceedsFeeUpdate();
+      refetchProceedsFeeBps();
+    }
+  }, [isProceedsFeeUpdateSuccess, refetchProceedsFeeBps, resetProceedsFeeUpdate]);
+
+  useEffect(() => {
+    if (isProceedsFeeUpdateError) {
+      toast.error(proceedsFeeUpdateError?.message ?? 'Failed to update NFT proceeds fee.');
+      resetProceedsFeeUpdate();
+    }
+  }, [isProceedsFeeUpdateError, proceedsFeeUpdateError, resetProceedsFeeUpdate]);
 
   const handleCopy = (value: string) => {
     if (!value) return;
@@ -101,13 +132,29 @@ const AdminDashboard: React.FC = () => {
 
   const handleSetFeeRecipient = () => {
     if (!newFeeRecipient || !isAddress(newFeeRecipient)) {
-      toast.error('Enter a valid address.');
+      toast.error('Enter a valid fee recipient address.');
       return;
     }
     setFeeRecipient(newFeeRecipient as Address);
   };
 
-  const adminStatusLabel = isOnChainOwner ? 'On-chain owner' : 'Admin access';
+  const handleSetProceedsFeeBps = () => {
+    const parsed = Number.parseInt(newProceedsFeeBps, 10);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 10_000) {
+      toast.error('Proceeds fee must be between 0 and 10000 bps.');
+      return;
+    }
+    setProceedsFeeBps(parsed);
+  };
+
+  const adminStatusLabel = isOnChainOwner ? 'NFT factory owner' : 'Admin access';
+  const currentProceedsFeeLabel =
+    proceedsFeeBps !== undefined
+      ? `${(Number(proceedsFeeBps) / 100).toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })}%`
+      : 'Unknown';
 
   return (
     <motion.div
@@ -120,7 +167,7 @@ const AdminDashboard: React.FC = () => {
         <p className="text-label text-ink-faint uppercase tracking-wider">Admin</p>
         <h1 className="font-display text-display-lg text-ink">Stage0 Admin</h1>
         <p className="text-body text-ink-muted max-w-3xl">
-          Manage presales, whitelisted creators, and platform settings from one place.
+          Manage presales, whitelisted creators, and NFT launchpad fee defaults from one place.
         </p>
       </motion.section>
 
@@ -195,20 +242,19 @@ const AdminDashboard: React.FC = () => {
             </div>
             <div>
               <p className="text-body font-medium text-ink">Platform Settings</p>
-              <p className="text-body-sm text-ink-muted">Fee recipient + metadata</p>
+              <p className="text-body-sm text-ink-muted">NFT factory fee defaults</p>
             </div>
           </div>
         </div>
       </motion.section>
 
-      {/* NFT Factory */}
       <motion.section variants={itemVariants} className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div className="space-y-1">
             <p className="text-label text-ink-faint uppercase tracking-wider">NFT Launchpad</p>
             <h2 className="font-display text-display-md text-ink">NFT Factory</h2>
             <p className="text-body text-ink-muted max-w-2xl">
-              Deploy standard ERC721 or ERC721A collections with configurable mint windows and wallet limits.
+              Deploy standard ERC721 or ERC721A collections with configurable mint windows, wallet limits, and default withdraw fees.
             </p>
           </div>
           <a
@@ -246,19 +292,41 @@ const AdminDashboard: React.FC = () => {
           </div>
           <div className="space-y-4">
             <div>
-              <p className="text-body-sm text-ink-muted">Presale Factory</p>
+              <p className="text-body-sm text-ink-muted">NFT Factory</p>
               <div className="flex items-center gap-2">
-                <code className="text-body-sm font-mono text-ink break-all">{presaleFactory}</code>
+                <code className="text-body-sm font-mono text-ink break-all">{nftFactory}</code>
                 <button
-                  onClick={() => handleCopy(presaleFactory)}
+                  onClick={() => handleCopy(nftFactory)}
                   className="p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
-                  aria-label="Copy factory address"
+                  aria-label="Copy NFT factory address"
                 >
                   <Copy className="w-4 h-4 text-ink-muted" />
                 </button>
               </div>
               <a
-                href={`${explorerUrl}/address/${presaleFactory}`}
+                href={`${explorerUrl}/address/${nftFactory}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-body-sm text-accent link-underline inline-flex items-center gap-1 mt-1"
+              >
+                View on explorer
+              </a>
+            </div>
+
+            <div>
+              <p className="text-body-sm text-ink-muted">NFT Factory Lens</p>
+              <div className="flex items-center gap-2">
+                <code className="text-body-sm font-mono text-ink break-all">{nftFactoryLens}</code>
+                <button
+                  onClick={() => handleCopy(nftFactoryLens)}
+                  className="p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+                  aria-label="Copy NFT factory lens address"
+                >
+                  <Copy className="w-4 h-4 text-ink-muted" />
+                </button>
+              </div>
+              <a
+                href={`${explorerUrl}/address/${nftFactoryLens}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-body-sm text-accent link-underline inline-flex items-center gap-1 mt-1"
@@ -276,17 +344,30 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-xs text-status-live mt-1">✓ Connected wallet is owner</p>
               )}
             </div>
-
           </div>
         </div>
 
-        <div className="glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="font-display text-display-sm text-ink">Fee Recipient</h2>
-          <div>
-            <p className="text-body-sm text-ink-muted">Current Fee Recipient</p>
-            <p className="text-body-sm font-mono text-ink break-all">
-              {isLoadingFeeRecipient ? 'Loading...' : feeRecipient ?? 'Unknown'}
+        <div className="glass-card rounded-3xl p-6 space-y-5">
+          <div className="space-y-1">
+            <h2 className="font-display text-display-sm text-ink">Factory Fee Defaults</h2>
+            <p className="text-body-sm text-ink-muted">
+              These defaults are applied to NFT collections deployed from this factory.
             </p>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-body-sm text-ink-muted">Current Fee Recipient</p>
+              <p className="text-body-sm font-mono text-ink break-all">
+                {isLoadingFeeRecipient ? 'Loading...' : feeRecipient ?? 'Unknown'}
+              </p>
+            </div>
+            <div>
+              <p className="text-body-sm text-ink-muted">Current Proceeds Fee</p>
+              <p className="text-body text-ink">
+                {isLoadingProceedsFeeBps ? 'Loading...' : `${currentProceedsFeeLabel} (${proceedsFeeBps?.toString() ?? '0'} bps)`}
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -299,13 +380,33 @@ const AdminDashboard: React.FC = () => {
             />
             <button
               onClick={handleSetFeeRecipient}
-              disabled={!newFeeRecipient || isBusy}
+              disabled={!newFeeRecipient || isUpdatingFeeRecipient}
               className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isBusy ? 'Updating...' : 'Update Recipient'}
+              {isUpdatingFeeRecipient ? 'Updating Recipient...' : 'Update Recipient'}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-body-sm text-ink-muted">Update Proceeds Fee (bps)</label>
+            <input
+              type="number"
+              min="0"
+              max="10000"
+              value={newProceedsFeeBps}
+              onChange={(event) => setNewProceedsFeeBps(event.target.value)}
+              placeholder={proceedsFeeBps?.toString() ?? '200'}
+              className="input-field"
+            />
+            <button
+              onClick={handleSetProceedsFeeBps}
+              disabled={!newProceedsFeeBps || isUpdatingProceedsFee}
+              className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isUpdatingProceedsFee ? 'Updating Fee...' : 'Update Proceeds Fee'}
             </button>
             <p className="text-xs text-ink-faint">
-              Only the presale factory owner can update this setting.
+              Basis points: 100 = 1%. Only the NFT factory owner can update these settings.
             </p>
           </div>
         </div>

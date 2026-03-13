@@ -30,7 +30,7 @@ dataSources:
     name: NFTFactory
     network: rise-sepolia
     source:
-      address: "0x6DDca710993C91402d52061868bE76043a4C5888"
+      address: "0xCEA1A715927408216B838DcAcd90Dff025Ab0b2D"
       abi: NFTFactory
       startBlock: 37471045
     mapping:

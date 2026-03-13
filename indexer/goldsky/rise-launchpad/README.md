@@ -8,7 +8,7 @@ This subgraph indexes:
 
 - Network: `rise-sepolia`
 - PresaleFactory: `0x67064a9236050D3d947d7F5Bd3448BD4b5D947FC`
-- NFTFactory: `0x6DDca710993C91402d52061868bE76043a4C5888`
+- NFTFactory: `0xCEA1A715927408216B838DcAcd90Dff025Ab0b2D`
 
 ## Local commands
 

@@ -35,6 +35,8 @@ export interface NFTDeploymentWithMetadata {
   creator: Address;
   owner: Address;
   payoutWallet: Address;
+  feeRecipient?: Address;
+  proceedsFeeBps?: bigint;
   is721A: boolean;
   name: string;
   symbol: string;
@@ -79,6 +81,8 @@ interface CollectionInfo {
   whitelistPrice: bigint;
   owner: Address;
   payoutWallet: Address;
+  feeRecipient: Address;
+  proceedsFeeBps: bigint;
 }
 
 type RawCollectionInfo = Partial<CollectionInfo> & {
@@ -136,6 +140,8 @@ function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
     creator: info.creator,
     owner: info.owner,
     payoutWallet: info.payoutWallet,
+    feeRecipient: info.feeRecipient,
+    proceedsFeeBps: info.proceedsFeeBps,
     is721A: info.is721A,
     name: info.name || 'NFT Collection',
     symbol: info.symbol || 'NFT',
@@ -181,6 +187,8 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
   const whitelistPrice = (raw.whitelistPrice ?? raw[15]) as bigint | undefined;
   const owner = (raw.owner ?? raw[16]) as Address | undefined;
   const payoutWallet = (raw.payoutWallet ?? raw[17]) as Address | undefined;
+  const feeRecipient = (raw.feeRecipient ?? raw[18]) as Address | undefined;
+  const proceedsFeeBps = (raw.proceedsFeeBps ?? raw[19]) as bigint | undefined;
 
   if (
     !nft ||
@@ -200,7 +208,9 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     whitelistStart === undefined ||
     whitelistPrice === undefined ||
     !owner ||
-    !payoutWallet
+    !payoutWallet ||
+    !feeRecipient ||
+    proceedsFeeBps === undefined
   ) {
     return null;
   }
@@ -224,6 +234,8 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     whitelistPrice,
     owner,
     payoutWallet,
+    feeRecipient,
+    proceedsFeeBps,
   };
 }
 

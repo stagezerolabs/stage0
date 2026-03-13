@@ -1,13 +1,27 @@
-import { LaunchpadPresaleContract, PresaleFactory } from '@/config';
+import { LaunchpadPresaleContract, NFTFactory, PresaleFactory } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import type { Address } from 'viem';
+import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import type { Abi, Address } from 'viem';
 
-/**
- * Hook for factory owner to manage whitelisted creators
- */
-export function useSetWhitelistedCreator() {
-  const { presaleFactory } = useChainContracts();
+type FactoryTarget = 'presale' | 'nft';
+
+function useFactoryWriteConfig(target: FactoryTarget) {
+  const { presaleFactory, nftFactory } = useChainContracts();
+
+  if (target === 'nft') {
+    return {
+      address: nftFactory,
+      abi: NFTFactory as Abi,
+    };
+  }
+
+  return {
+    address: presaleFactory,
+    abi: PresaleFactory as Abi,
+  };
+}
+
+function useContractWriteState() {
   const {
     writeContract,
     data: hash,
@@ -21,8 +35,28 @@ export function useSetWhitelistedCreator() {
     hash,
   });
 
+  return {
+    writeContract,
+    hash,
+    isPending,
+    isConfirming,
+    isSuccess,
+    isError,
+    error,
+    reset,
+    isBusy: isPending || isConfirming,
+  };
+}
+
+/**
+ * Hook for factory owner to manage whitelisted creators.
+ */
+export function useSetWhitelistedCreator() {
+  const { presaleFactory } = useChainContracts();
+  const contractState = useContractWriteState();
+
   const addWhitelistedCreator = (creatorAddress: Address) => {
-    writeContract({
+    contractState.writeContract({
       address: presaleFactory,
       abi: PresaleFactory,
       functionName: 'setWhitelistedCreator',
@@ -32,37 +66,19 @@ export function useSetWhitelistedCreator() {
 
   return {
     addWhitelistedCreator,
-    hash,
-    isPending,
-    isConfirming,
-    isSuccess,
-    isError,
-    error,
-    reset,
-    isBusy: isPending || isConfirming,
+    ...contractState,
   };
 }
 
 /**
- * Hook for factory owner to remove whitelisted creators
+ * Hook for factory owner to remove whitelisted creators.
  */
 export function useRemoveWhitelistedCreator() {
   const { presaleFactory } = useChainContracts();
-  const {
-    writeContract,
-    data: hash,
-    isPending,
-    isError,
-    error,
-    reset,
-  } = useWriteContract();
-
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const contractState = useContractWriteState();
 
   const removeWhitelistedCreator = (creatorAddress: Address) => {
-    writeContract({
+    contractState.writeContract({
       address: presaleFactory,
       abi: PresaleFactory,
       functionName: 'setWhitelistedCreator',
@@ -72,39 +88,21 @@ export function useRemoveWhitelistedCreator() {
 
   return {
     removeWhitelistedCreator,
-    hash,
-    isPending,
-    isConfirming,
-    isSuccess,
-    isError,
-    error,
-    reset,
-    isBusy: isPending || isConfirming,
+    ...contractState,
   };
 }
 
 /**
- * Hook for factory owner to update fee recipient
+ * Hook for factory owner to update a factory fee recipient.
  */
-export function useSetFeeRecipient() {
-  const { presaleFactory } = useChainContracts();
-  const {
-    writeContract,
-    data: hash,
-    isPending,
-    isError,
-    error,
-    reset,
-  } = useWriteContract();
-
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+export function useSetFeeRecipient(target: FactoryTarget = 'presale') {
+  const { address, abi } = useFactoryWriteConfig(target);
+  const contractState = useContractWriteState();
 
   const setFeeRecipient = (newRecipient: Address) => {
-    writeContract({
-      address: presaleFactory,
-      abi: PresaleFactory,
+    contractState.writeContract({
+      address,
+      abi,
       functionName: 'setFeeRecipient',
       args: [newRecipient],
     });
@@ -112,40 +110,44 @@ export function useSetFeeRecipient() {
 
   return {
     setFeeRecipient,
-    hash,
-    isPending,
-    isConfirming,
-    isSuccess,
-    isError,
-    error,
-    reset,
-    isBusy: isPending || isConfirming,
+    ...contractState,
   };
 }
 
 /**
- * Hook for fee recipient to update fees on a specific presale
+ * Hook for NFT factory owner to update the default proceeds fee.
+ */
+export function useSetNFTFactoryProceedsFeeBps() {
+  const { nftFactory } = useChainContracts();
+  const contractState = useContractWriteState();
+
+  const setProceedsFeeBps = (newProceedsFeeBps: number) => {
+    contractState.writeContract({
+      address: nftFactory,
+      abi: NFTFactory,
+      functionName: 'setProceedsFeeBps',
+      args: [BigInt(newProceedsFeeBps)],
+    });
+  };
+
+  return {
+    setProceedsFeeBps,
+    ...contractState,
+  };
+}
+
+/**
+ * Hook for fee recipient to update fees on a specific presale.
  */
 export function useUpdatePresaleFees() {
-  const {
-    writeContract,
-    data: hash,
-    isPending,
-    isError,
-    error,
-    reset,
-  } = useWriteContract();
-
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const contractState = useContractWriteState();
 
   const updateFees = (
     presaleAddress: Address,
     newTokenFeeBps: number,
     newProceedsFeeBps: number
   ) => {
-    writeContract({
+    contractState.writeContract({
       address: presaleAddress,
       abi: LaunchpadPresaleContract,
       functionName: 'updateFees',
@@ -155,13 +157,6 @@ export function useUpdatePresaleFees() {
 
   return {
     updateFees,
-    hash,
-    isPending,
-    isConfirming,
-    isSuccess,
-    isError,
-    error,
-    reset,
-    isBusy: isPending || isConfirming,
+    ...contractState,
   };
 }

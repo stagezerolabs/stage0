@@ -100,8 +100,8 @@ export type ContractAddressMap = {
 export const CONTRACT_ADDRESSES: Record<number, ContractAddressMap> = {
   [riseTestnet.id]: {
     tokenLocker: "0xb225cb8Ea90E0ab1F9f5011d31fD217083c31fc7",
-    nftFactory: "0x288Ab2e2d8ABCe7dccC22a8B19D83FFE141Eb5FC",
-    nftFactoryLens: "0xf87f2dd3437Be3738f36759856Fbd1FB38e1C308",
+    nftFactory: "0xCEA1A715927408216B838DcAcd90Dff025Ab0b2D",
+    nftFactoryLens: "0x5f52461ac88ea4A9095A2eD82743DF17e1A1C1af",
     presaleFactory: "0x67064a9236050D3d947d7F5Bd3448BD4b5D947FC",
     tokenFactory: "0xa0b761A94013FF721fD682eEB7e57709C0e03f42",
     airdropMultisender: "0x8DB306030Cf163A6C809fB3599500DBE28Df2CC6",
@@ -1109,6 +1109,11 @@ export const AirdropMultiSender = [
 
 export const NFTFactory = [
   {
+    inputs: [],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
     inputs: [
       {
         internalType: "struct NFTFactory.NFTParams",
@@ -1225,10 +1230,59 @@ export const NFTFactory = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "ethNFTDeployer",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "nft721ADeployer",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [{ internalType: "address", name: "", type: "address" }],
     name: "deploymentIndex",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "feeRecipient",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "proceedsFeeBps",
+    outputs: [{ internalType: "uint96", name: "", type: "uint96" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "FEE_BPS_DENOMINATOR",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "newRecipient", type: "address" }],
+    name: "setFeeRecipient",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint96", name: "newProceedsFeeBps", type: "uint96" }],
+    name: "setProceedsFeeBps",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -1239,6 +1293,18 @@ export const NFTFactory = [
       { indexed: true, internalType: "bool", name: "is721A", type: "bool" },
     ],
     name: "NFTCreated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: true, internalType: "address", name: "newRecipient", type: "address" }],
+    name: "FeeRecipientUpdated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: false, internalType: "uint96", name: "newProceedsFeeBps", type: "uint96" }],
+    name: "ProceedsFeeUpdated",
     type: "event",
   },
 ] as const;
@@ -1341,6 +1407,20 @@ export const NFTCollectionContract = [
   },
   {
     inputs: [],
+    name: "feeRecipient",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "proceedsFeeBps",
+    outputs: [{ internalType: "uint96", name: "", type: "uint96" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "remainingSupply",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
@@ -1370,6 +1450,16 @@ export const NFTCollectionContract = [
   {
     inputs: [{ internalType: "address", name: "newWallet", type: "address" }],
     name: "setPayoutWallet",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint96", name: "newProceedsFeeBps", type: "uint96" },
+      { internalType: "address", name: "newFeeRecipient", type: "address" },
+    ],
+    name: "updateFeeConfig",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -1428,6 +1518,28 @@ export const NFTCollectionContract = [
       },
     ],
     name: "setMintConfig",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "struct SaleTerms",
+        name: "terms",
+        type: "tuple",
+        components: [
+          { internalType: "string", name: "baseURI", type: "string" },
+          { internalType: "string", name: "contractURI", type: "string" },
+          { internalType: "address", name: "payoutWallet", type: "address" },
+          { internalType: "uint64", name: "saleStart", type: "uint64" },
+          { internalType: "uint64", name: "saleEnd", type: "uint64" },
+          { internalType: "uint128", name: "mintPrice", type: "uint128" },
+          { internalType: "uint32", name: "walletLimit", type: "uint32" },
+        ],
+      },
+    ],
+    name: "updateSaleTerms",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -1624,6 +1736,8 @@ const COLLECTION_INFO_COMPONENTS = [
   { internalType: "uint128", name: "whitelistPrice", type: "uint128" },
   { internalType: "address", name: "owner", type: "address" },
   { internalType: "address", name: "payoutWallet", type: "address" },
+  { internalType: "address", name: "feeRecipient", type: "address" },
+  { internalType: "uint96", name: "proceedsFeeBps", type: "uint96" },
 ] as const;
 
 export const NFTFactoryLens = [

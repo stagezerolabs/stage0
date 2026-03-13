@@ -11,7 +11,7 @@ import {
 } from 'wagmi';
 import { formatEther, isAddress, parseEther, type Address } from 'viem';
 import { toast } from 'sonner';
-import { ArrowLeft, ExternalLink, Loader2, Save, Shield, Wallet } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Wallet } from 'lucide-react';
 import { NFT_COLLECTION_IMAGES, NFTCollectionContract, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import { isWhitelistLocked } from '@/lib/utils/nft-sales';
@@ -33,21 +33,6 @@ const itemVariants = {
     transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
   },
 };
-
-function toDateTimeLocal(ts: bigint | undefined): string {
-  if (!ts || ts === 0n) return '';
-  const date = new Date(Number(ts) * 1000);
-  const tzOffsetMs = date.getTimezoneOffset() * 60_000;
-  const local = new Date(date.getTime() - tzOffsetMs);
-  return local.toISOString().slice(0, 16);
-}
-
-function parseDateTimeInput(value: string): number | null {
-  if (!value.trim()) return null;
-  const parsed = new Date(value).getTime();
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return Math.floor(parsed / 1000);
-}
 
 function parseWalletList(value: string): Address[] {
   const addresses = value
@@ -75,13 +60,6 @@ const ManageNFTPage: React.FC = () => {
     ? NFT_COLLECTION_IMAGES[collectionAddress.toLowerCase()]
     : undefined;
 
-  const [mintPriceInput, setMintPriceInput] = useState('');
-  const [walletLimitInput, setWalletLimitInput] = useState('0');
-  const [saleStartInput, setSaleStartInput] = useState('');
-  const [saleEndInput, setSaleEndInput] = useState('');
-  const [whitelistEnabledInput, setWhitelistEnabledInput] = useState(false);
-  const [whitelistStartInput, setWhitelistStartInput] = useState('');
-  const [whitelistPriceInput, setWhitelistPriceInput] = useState('');
   const [payoutWalletInput, setPayoutWalletInput] = useState('');
   const [baseURIInput, setBaseURIInput] = useState('');
   const [contractURIInput, setContractURIInput] = useState('');
@@ -109,8 +87,6 @@ const ManageNFTPage: React.FC = () => {
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'maxSupply' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'totalMinted' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'mintPrice' },
-      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'walletLimit' },
-      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleStart' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleEnd' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistEnabled' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistStart' },
@@ -152,7 +128,7 @@ const ManageNFTPage: React.FC = () => {
     if (
       !collectionAddress ||
       !collectionResults ||
-      collectionResults.length < 14 ||
+      collectionResults.length < 12 ||
       !hasSuccessfulCollectionRead
     ) {
       return null;
@@ -172,14 +148,12 @@ const ManageNFTPage: React.FC = () => {
       maxSupply: readAt<bigint>(3, 0n),
       totalMinted: readAt<bigint>(4, 0n),
       mintPrice: readAt<bigint>(5, 0n),
-      walletLimitRaw: readAt<bigint | number | undefined>(6, undefined),
-      saleStart: readAt<bigint>(7, 0n),
-      saleEnd: readAt<bigint>(8, 0n),
-      whitelistEnabled: readAt<boolean>(9, false),
-      whitelistStart: readAt<bigint>(10, 0n),
-      whitelistPrice: readAt<bigint>(11, 0n),
-      payoutWallet: readAt<Address | undefined>(12, undefined),
-      contractURI: readAt<string>(13, ''),
+      saleEnd: readAt<bigint>(6, 0n),
+      whitelistEnabled: readAt<boolean>(7, false),
+      whitelistStart: readAt<bigint>(8, 0n),
+      whitelistPrice: readAt<bigint>(9, 0n),
+      payoutWallet: readAt<Address | undefined>(10, undefined),
+      contractURI: readAt<string>(11, ''),
     };
   }, [collectionAddress, collectionResults, hasSuccessfulCollectionRead]);
 
@@ -190,17 +164,6 @@ const ManageNFTPage: React.FC = () => {
 
   useEffect(() => {
     if (!collection || initialisedFromChain) return;
-    const walletLimitRaw = collection.walletLimitRaw;
-    const walletLimitNumber =
-      typeof walletLimitRaw === 'number' ? walletLimitRaw : Number(walletLimitRaw ?? 0);
-
-    setMintPriceInput(formatEther(collection.mintPrice));
-    setWalletLimitInput(String(walletLimitNumber));
-    setSaleStartInput(toDateTimeLocal(collection.saleStart));
-    setSaleEndInput(toDateTimeLocal(collection.saleEnd));
-    setWhitelistEnabledInput(collection.whitelistEnabled);
-    setWhitelistStartInput(toDateTimeLocal(collection.whitelistStart));
-    setWhitelistPriceInput(formatEther(collection.whitelistPrice));
     setPayoutWalletInput(collection.payoutWallet ?? '');
     setContractURIInput(collection.contractURI ?? '');
     setInitialisedFromChain(true);
@@ -226,143 +189,6 @@ const ManageNFTPage: React.FC = () => {
   const whitelistLocked = collection
     ? isWhitelistLocked(collection.whitelistEnabled, collection.whitelistStart)
     : false;
-
-  const handleSaveMintConfig = () => {
-    if (!collectionAddress) return;
-    if (!mintPriceInput.trim()) {
-      toast.error('Public mint price is required.');
-      return;
-    }
-    if (!saleStartInput) {
-      toast.error('Public sale start is required.');
-      return;
-    }
-    if (!saleEndInput) {
-      toast.error('Sale end is required.');
-      return;
-    }
-
-    let mintPriceValue: bigint;
-    try {
-      mintPriceValue = parseEther(mintPriceInput.trim());
-    } catch {
-      toast.error('Invalid public mint price.');
-      return;
-    }
-
-    const walletLimitNumber = Number(walletLimitInput || '0');
-    if (
-      !Number.isInteger(walletLimitNumber) ||
-      walletLimitNumber < 0 ||
-      walletLimitNumber > 4_294_967_295
-    ) {
-      toast.error('Wallet limit must be between 0 and 4,294,967,295.');
-      return;
-    }
-
-    const saleStartTs = parseDateTimeInput(saleStartInput);
-    if (!saleStartTs) {
-      toast.error('Invalid public sale start.');
-      return;
-    }
-
-    const saleEndTs = parseDateTimeInput(saleEndInput);
-    if (!saleEndTs) {
-      toast.error('Invalid sale end.');
-      return;
-    }
-    if (saleEndTs <= saleStartTs) {
-      toast.error('Sale end must be later than the public sale start.');
-      return;
-    }
-
-    if (whitelistEnabledInput) {
-      const whitelistStartTs = parseDateTimeInput(whitelistStartInput);
-      if (!whitelistStartTs) {
-        toast.error('Whitelist start must be set before saving the public sale config.');
-        return;
-      }
-      if (whitelistStartTs >= saleStartTs) {
-        toast.error('Whitelist mint must begin before the public sale starts.');
-        return;
-      }
-      if (whitelistStartTs >= saleEndTs) {
-        toast.error('Whitelist mint must begin before the sale ends.');
-        return;
-      }
-    }
-
-    setPendingAction('saveMintConfig');
-    writeContract({
-      abi: NFTCollectionContract,
-      address: collectionAddress,
-      functionName: 'setMintConfig',
-      args: [{
-        saleStart: BigInt(saleStartTs),
-        saleEnd: BigInt(saleEndTs),
-        walletLimit: walletLimitNumber,
-        price: mintPriceValue,
-      }],
-    });
-  };
-
-  const handleSaveWhitelistConfig = () => {
-    if (!collectionAddress) return;
-    if (whitelistLocked) {
-      toast.error('Whitelist settings can no longer be edited because the whitelist phase has started.');
-      return;
-    }
-
-    let whitelistStartTs = 0;
-    let whitelistPriceValue = 0n;
-
-    if (whitelistEnabledInput) {
-      if (!whitelistStartInput) {
-        toast.error('Whitelist start is required when whitelist minting is enabled.');
-        return;
-      }
-      if (!whitelistPriceInput.trim()) {
-        toast.error('Whitelist price is required when whitelist minting is enabled.');
-        return;
-      }
-
-      const saleStartTs = parseDateTimeInput(saleStartInput);
-      const saleEndTs = parseDateTimeInput(saleEndInput);
-      whitelistStartTs = parseDateTimeInput(whitelistStartInput) ?? 0;
-
-      if (!whitelistStartTs) {
-        toast.error('Invalid whitelist start.');
-        return;
-      }
-      if (!saleStartTs || !saleEndTs) {
-        toast.error('Save valid public sale dates before enabling whitelist minting.');
-        return;
-      }
-      if (whitelistStartTs >= saleStartTs) {
-        toast.error('Whitelist mint must begin before the public sale starts.');
-        return;
-      }
-      if (whitelistStartTs >= saleEndTs) {
-        toast.error('Whitelist mint must begin before the sale ends.');
-        return;
-      }
-
-      try {
-        whitelistPriceValue = parseEther(whitelistPriceInput.trim());
-      } catch {
-        toast.error('Invalid whitelist price.');
-        return;
-      }
-    }
-
-    setPendingAction('saveWhitelistConfig');
-    writeContract({
-      abi: NFTCollectionContract,
-      address: collectionAddress,
-      functionName: 'setWhitelistConfig',
-      args: [whitelistEnabledInput, BigInt(whitelistStartTs), whitelistPriceValue],
-    });
-  };
 
   const handleWhitelistUpdate = (mode: 'add' | 'remove') => {
     if (!collectionAddress) return;
@@ -519,6 +345,19 @@ const ManageNFTPage: React.FC = () => {
     );
   }
 
+  const contractBalanceLabel = contractBalance
+    ? `${Number(contractBalance.formatted).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${
+        contractBalance.symbol ?? 'ETH'
+      }`
+    : '0 ETH';
+  const whitelistStatusLabel = collection.whitelistEnabled ? 'Enabled' : 'Disabled';
+  const whitelistStatusDetail =
+    collection.whitelistEnabled && collection.whitelistStart > 0n
+      ? `Starts ${new Date(Number(collection.whitelistStart) * 1000).toLocaleString()}`
+      : 'No whitelist phase configured';
+  const saleEndLabel =
+    collection.saleEnd > 0n ? new Date(Number(collection.saleEnd) * 1000).toLocaleDateString() : 'Unset';
+
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 max-w-5xl">
       <motion.section variants={itemVariants} className="space-y-3">
@@ -553,7 +392,45 @@ const ManageNFTPage: React.FC = () => {
         </div>
       </motion.section>
 
-      <motion.section variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+      <motion.section variants={itemVariants} className="md:hidden">
+        <div className="glass-card rounded-3xl p-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-body-sm text-ink-muted">Minted</p>
+              <p className="font-display text-display-sm text-ink">{collection.totalMinted.toString()}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-body-sm text-ink-muted">Max Supply</p>
+              <p className="font-display text-display-sm text-ink">{collection.maxSupply.toString()}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-body-sm text-ink-muted">Public Price</p>
+              <p className="font-display text-display-sm text-ink">{formatEther(collection.mintPrice)} ETH</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-body-sm text-ink-muted">Whitelist Price</p>
+              <p className="font-display text-display-sm text-ink">
+                {collection.whitelistEnabled ? `${formatEther(collection.whitelistPrice)} ETH` : 'Disabled'}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-body-sm text-ink-muted">Contract Balance</p>
+              <p className="font-display text-display-sm text-ink">{contractBalanceLabel}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-body-sm text-ink-muted">Sale End</p>
+              <p className="font-display text-display-sm text-ink">{saleEndLabel}</p>
+            </div>
+            <div className="col-span-2 space-y-1 border-t border-border pt-4">
+              <p className="text-body-sm text-ink-muted">Whitelist Status</p>
+              <p className="font-display text-display-sm text-ink">{whitelistStatusLabel}</p>
+              <p className="text-body-sm text-ink-muted">{whitelistStatusDetail}</p>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
+      <motion.section variants={itemVariants} className="hidden md:grid md:grid-cols-2 xl:grid-cols-5 gap-4">
         <div className="stat-card">
           <p className="text-body-sm text-ink-muted">Minted</p>
           <p className="font-display text-display-sm text-ink">{collection.totalMinted.toString()}</p>
@@ -574,41 +451,19 @@ const ManageNFTPage: React.FC = () => {
         </div>
         <div className="stat-card">
           <p className="text-body-sm text-ink-muted">Contract Balance</p>
-          <p className="font-display text-display-sm text-ink">
-            {contractBalance
-              ? `${Number(contractBalance.formatted).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${contractBalance.symbol ?? 'ETH'}`
-              : '0 ETH'}
-          </p>
+          <p className="font-display text-display-sm text-ink">{contractBalanceLabel}</p>
         </div>
       </motion.section>
 
-      <motion.section variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <motion.section variants={itemVariants} className="hidden md:grid md:grid-cols-1 gap-4">
         <div className="glass-card rounded-3xl p-5 space-y-1">
           <p className="text-body-sm text-ink-muted">Whitelist Status</p>
-          <p className="font-display text-display-sm text-ink">{collection.whitelistEnabled ? 'Enabled' : 'Disabled'}</p>
-          <p className="text-body-sm text-ink-muted">
-            {collection.whitelistEnabled && collection.whitelistStart > 0n
-              ? `Starts ${new Date(Number(collection.whitelistStart) * 1000).toLocaleString()}`
-              : 'No whitelist phase configured'}
-          </p>
-        </div>
-        <div className="glass-card rounded-3xl p-5 space-y-1">
-          <p className="text-body-sm text-ink-muted">Whitelist Editing</p>
-          <p className="font-display text-display-sm text-ink">{whitelistLocked ? 'Locked' : 'Open'}</p>
-          <p className="text-body-sm text-ink-muted">
-            {whitelistLocked
-              ? 'Whitelist wallets can no longer be modified because minting has started.'
-              : 'You can still edit whitelist config and wallet entries.'}
-          </p>
+          <p className="font-display text-display-sm text-ink">{whitelistStatusLabel}</p>
+          <p className="text-body-sm text-ink-muted">{whitelistStatusDetail}</p>
         </div>
         <div className="glass-card rounded-3xl p-5 space-y-1">
           <p className="text-body-sm text-ink-muted">Sale End</p>
-          <p className="font-display text-display-sm text-ink">
-            {collection.saleEnd > 0n
-              ? new Date(Number(collection.saleEnd) * 1000).toLocaleDateString()
-              : 'Unset'}
-          </p>
-          <p className="text-body-sm text-ink-muted">This dapp now requires a sale end when saving configuration.</p>
+          <p className="font-display text-display-sm text-ink">{saleEndLabel}</p>
         </div>
       </motion.section>
 
@@ -622,126 +477,6 @@ const ManageNFTPage: React.FC = () => {
 
       {isOwner && (
         <>
-          <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-5">
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-accent" />
-              <div className="space-y-1">
-                <h2 className="font-display text-display-sm text-ink">Public Sale Configuration</h2>
-                <p className="text-body-sm text-ink-muted">These settings control the open mint phase and require a sale end.</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Public Price (ETH)</label>
-                <input
-                  value={mintPriceInput}
-                  onChange={(e) => setMintPriceInput(e.target.value)}
-                  className="input-field w-full"
-                  placeholder="0.01"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Wallet Limit (0 = unlimited)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={walletLimitInput}
-                  onChange={(e) => setWalletLimitInput(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Public Sale Start</label>
-                <input
-                  type="datetime-local"
-                  value={saleStartInput}
-                  onChange={(e) => setSaleStartInput(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Sale End</label>
-                <input
-                  type="datetime-local"
-                  value={saleEndInput}
-                  onChange={(e) => setSaleEndInput(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
-            </div>
-            <button
-              onClick={handleSaveMintConfig}
-              disabled={isBusy}
-              className="btn-primary inline-flex items-center gap-2 disabled:opacity-60"
-            >
-              {pendingAction === 'saveMintConfig' && isBusy ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>
-              ) : (
-                <><Save className="w-4 h-4" />Save Public Sale</>
-              )}
-            </button>
-          </motion.section>
-
-          <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-5">
-            <div className="space-y-1">
-              <h2 className="font-display text-display-sm text-ink">Whitelist Mint Configuration</h2>
-              <p className="text-body-sm text-ink-muted">
-                Configure the early allowlist window and discounted or alternate whitelist pricing.
-              </p>
-            </div>
-
-            <label className="inline-flex items-center gap-2 text-body-sm text-ink">
-              <input
-                type="checkbox"
-                checked={whitelistEnabledInput}
-                onChange={(e) => setWhitelistEnabledInput(e.target.checked)}
-                disabled={whitelistLocked}
-                className="h-4 w-4 rounded border-border text-accent focus:ring-accent disabled:opacity-60"
-              />
-              Enable whitelist mint
-            </label>
-
-            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${whitelistEnabledInput ? '' : 'opacity-60'}`}>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Whitelist Start</label>
-                <input
-                  type="datetime-local"
-                  value={whitelistStartInput}
-                  onChange={(e) => setWhitelistStartInput(e.target.value)}
-                  disabled={!whitelistEnabledInput || whitelistLocked}
-                  className="input-field w-full disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Whitelist Price (ETH)</label>
-                <input
-                  value={whitelistPriceInput}
-                  onChange={(e) => setWhitelistPriceInput(e.target.value)}
-                  disabled={!whitelistEnabledInput || whitelistLocked}
-                  placeholder="0.005"
-                  className="input-field w-full disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-canvas-alt p-4 text-body-sm text-ink-muted">
-              Save your public sale settings first if you are changing both windows at once. Whitelist mint must begin
-              before public mint starts.
-            </div>
-
-            <button
-              onClick={handleSaveWhitelistConfig}
-              disabled={isBusy || whitelistLocked}
-              className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-            >
-              {pendingAction === 'saveWhitelistConfig' && isBusy ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>
-              ) : (
-                <><Save className="w-4 h-4" />Save Whitelist Config</>
-              )}
-            </button>
-          </motion.section>
-
           <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-5">
             <div className="space-y-1">
               <h2 className="font-display text-display-sm text-ink">Whitelist Wallets</h2>

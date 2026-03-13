@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits, type Address } from 'viem';
+import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { isAddress, maxUint256, parseUnits, type Address } from 'viem';
 import { TokenLocker, erc20Abi, getContractAddresses, getExplorerUrl } from '@/config';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
 import {
@@ -68,7 +68,7 @@ function isExpired(unlockDate: bigint): boolean {
 }
 
 const TokenLockerPage: React.FC = () => {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const contracts = getContractAddresses(chainId);
   const explorerUrl = getExplorerUrl(chainId);
@@ -83,12 +83,44 @@ const TokenLockerPage: React.FC = () => {
   const [lockName, setLockName] = useState('');
   const [lockDescription, setLockDescription] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(true);
+  const validTokenAddress = isAddress(tokenAddress) ? (tokenAddress as Address) : undefined;
+
+  const {
+    data: tokenDecimals,
+    isLoading: isLoadingTokenDecimals,
+    error: tokenDecimalsError,
+  } = useReadContract({
+    abi: erc20Abi,
+    address: validTokenAddress,
+    functionName: 'decimals',
+    query: {
+      enabled: Boolean(validTokenAddress),
+    },
+  });
+
+  const {
+    data: allowance,
+    isLoading: isLoadingAllowance,
+    error: allowanceError,
+    refetch: refetchAllowance,
+  } = useReadContract({
+    abi: erc20Abi,
+    address: validTokenAddress,
+    functionName: 'allowance',
+    args: address && validTokenAddress ? [address, contracts.tokenLocker] : undefined,
+    query: {
+      enabled: Boolean(address && validTokenAddress),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
 
   // Approval
   const {
     data: approveHash,
     writeContract: approveWrite,
     isPending: isApprovePending,
+    error: approveError,
   } = useWriteContract();
 
   const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } =
@@ -125,35 +157,120 @@ const TokenLockerPage: React.FC = () => {
   const [extendDays, setExtendDays] = useState('');
   const [transferLockId, setTransferLockId] = useState<bigint | null>(null);
   const [transferAddress, setTransferAddress] = useState('');
+  const parsedAmount = useMemo(() => {
+    if (!amount.trim()) return null;
+    if (tokenDecimals === undefined) return null;
+    try {
+      return parseUnits(amount.trim(), tokenDecimals);
+    } catch {
+      return null;
+    }
+  }, [amount, tokenDecimals]);
+  const parsedDurationDays = useMemo(() => {
+    if (!durationDays.trim()) return null;
+    const value = Number.parseInt(durationDays, 10);
+    if (!Number.isInteger(value) || value <= 0) return null;
+    return value;
+  }, [durationDays]);
+  const durationSeconds = parsedDurationDays !== null ? BigInt(parsedDurationDays) * 86400n : null;
+  const currentAllowance = allowance as bigint | undefined;
+  const hasSufficientAllowance = Boolean(
+    parsedAmount !== null &&
+    currentAllowance !== undefined &&
+    currentAllowance >= parsedAmount
+  );
+  const primaryError = approveError ?? lockError ?? tokenDecimalsError ?? allowanceError;
+  const isPrimaryPending = hasSufficientAllowance
+    ? (isLockPending || isLockConfirming)
+    : (isApprovePending || isApproveConfirming);
+  const isCheckingTokenState = Boolean(
+    validTokenAddress &&
+    (isLoadingTokenDecimals || (Boolean(address) && isLoadingAllowance))
+  );
+  const primaryButtonLabel = (() => {
+    if (hasSufficientAllowance) {
+      if (isLockPending || isLockConfirming) {
+        return isLockConfirming ? 'Confirming...' : 'Locking...';
+      }
+      return 'Lock Tokens';
+    }
+    if (isApprovePending || isApproveConfirming) return 'Approving...';
+    if (!isConnected) return 'Connect Wallet';
+    if (!validTokenAddress) return 'Enter Token Address';
+    if (!amount.trim()) return 'Enter Amount';
+    if (!durationDays.trim()) return 'Enter Lock Duration';
+    if (isCheckingTokenState) return 'Checking Allowance...';
+    if (tokenDecimalsError) return 'Unsupported Token';
+    if (parsedAmount === null) return 'Invalid Amount';
+    if (durationSeconds === null) return 'Invalid Lock Duration';
+    return 'Approve Tokens';
+  })();
+  const isPrimaryDisabled = Boolean(
+    isPrimaryPending ||
+    !isConnected ||
+    !validTokenAddress ||
+    !amount.trim() ||
+    !durationDays.trim() ||
+    isCheckingTokenState ||
+    parsedAmount === null ||
+    durationSeconds === null
+  );
+
+  useEffect(() => {
+    if (isApproveSuccess) {
+      void refetchAllowance();
+    }
+  }, [isApproveSuccess, refetchAllowance]);
+
+  useEffect(() => {
+    if (isLockSuccess) {
+      setAmount('');
+      setDurationDays('');
+      setLockName('');
+      setLockDescription('');
+      void Promise.all([refetchAllowance(), refetchLocks()]);
+    }
+  }, [isLockSuccess, refetchAllowance, refetchLocks]);
+
+  useEffect(() => {
+    if (isActionSuccess) {
+      void refetchLocks();
+    }
+  }, [isActionSuccess, refetchLocks]);
 
   const handleApprove = () => {
-    if (!tokenAddress || !amount) return;
-    const parsed = parseUnits(amount, 18);
+    if (!validTokenAddress || parsedAmount === null) return;
     approveWrite({
       abi: erc20Abi,
-      address: tokenAddress as Address,
+      address: validTokenAddress,
       functionName: 'approve',
-      args: [contracts.tokenLocker, parsed],
+      args: [contracts.tokenLocker, maxUint256],
     });
   };
 
   const handleCreateLock = () => {
-    if (!tokenAddress || !amount || !durationDays) return;
-    const parsed = parseUnits(amount, 18);
-    const durationSeconds = BigInt(parseInt(durationDays) * 86400);
+    if (!validTokenAddress || parsedAmount === null || durationSeconds === null) return;
 
     lockWrite({
       abi: TokenLocker,
       address: contracts.tokenLocker,
       functionName: 'lockTokens',
       args: [
-        tokenAddress as Address,
-        parsed,
+        validTokenAddress,
+        parsedAmount,
         durationSeconds,
         lockName || 'Token Lock',
         lockDescription || '',
       ],
     });
+  };
+
+  const handlePrimaryAction = () => {
+    if (hasSufficientAllowance) {
+      handleCreateLock();
+      return;
+    }
+    handleApprove();
   };
 
   const handleUnlock = (lockId: bigint) => {
@@ -286,10 +403,10 @@ const TokenLockerPage: React.FC = () => {
                 </div>
               </div>
 
-              {lockError && (
+              {primaryError && (
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-status-error-bg text-status-error text-sm">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p>{lockError.message?.slice(0, 200) || 'Transaction failed'}</p>
+                  <p>{primaryError.message?.slice(0, 200) || 'Transaction failed'}</p>
                 </div>
               )}
 
@@ -300,50 +417,29 @@ const TokenLockerPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="space-y-2">
                 <button
-                  onClick={handleApprove}
-                  disabled={isApprovePending || isApproveConfirming || !tokenAddress || !amount}
-                  className="btn-secondary flex-1"
+                  onClick={handlePrimaryAction}
+                  disabled={isPrimaryDisabled}
+                  className="btn-primary w-full disabled:opacity-60"
                 >
-                  {isApprovePending || isApproveConfirming ? (
+                  {isPrimaryPending ? (
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Approving...
+                      {primaryButtonLabel}
                     </span>
-                  ) : isApproveSuccess ? (
-                    <span className="inline-flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Approved
-                    </span>
-                  ) : (
-                    'Approve'
-                  )}
-                </button>
-                <button
-                  onClick={handleCreateLock}
-                  disabled={
-                    isLockPending ||
-                    isLockConfirming ||
-                    !isConnected ||
-                    !tokenAddress ||
-                    !amount ||
-                    !durationDays
-                  }
-                  className="btn-primary flex-1"
-                >
-                  {isLockPending || isLockConfirming ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {isLockConfirming ? 'Confirming...' : 'Locking...'}
-                    </span>
-                  ) : (
+                  ) : hasSufficientAllowance ? (
                     <span className="inline-flex items-center gap-2">
                       <Lock className="w-4 h-4" />
-                      Lock Tokens
+                      {primaryButtonLabel}
                     </span>
+                  ) : (
+                    primaryButtonLabel
                   )}
                 </button>
+                <p className="text-xs text-ink-faint">
+                  Approve once for this token, then the same button switches to locking the tokens.
+                </p>
               </div>
             </div>
           )}

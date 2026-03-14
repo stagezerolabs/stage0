@@ -1,13 +1,25 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   useAccount,
   useChainId,
-  useWriteContract,
+  useReadContract,
   useWaitForTransactionReceipt,
+  useWriteContract,
 } from 'wagmi';
-import { parseUnits, type Address } from 'viem';
-import { AirdropMultiSender, erc20Abi, getContractAddresses } from '@/config';
+import {
+  formatUnits,
+  isAddress,
+  parseUnits,
+  type Address,
+} from 'viem';
+import {
+  AirdropMultiSender,
+  erc20Abi,
+  getContractAddresses,
+  getNativeTokenLabel,
+} from '@/config';
 import {
   Send,
   Loader2,
@@ -50,15 +62,97 @@ interface Recipient {
   amount: string;
 }
 
+function formatTokenAmount(value: bigint, decimals: number, maxFractionDigits = 6): string {
+  const normalized = Number(formatUnits(value, decimals));
+  if (!Number.isFinite(normalized)) return formatUnits(value, decimals);
+  return normalized.toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
+}
+
 const AirdropPage: React.FC = () => {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const contracts = getContractAddresses(chainId);
+  const nativeTokenLabel = getNativeTokenLabel(chainId);
+  const [searchParams] = useSearchParams();
+  const queryToken = searchParams.get('token') || '';
 
   const [isNativeToken, setIsNativeToken] = useState(false);
-  const [tokenAddress, setTokenAddress] = useState('');
+  const [tokenAddress, setTokenAddress] = useState(queryToken);
   const [recipientsText, setRecipientsText] = useState('');
-  const [decimals] = useState(18);
+  const validTokenAddress = isAddress(tokenAddress) ? (tokenAddress as Address) : undefined;
+
+  useEffect(() => {
+    if (queryToken) {
+      setTokenAddress(queryToken);
+    }
+  }, [queryToken]);
+
+  const {
+    data: tokenDecimals,
+    isLoading: isTokenDecimalsLoading,
+    error: tokenDecimalsError,
+  } = useReadContract({
+    abi: erc20Abi,
+    address: validTokenAddress,
+    functionName: 'decimals',
+    query: {
+      enabled: !isNativeToken && Boolean(validTokenAddress),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
+  const { data: tokenSymbol } = useReadContract({
+    abi: erc20Abi,
+    address: validTokenAddress,
+    functionName: 'symbol',
+    query: {
+      enabled: !isNativeToken && Boolean(validTokenAddress),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
+  const {
+    data: tokenBalance,
+    isLoading: isTokenBalanceLoading,
+    refetch: refetchTokenBalance,
+  } = useReadContract({
+    abi: erc20Abi,
+    address: validTokenAddress,
+    functionName: 'balanceOf',
+    args: address && validTokenAddress ? [address] : undefined,
+    query: {
+      enabled: !isNativeToken && Boolean(address && validTokenAddress),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
+  const {
+    data: allowance,
+    isLoading: isAllowanceLoading,
+    refetch: refetchAllowance,
+  } = useReadContract({
+    abi: erc20Abi,
+    address: validTokenAddress,
+    functionName: 'allowance',
+    args: address && validTokenAddress ? [address, contracts.airdropMultisender] : undefined,
+    query: {
+      enabled: !isNativeToken && Boolean(address && validTokenAddress),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
+  const tokenDecimalsValue = typeof tokenDecimals === 'number'
+    ? tokenDecimals
+    : Number(tokenDecimals ?? 18);
+  const amountDecimals = isNativeToken ? 18 : tokenDecimalsValue;
+  const tokenSymbolValue = (tokenSymbol as string | undefined) ?? 'TOKEN';
+  const tokenSymbolDisplay = tokenSymbolValue.startsWith('$')
+    ? tokenSymbolValue
+    : `$${tokenSymbolValue}`;
 
   const parsedRecipients = useMemo((): Recipient[] => {
     if (!recipientsText.trim()) return [];
@@ -77,26 +171,43 @@ const AirdropPage: React.FC = () => {
   }, [recipientsText]);
 
   const totalAmount = useMemo(() => {
+    if (!isNativeToken && tokenDecimals === undefined) return 0n;
     try {
       return parsedRecipients.reduce((sum, r) => {
-        return sum + parseUnits(r.amount, decimals);
+        return sum + parseUnits(r.amount, amountDecimals);
       }, 0n);
     } catch {
       return 0n;
     }
-  }, [parsedRecipients, decimals]);
+  }, [parsedRecipients, amountDecimals, isNativeToken, tokenDecimals]);
+
+  const currentAllowance = allowance as bigint | undefined;
+  const hasSufficientAllowance = Boolean(
+    isNativeToken
+    || (
+      totalAmount > 0n
+      && currentAllowance !== undefined
+      && currentAllowance >= totalAmount
+    )
+  );
+
+  const isTokenStateLoading = Boolean(
+    !isNativeToken
+    && validTokenAddress
+    && (isTokenDecimalsLoading || (Boolean(address) && (isAllowanceLoading || isTokenBalanceLoading)))
+  );
 
   // Approval
   const {
     data: approveHash,
     writeContract: approveWrite,
     isPending: isApprovePending,
-    reset: resetApprove,
+    error: approveError,
   } = useWriteContract();
 
   const {
     isLoading: isApproveConfirming,
-    isSuccess: isApproveSuccess,
+    isSuccess: isApproveConfirmed,
   } = useWaitForTransactionReceipt({ hash: approveHash });
 
   // Send
@@ -113,47 +224,103 @@ const AirdropPage: React.FC = () => {
     isSuccess: isSendSuccess,
   } = useWaitForTransactionReceipt({ hash: sendHash });
 
+  useEffect(() => {
+    if (isApproveConfirmed) {
+      void refetchAllowance();
+    }
+  }, [isApproveConfirmed, refetchAllowance]);
+
+  useEffect(() => {
+    if (isSendSuccess && !isNativeToken) {
+      void Promise.all([refetchAllowance(), refetchTokenBalance()]);
+    }
+  }, [isSendSuccess, isNativeToken, refetchAllowance, refetchTokenBalance]);
+
   const handleApprove = () => {
-    if (!tokenAddress || totalAmount === 0n) return;
+    if (!validTokenAddress || totalAmount === 0n) return;
     approveWrite({
       abi: erc20Abi,
-      address: tokenAddress as Address,
+      address: validTokenAddress,
       functionName: 'approve',
       args: [contracts.airdropMultisender, totalAmount],
     });
   };
 
   const handleSend = () => {
-    if (parsedRecipients.length === 0) return;
+    if (parsedRecipients.length === 0 || totalAmount === 0n) return;
 
     const addresses = parsedRecipients.map((r) => r.address as Address);
-    const amounts = parsedRecipients.map((r) => parseUnits(r.amount, decimals));
+    const amounts = parsedRecipients.map((r) => parseUnits(r.amount, amountDecimals));
 
     if (isNativeToken) {
       sendWrite({
         abi: AirdropMultiSender,
         address: contracts.airdropMultisender,
-        functionName: 'multiSendETH',
+        functionName: 'sendETH',
         args: [addresses, amounts],
         value: totalAmount,
       });
     } else {
-      if (!tokenAddress) return;
+      if (!validTokenAddress) return;
       sendWrite({
         abi: AirdropMultiSender,
         address: contracts.airdropMultisender,
-        functionName: 'multiSendToken',
-        args: [tokenAddress as Address, addresses, amounts],
+        functionName: 'sendERC20',
+        args: [validTokenAddress, addresses, amounts],
       });
     }
   };
 
+  const handlePrimaryAction = () => {
+    if (!isNativeToken && !hasSufficientAllowance) {
+      handleApprove();
+      return;
+    }
+    handleSend();
+  };
+
   const handleReset = () => {
-    resetApprove();
     resetSend();
     setRecipientsText('');
-    setTokenAddress('');
+    setTokenAddress(queryToken);
   };
+
+  const primaryButtonLabel = (() => {
+    if (!isConnected) return 'Connect Wallet First';
+    if (parsedRecipients.length === 0) return 'Add Recipients';
+    if (!isNativeToken && !validTokenAddress) return 'Enter Token Address';
+    if (!isNativeToken && tokenDecimalsError) return 'Unsupported Token';
+    if (!isNativeToken && isTokenStateLoading) return 'Checking Token State...';
+    if (totalAmount === 0n) return 'Invalid Amounts';
+
+    if (!isNativeToken && !hasSufficientAllowance) {
+      if (isApprovePending || isApproveConfirming) {
+        return isApproveConfirming ? 'Confirming...' : 'Approving...';
+      }
+      return 'Approve Tokens';
+    }
+
+    if (isSendPending || isSendConfirming) {
+      return isSendConfirming ? 'Confirming...' : 'Sending...';
+    }
+
+    return 'Send Airdrop';
+  })();
+
+  const isPrimaryDisabled = Boolean(
+    !isConnected
+    || parsedRecipients.length === 0
+    || (!isNativeToken && !validTokenAddress)
+    || (!isNativeToken && isTokenStateLoading)
+    || totalAmount === 0n
+    || isApprovePending
+    || isApproveConfirming
+    || isSendPending
+    || isSendConfirming
+  );
+
+  const tokenBalanceValue = tokenBalance as bigint | undefined;
+  const primaryError = approveError ?? sendError ?? tokenDecimalsError;
 
   if (isSendSuccess) {
     return (
@@ -211,7 +378,7 @@ const AirdropPage: React.FC = () => {
               </p>
               <p className="text-body-sm text-ink-muted">
                 {isNativeToken
-                  ? 'Send native chain token to multiple addresses.'
+                  ? `Send ${nativeTokenLabel} to multiple addresses.`
                   : 'Send an ERC20 token to multiple addresses.'}
               </p>
             </div>
@@ -239,6 +406,23 @@ const AirdropPage: React.FC = () => {
               placeholder="0x..."
               className="input-field w-full font-mono text-sm"
             />
+
+            {validTokenAddress && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <div className="rounded-xl bg-ink/[0.03] px-3 py-2">
+                  <p className="text-label text-ink-faint uppercase">Symbol</p>
+                  <p className="text-body-sm text-ink font-mono">{tokenSymbolDisplay}</p>
+                </div>
+                <div className="rounded-xl bg-ink/[0.03] px-3 py-2">
+                  <p className="text-label text-ink-faint uppercase">Wallet Balance</p>
+                  <p className="text-body-sm text-ink font-mono">
+                    {tokenBalanceValue !== undefined
+                      ? `${formatTokenAmount(tokenBalanceValue, tokenDecimalsValue)} ${tokenSymbolDisplay}`
+                      : 'Loading...'}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -261,7 +445,7 @@ const AirdropPage: React.FC = () => {
           <textarea
             value={recipientsText}
             onChange={(e) => setRecipientsText(e.target.value)}
-            placeholder={`0x1234...abcd,100\n0x5678...efgh,200\n0x9abc...ijkl,300`}
+            placeholder={'0x1234...abcd,100\\n0x5678...efgh,200\\n0x9abc...ijkl,300'}
             rows={8}
             className="input-field w-full font-mono text-sm resize-y"
           />
@@ -304,71 +488,40 @@ const AirdropPage: React.FC = () => {
                 {parsedRecipients.length} recipients
               </span>
               <span className="text-body-sm font-medium text-accent">
-                Total: {totalAmount > 0n ? (Number(totalAmount) / 10 ** decimals).toLocaleString() : '0'} tokens
+                Total: {totalAmount > 0n ? formatTokenAmount(totalAmount, amountDecimals) : '0'}{' '}
+                {isNativeToken ? nativeTokenLabel : tokenSymbolDisplay}
               </span>
             </div>
           </div>
         )}
 
         {/* Error */}
-        {sendError && (
+        {primaryError && (
           <div className="flex items-start gap-2 p-3 rounded-xl bg-status-error-bg text-status-error text-sm">
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <p>{sendError.message?.slice(0, 200) || 'Transaction failed'}</p>
+            <p>{primaryError.message?.slice(0, 200) || 'Transaction failed'}</p>
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Primary Action */}
         <div className="flex gap-3">
-          {!isNativeToken && (
-            <button
-              onClick={handleApprove}
-              disabled={
-                isApprovePending ||
-                isApproveConfirming ||
-                !tokenAddress ||
-                parsedRecipients.length === 0
-              }
-              className="btn-secondary flex-1"
-            >
-              {isApprovePending || isApproveConfirming ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Approving...
-                </span>
-              ) : isApproveSuccess ? (
-                <span className="inline-flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Approved
-                </span>
-              ) : (
-                'Approve'
-              )}
-            </button>
-          )}
           <button
-            onClick={handleSend}
-            disabled={
-              isSendPending ||
-              isSendConfirming ||
-              !isConnected ||
-              parsedRecipients.length === 0 ||
-              (!isNativeToken && !tokenAddress)
-            }
+            onClick={handlePrimaryAction}
+            disabled={isPrimaryDisabled}
             className="btn-primary flex-1"
           >
-            {isSendPending || isSendConfirming ? (
+            {isApprovePending || isApproveConfirming || isSendPending || isSendConfirming ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {isSendConfirming ? 'Confirming...' : 'Sending...'}
+                {primaryButtonLabel}
               </span>
-            ) : !isConnected ? (
-              'Connect Wallet First'
-            ) : (
+            ) : primaryButtonLabel === 'Send Airdrop' ? (
               <span className="inline-flex items-center gap-2">
                 <Send className="w-4 h-4" />
-                Send Airdrop
+                {primaryButtonLabel}
               </span>
+            ) : (
+              primaryButtonLabel
             )}
           </button>
         </div>

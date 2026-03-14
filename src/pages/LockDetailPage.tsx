@@ -8,8 +8,10 @@ import {
   Clock,
   ExternalLink,
   Lock,
+  Unlock,
   Timer,
   ArrowRightLeft,
+  Loader2,
   User,
 } from 'lucide-react';
 import { TokenLocker, erc20Abi } from '@/config';
@@ -328,48 +330,100 @@ const LockDetailPage: React.FC = () => {
       </div>
 
       {isOwner && !lock.withdrawn && (
-        <div className="glass-card rounded-3xl p-6 space-y-4">
+        <div className="glass-card rounded-3xl p-6 space-y-6">
           <h2 className="font-display text-display-sm text-ink">Manage Lock</h2>
-          <div className="flex flex-col md:flex-row gap-3">
+
+          {/* Unlock */}
+          <div className="rounded-2xl border border-border bg-canvas-alt/50 p-4 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-accent-muted text-accent flex items-center justify-center flex-shrink-0">
+                <Unlock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-body font-medium text-ink">Withdraw Tokens</h3>
+                <p className="text-body-sm text-ink-muted">
+                  {unlockable
+                    ? 'Your lock period has ended. Withdraw your tokens now.'
+                    : 'Tokens can only be withdrawn after the unlock date.'}
+                </p>
+              </div>
+            </div>
             <button
               onClick={handleUnlock}
               disabled={!unlockable || isPending || isConfirming}
-              className="btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending || isConfirming ? 'Processing...' : 'Unlock Tokens'}
+              {isPending || isConfirming ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <Unlock className="w-4 h-4" />
+                  Unlock Tokens
+                </span>
+              )}
             </button>
-            <div className="flex flex-1 gap-2">
+          </div>
+
+          {/* Extend */}
+          <div className="rounded-2xl border border-border bg-canvas-alt/50 p-4 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-accent-muted text-accent flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-body font-medium text-ink">Extend Lock</h3>
+                <p className="text-body-sm text-ink-muted">Add more days to the current lock duration.</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="number"
                 value={extendDays}
                 onChange={(event) => setExtendDays(event.target.value)}
-                placeholder="Extend (days)"
+                placeholder="Number of days"
                 className="input-field flex-1"
               />
               <button
                 onClick={handleExtend}
                 disabled={!extendDays || isPending || isConfirming}
-                className="btn-secondary"
+                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               >
+                <Clock className="w-4 h-4" />
                 Extend
               </button>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row gap-2">
-            <input
-              value={transferAddress}
-              onChange={(event) => setTransferAddress(event.target.value)}
-              placeholder="Transfer to (0x...)"
-              className="input-field font-mono flex-1"
-            />
-            <button
-              onClick={handleTransfer}
-              disabled={!transferAddress || isPending || isConfirming}
-              className="btn-secondary inline-flex items-center gap-2"
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-              Transfer
-            </button>
+
+          {/* Transfer */}
+          <div className="rounded-2xl border border-border bg-canvas-alt/50 p-4 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-accent-muted text-accent flex items-center justify-center flex-shrink-0">
+                <ArrowRightLeft className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-body font-medium text-ink">Transfer Ownership</h3>
+                <p className="text-body-sm text-ink-muted">Transfer this lock to another wallet address.</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={transferAddress}
+                onChange={(event) => setTransferAddress(event.target.value)}
+                placeholder="Recipient address (0x...)"
+                className="input-field font-mono flex-1"
+              />
+              <button
+                onClick={handleTransfer}
+                disabled={!transferAddress || isPending || isConfirming}
+                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                Transfer
+              </button>
+            </div>
           </div>
         </div>
       )}

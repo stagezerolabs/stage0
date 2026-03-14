@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import { TokenLocker } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
@@ -50,12 +50,12 @@ export function useUserLocks(forceRefetch = false) {
     }
   }, [forceRefetch, address, refetch]);
 
-  const handleRefetch = async () => {
+  const handleRefetch = useCallback(async () => {
     if (address) {
       setUserLocksLoading(address, true);
       await refetch();
     }
-  };
+  }, [address, setUserLocksLoading, refetch]);
 
   return {
     lockIds: cachedLockIds || (lockIds as unknown as bigint[]) || [],

@@ -101,7 +101,7 @@ export const CONTRACT_ADDRESSES: Record<number, ContractAddressMap> = {
   [riseTestnet.id]: {
     tokenLocker: "0xb225cb8Ea90E0ab1F9f5011d31fD217083c31fc7",
     nftFactory: "0xCEA1A715927408216B838DcAcd90Dff025Ab0b2D",
-    nftFactoryLens: "0x5f52461ac88ea4A9095A2eD82743DF17e1A1C1af",
+    nftFactoryLens: "0x5F52461ac88ea4a9095A2eD82743Df17E1a1c1af",
     presaleFactory: "0x67064a9236050D3d947d7F5Bd3448BD4b5D947FC",
     tokenFactory: "0xa0b761A94013FF721fD682eEB7e57709C0e03f42",
     airdropMultisender: "0x8DB306030Cf163A6C809fB3599500DBE28Df2CC6",
@@ -1067,7 +1067,7 @@ export const AirdropMultiSender = [
       { internalType: "address[]", name: "recipients", type: "address[]" },
       { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
     ],
-    name: "multiSendToken",
+    name: "sendERC20",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -1077,7 +1077,7 @@ export const AirdropMultiSender = [
       { internalType: "address[]", name: "recipients", type: "address[]" },
       { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
     ],
-    name: "multiSendETH",
+    name: "sendETH",
     outputs: [],
     stateMutability: "payable",
     type: "function",
@@ -1086,7 +1086,6 @@ export const AirdropMultiSender = [
     anonymous: false,
     inputs: [
       { indexed: true, internalType: "address", name: "token", type: "address" },
-      { indexed: false, internalType: "uint256", name: "totalRecipients", type: "uint256" },
       { indexed: false, internalType: "uint256", name: "totalAmount", type: "uint256" },
     ],
     name: "TokensSent",
@@ -1095,10 +1094,9 @@ export const AirdropMultiSender = [
   {
     anonymous: false,
     inputs: [
-      { indexed: false, internalType: "uint256", name: "totalRecipients", type: "uint256" },
       { indexed: false, internalType: "uint256", name: "totalAmount", type: "uint256" },
     ],
-    name: "ETHSent",
+    name: "EthSent",
     type: "event",
   },
 ] as const;

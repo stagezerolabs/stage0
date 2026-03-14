@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useReadContract } from 'wagmi';
-import { type Address } from 'viem';
+import { usePublicClient } from 'wagmi';
+import { getAddress, type Address } from 'viem';
 import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import {
@@ -287,14 +287,77 @@ function toIndexedDeployment(deployment: IndexedNftCollection): NFTDeploymentWit
 export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   const { creator, enabled = true } = options;
   const { nftFactoryLens } = useChainContracts();
+  const publicClient = usePublicClient();
   const [metadataByAddress, setMetadataByAddress] = useState<Record<string, NFTContractMetadata | null>>({});
   const [isMetadataLoading, setIsMetadataLoading] = useState(false);
 
-  const hasLens = Boolean(nftFactoryLens && nftFactoryLens !== ZERO_ADDRESS);
+  // Normalize lens address to checksum format. Lowercasing first avoids
+  // throwing on mixed-case, non-checksummed input while preserving bytes.
+  const lensAddress = useMemo(() => {
+    if (!nftFactoryLens || nftFactoryLens === ZERO_ADDRESS) return undefined;
+    try {
+      return getAddress(nftFactoryLens.toLowerCase() as Address);
+    } catch (error) {
+      console.error('[useNFTDeployments] Invalid lens address in config:', nftFactoryLens, error);
+      return undefined;
+    }
+  }, [nftFactoryLens]);
+
+  const hasLens = Boolean(lensAddress);
   const canRead = Boolean(enabled);
   const isIndexerConfigured = isGoldskyIndexerConfigured();
-  const canReadFromChain = Boolean(canRead && hasLens);
-  const canReadFromIndexer = Boolean(canRead && !hasLens && isIndexerConfigured);
+  const canReadFromChain = Boolean(canRead && hasLens && publicClient);
+
+  // ── On-chain reads via NFTFactoryLens (always preferred) ──────────────
+  // Uses viem publicClient.readContract directly for reliability.
+  const {
+    data: chainRaw,
+    isLoading: isChainLoading,
+    error: chainError,
+  } = useQuery({
+    queryKey: ['nft-lens', creator?.toLowerCase() ?? 'all', lensAddress],
+    queryFn: async (): Promise<RawCollectionInfo[]> => {
+      if (!publicClient || !lensAddress) return [];
+
+      if (creator) {
+        const result = await publicClient.readContract({
+          abi: NFTFactoryLens,
+          address: lensAddress,
+          functionName: 'getCollectionsByCreator',
+          args: [creator],
+        });
+        return result as unknown as RawCollectionInfo[];
+      }
+
+      const result = await publicClient.readContract({
+        abi: NFTFactoryLens,
+        address: lensAddress,
+        functionName: 'getAllCollections',
+        args: [0n, 0n],
+      });
+      return result as unknown as RawCollectionInfo[];
+    },
+    enabled: canReadFromChain,
+    refetchInterval: canReadFromChain ? AUTO_REFRESH_INTERVAL : false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 2,
+  });
+
+  useEffect(() => {
+    if (chainError) {
+      console.error('[useNFTDeployments] Lens call failed:', chainError);
+    }
+  }, [chainError]);
+
+  // ── Goldsky indexer fallback ───────────────────────────────────────────
+  // Prefer lens data whenever available. Use indexer only if lens cannot
+  // be read (missing/invalid lens or read error).
+  const shouldFallbackToIndexer = Boolean(
+    canRead &&
+    isIndexerConfigured &&
+    (!canReadFromChain || Boolean(chainError))
+  );
 
   const {
     data: indexedCollections = [],
@@ -303,43 +366,20 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   } = useQuery({
     queryKey: ['goldsky', 'nftCollections', creator?.toLowerCase() ?? 'all'],
     queryFn: () => fetchIndexedNftCollections(creator),
-    enabled: canReadFromIndexer,
+    enabled: shouldFallbackToIndexer,
     staleTime: AUTO_REFRESH_INTERVAL,
-    refetchInterval: canReadFromIndexer ? AUTO_REFRESH_INTERVAL : false,
+    refetchInterval: shouldFallbackToIndexer ? AUTO_REFRESH_INTERVAL : false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });
 
-  const useIndexer =
-    canReadFromIndexer &&
+  const hasLensData = Boolean(chainRaw && chainRaw.length > 0);
+  const useIndexer = Boolean(
+    !hasLensData &&
+    shouldFallbackToIndexer &&
     !isIndexerError &&
-    (isIndexerLoading || indexedCollections.length > 0);
-
-  const { data: creatorData, isLoading: isCreatorLoading } = useReadContract({
-    abi: NFTFactoryLens,
-    address: nftFactoryLens,
-    functionName: 'getCollectionsByCreator',
-    args: creator ? [creator] : undefined,
-    query: {
-      enabled: canReadFromChain && Boolean(creator),
-      refetchInterval: canReadFromChain && Boolean(creator) ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-    },
-  });
-
-  const { data: allData, isLoading: isAllLoading } = useReadContract({
-    abi: NFTFactoryLens,
-    address: nftFactoryLens,
-    functionName: 'getAllCollections',
-    args: [0n, 0n],
-    query: {
-      enabled: canReadFromChain && !creator,
-      refetchInterval: canReadFromChain && !creator ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-    },
-  });
+    (isIndexerLoading || indexedCollections.length > 0)
+  );
 
   const indexedDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
     if (!useIndexer) return [];
@@ -351,15 +391,14 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       return indexedDeployments;
     }
 
-    const raw = (creator ? creatorData : allData) as RawCollectionInfo[] | undefined;
-    if (!raw || raw.length === 0) return [];
+    if (!chainRaw || chainRaw.length === 0) return [];
 
-    return [...raw]
+    return [...chainRaw]
       .reverse()
       .map(normalizeCollectionInfo)
       .filter((entry): entry is CollectionInfo => entry !== null)
       .map(toDeployment);
-  }, [allData, creator, creatorData, indexedDeployments, useIndexer]);
+  }, [chainRaw, indexedDeployments, useIndexer]);
 
   useEffect(() => {
     const pending = rawDeployments.filter((deployment) => {
@@ -453,7 +492,6 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     });
   }, [rawDeployments, metadataByAddress]);
 
-  const isChainLoading = canReadFromChain ? (creator ? isCreatorLoading : isAllLoading) : false;
   const isLoading = useIndexer ? isIndexerLoading : isChainLoading;
 
   return {

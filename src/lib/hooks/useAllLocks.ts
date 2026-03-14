@@ -1,6 +1,6 @@
 import { TokenLocker } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { erc20Abi, formatUnits, type Address, type Abi } from 'viem';
 import { useReadContracts } from 'wagmi';
 import { useUserLocks } from './useUserLocks';
@@ -131,10 +131,10 @@ export function useAllLocks(forceRefetch = false) {
 
   }, [lockData, tokenInfoMap, lockIds]);
 
-  const refetch = async () => {
+  const refetch = useCallback(async () => {
     await refetchLocks();
     refetchLockData();
-  }
+  }, [refetchLocks, refetchLockData]);
 
   return {
     locks,

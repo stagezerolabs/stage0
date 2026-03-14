@@ -45,7 +45,13 @@ const itemVariants = {
 };
 
 function formatDate(timestamp: bigint): string {
-  return new Date(Number(timestamp) * 1000).toLocaleDateString(undefined, {
+  const seconds = Number(timestamp);
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 8_640_000_000_000) {
+    return 'Invalid date';
+  }
+  const date = new Date(seconds * 1000);
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
+  return date.toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -55,11 +61,14 @@ function formatDate(timestamp: bigint): string {
 }
 
 function getLockProgress(lockDate: bigint, unlockDate: bigint): number {
+  if (unlockDate <= lockDate) return 100;
   const now = BigInt(Math.floor(Date.now() / 1000));
   if (now >= unlockDate) return 100;
   if (now <= lockDate) return 0;
   const total = Number(unlockDate - lockDate);
   const elapsed = Number(now - lockDate);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  if (!Number.isFinite(elapsed) || elapsed < 0) return 0;
   return Math.min(Math.round((elapsed / total) * 100), 100);
 }
 
@@ -73,17 +82,25 @@ const TokenLockerPage: React.FC = () => {
   const contracts = getContractAddresses(chainId);
   const explorerUrl = getExplorerUrl(chainId);
   const [searchParams] = useSearchParams();
+  const queryToken = searchParams.get('token') || '';
 
   const { locks, isLoading: isLoadingLocks, refetch: refetchLocks } = useAllLocks();
 
   // Create Lock Form - pre-fill token from query param
-  const [tokenAddress, setTokenAddress] = useState(searchParams.get('token') || '');
+  const [tokenAddress, setTokenAddress] = useState(queryToken);
   const [amount, setAmount] = useState('');
   const [durationDays, setDurationDays] = useState('');
   const [lockName, setLockName] = useState('');
   const [lockDescription, setLockDescription] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(true);
   const validTokenAddress = isAddress(tokenAddress) ? (tokenAddress as Address) : undefined;
+
+  useEffect(() => {
+    if (!queryToken) return;
+    setTokenAddress((current) =>
+      current.toLowerCase() === queryToken.toLowerCase() ? current : queryToken
+    );
+  }, [queryToken]);
 
   const {
     data: tokenDecimals,
@@ -228,13 +245,35 @@ const TokenLockerPage: React.FC = () => {
       setDurationDays('');
       setLockName('');
       setLockDescription('');
-      void Promise.all([refetchAllowance(), refetchLocks()]);
+      const refresh = async () => {
+        try {
+          await Promise.all([refetchAllowance(), refetchLocks()]);
+        } catch (error) {
+          console.error('Failed to refresh lock data after lock', error);
+        }
+      };
+      void refresh();
+      const retry1 = window.setTimeout(() => void refresh(), 1500);
+      const retry2 = window.setTimeout(() => void refresh(), 5000);
+      return () => {
+        window.clearTimeout(retry1);
+        window.clearTimeout(retry2);
+      };
     }
   }, [isLockSuccess, refetchAllowance, refetchLocks]);
 
   useEffect(() => {
     if (isActionSuccess) {
-      void refetchLocks();
+      const refresh = async () => {
+        try {
+          await refetchLocks();
+        } catch (error) {
+          console.error('Failed to refresh lock data after action', error);
+        }
+      };
+      void refresh();
+      const retry = window.setTimeout(() => void refresh(), 1500);
+      return () => window.clearTimeout(retry);
     }
   }, [isActionSuccess, refetchLocks]);
 
@@ -448,12 +487,7 @@ const TokenLockerPage: React.FC = () => {
 
       {/* Your Locks */}
       <motion.section variants={itemVariants} className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-display-sm text-ink">Your Locks</h2>
-          <button onClick={() => refetchLocks()} className="btn-ghost text-sm">
-            Refresh
-          </button>
-        </div>
+        <h2 className="font-display text-display-sm text-ink">Your Locks</h2>
 
         {locks && locks.length > 0 && (
           <div className="flex flex-wrap gap-2">

@@ -1,5 +1,6 @@
 import Dither from '@/components/animated/Dither';
 import CountUp from '@/components/ui/CountUp';
+import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { projects } from '@/lib/projects';
 import {
@@ -254,10 +255,37 @@ const RiseGlowOrbs: React.FC = () => (
   </span>
 );
 
+type CompactStatDisplay = {
+  value: number;
+  decimals: number;
+  suffix: string;
+};
+
+function toCompactStatDisplay(value: number): CompactStatDisplay {
+  if (!Number.isFinite(value) || value <= 0) {
+    return { value: 0, decimals: 0, suffix: '' };
+  }
+
+  if (value >= 1_000_000_000) {
+    return { value: value / 1_000_000_000, decimals: 1, suffix: 'B' };
+  }
+
+  if (value >= 1_000_000) {
+    return { value: value / 1_000_000, decimals: 1, suffix: 'M' };
+  }
+
+  if (value >= 1_000) {
+    return { value: value / 1_000, decimals: 1, suffix: 'K' };
+  }
+
+  return { value, decimals: value < 10 ? 1 : 0, suffix: '' };
+}
+
 /* ─── Main Component ─── */
 
 const HomePage: React.FC = () => {
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
+  const { totalDeployments, activeDeployments, estimatedEthRaised } = useUserNFTs();
   const reducedMotion = useReducedMotion();
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
   const prefersReducedMotion = typeof window !== 'undefined' && 
@@ -307,6 +335,66 @@ const HomePage: React.FC = () => {
       : isPresalesLoading
         ? []
         : fallbackFeaturedPresales;
+
+  const presaleRaisedEth = presales.reduce((sum, presale) => {
+    if (!presale.isPaymentETH) return sum;
+    const decimals = presale.paymentTokenDecimals ?? 18;
+    const normalized = Number(formatUnits(presale.totalRaised ?? 0n, decimals));
+    if (!Number.isFinite(normalized)) return sum;
+    return sum + normalized;
+  }, 0);
+  const nftRaisedEth = Number(formatUnits(estimatedEthRaised ?? 0n, 18));
+  const totalRaisedEth = presaleRaisedEth + (Number.isFinite(nftRaisedEth) ? nftRaisedEth : 0);
+
+  const totalProjectsLaunched = presales.length + Number(totalDeployments ?? 0n);
+  const activeProjects = livePresales.length + upcomingPresales.length + (activeDeployments ?? 0);
+
+  const totalRaisedDisplay = toCompactStatDisplay(totalRaisedEth);
+
+  const statCards = [
+    {
+      label: 'Total Raised',
+      value: totalRaisedDisplay.value,
+      decimals: totalRaisedDisplay.decimals,
+      prefix: '',
+      suffix: `${totalRaisedDisplay.suffix} ETH`,
+      duration: 2200,
+      icon: TrendingUp,
+      iconBg: 'bg-blue-500/15 text-blue-500 ring-1 ring-blue-500/30',
+      ghost: 'E',
+      cardClass: 'ambient-stat-card--orange',
+      gaugeColor: 'rgb(255, 138, 0)',
+      gaugeFill: 80,
+    },
+    {
+      label: 'Projects Launched',
+      value: totalProjectsLaunched,
+      decimals: 0,
+      prefix: '',
+      suffix: '',
+      duration: 1800,
+      icon: Rocket,
+      iconBg: 'bg-green-500/15 text-green-500 ring-1 ring-green-500/30',
+      ghost: '#',
+      cardClass: 'ambient-stat-card--blue',
+      gaugeColor: 'rgb(59, 130, 246)',
+      gaugeFill: 60,
+    },
+    {
+      label: 'Active Projects',
+      value: activeProjects,
+      decimals: 0,
+      prefix: '',
+      suffix: '',
+      duration: 2400,
+      icon: Users,
+      iconBg: 'bg-purple-500/15 text-purple-500 ring-1 ring-purple-500/30',
+      ghost: '+',
+      cardClass: 'ambient-stat-card--purple',
+      gaugeColor: 'rgb(139, 124, 255)',
+      gaugeFill: 90,
+    },
+  ];
 
   // Global Page Scroll
   const { scrollY } = useScroll();
@@ -466,50 +554,7 @@ const HomePage: React.FC = () => {
         {/* ─── Stats Section ─── */}
         <motion.section variants={itemVariants}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                label: 'Total Raised',
-                value: 2.4,
-                decimals: 1,
-                prefix: '$',
-                suffix: 'M+',
-                duration: 2200,
-                icon: TrendingUp,
-                iconBg: 'bg-blue-500/15 text-blue-500 ring-1 ring-blue-500/30',
-                ghost: '$',
-                cardClass: 'ambient-stat-card--orange',
-                gaugeColor: 'rgb(255, 138, 0)',
-                gaugeFill: 80,
-              },
-              {
-                label: 'Projects Launched',
-                value: 12,
-                decimals: 0,
-                prefix: '',
-                suffix: '',
-                duration: 1800,
-                icon: Rocket,
-                iconBg: 'bg-green-500/15 text-green-500 ring-1 ring-green-500/30',
-                ghost: '#',
-                cardClass: 'ambient-stat-card--blue',
-                gaugeColor: 'rgb(59, 130, 246)',
-                gaugeFill: 60,
-              },
-              {
-                label: 'Active Participants',
-                value: 3200,
-                decimals: 0,
-                prefix: '',
-                suffix: '+',
-                duration: 2400,
-                icon: Users,
-                iconBg: 'bg-purple-500/15 text-purple-500 ring-1 ring-purple-500/30',
-                ghost: '+',
-                cardClass: 'ambient-stat-card--purple',
-                gaugeColor: 'rgb(139, 124, 255)',
-                gaugeFill: 90,
-              },
-            ].map((stat, i) => {
+            {statCards.map((stat, i) => {
               const { ref, springX, springY, handleMouseMove, handleMouseLeave } = statTilts[i];
               return (
                 <motion.div

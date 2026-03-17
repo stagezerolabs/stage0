@@ -44,7 +44,7 @@ const itemVariants = {
 };
 
 type TabFilter = 'all' | 'live' | 'upcoming' | 'ended';
-type LaunchTypeFilter = 'all' | 'token' | 'nft';
+type LaunchTypeFilter = 'token' | 'nft';
 
 const tabs: { label: string; value: TabFilter }[] = [
   { label: 'All', value: 'all' },
@@ -54,9 +54,8 @@ const tabs: { label: string; value: TabFilter }[] = [
 ];
 
 const launchTypeTabs: { label: string; value: LaunchTypeFilter }[] = [
-  { label: 'All Launches', value: 'all' },
   { label: 'Token Presales', value: 'token' },
-  { label: 'NFT Deployments', value: 'nft' },
+  { label: 'NFT Drops', value: 'nft' },
 ];
 
 function getStatusBadge(status: string) {
@@ -117,7 +116,7 @@ function formatCountdown(targetTime: bigint | undefined, nowSec: number): string
 
 const PresalesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
-  const [activeLaunchType, setActiveLaunchType] = useState<LaunchTypeFilter>('all');
+  const [activeLaunchType, setActiveLaunchType] = useState<LaunchTypeFilter | null>(null);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -144,8 +143,9 @@ const PresalesPage: React.FC = () => {
     return nftDeployments.filter((deployment) => deployment.status === activeTab);
   }, [activeTab, nftDeployments]);
 
-  const showTokenLaunches = activeLaunchType !== 'nft';
-  const showNFTLaunches = activeLaunchType !== 'token';
+  const effectiveLaunchType = activeTab === 'all' ? null : activeLaunchType;
+  const showTokenLaunches = effectiveLaunchType !== 'nft';
+  const showNFTLaunches = effectiveLaunchType !== 'token';
   const visiblePresales = showTokenLaunches ? presales : [];
   const visibleNFTDeployments = showNFTLaunches ? filteredNFTDeployments : [];
   const isLoading = (showTokenLaunches && isPresalesLoading) || (showNFTLaunches && isNFTLoading);
@@ -169,13 +169,18 @@ const PresalesPage: React.FC = () => {
       {/* Filter Tabs */}
       <motion.section variants={itemVariants}>
         <div className="flex items-center gap-2 flex-wrap mb-3">
-          {tabs.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                activeTab === tab.value
-                  ? 'bg-accent text-accent-foreground shadow-glow-orange'
+              {tabs.map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => {
+                    setActiveTab(tab.value);
+                    if (tab.value === 'all') {
+                      setActiveLaunchType(null);
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === tab.value
+                      ? 'bg-accent text-accent-foreground shadow-glow-orange'
                   : 'bg-ink/5 text-ink-muted hover:bg-ink/10'
               }`}
             >
@@ -187,11 +192,16 @@ const PresalesPage: React.FC = () => {
           {launchTypeTabs.map((tab) => (
             <button
               key={tab.value}
-              onClick={() => setActiveLaunchType(tab.value)}
+              onClick={() => {
+                if (activeTab === 'all') return;
+                setActiveLaunchType((current) => (current === tab.value ? null : tab.value));
+              }}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                activeLaunchType === tab.value
+                activeTab !== 'all' && activeLaunchType === tab.value
                   ? 'bg-accent/15 text-accent border border-accent/30'
-                  : 'bg-ink/5 text-ink-muted hover:bg-ink/10 border border-transparent'
+                  : `bg-ink/5 text-ink-muted border border-transparent ${
+                    activeTab === 'all' ? 'opacity-60 cursor-default' : 'hover:bg-ink/10'
+                  }`
               }`}
             >
               {tab.label}
@@ -214,9 +224,9 @@ const PresalesPage: React.FC = () => {
             </div>
             <h3 className="font-display text-display-sm text-ink">No Launches Found</h3>
             <p className="text-body text-ink-muted max-w-md mx-auto">
-              {activeLaunchType === 'token'
+              {effectiveLaunchType === 'token'
                 ? 'No token presales match this filter.'
-                : activeLaunchType === 'nft'
+                : effectiveLaunchType === 'nft'
                 ? 'No NFT deployments match this filter.'
                 : 'No token or NFT launches match the current filters.'}
             </p>

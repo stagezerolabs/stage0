@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = [
-    { label: 'Documentation', href: '#' },
+    { label: 'Documentation', href: 'https://stagezerolabs.gitbook.io/stagezero-docs/' },
     { label: 'Terms', href: '#' },
     { label: 'Privacy', href: '#' },
   ];

@@ -706,7 +706,7 @@ const HomePage: React.FC = () => {
           <div className="text-center space-y-4 max-w-2xl mx-auto">
             <h2 className="font-display text-3xl md:text-5xl text-ink">How Stage0 Works</h2>
             <p className="text-lg text-ink-muted">
-              Participating in early-stage IDOs on Rise Chain is seamless. Connect, discover, and build with us.
+              Launching and participating in early-stage projects on Rise is simple. Stage0 provides the infrastructure for token launches, NFT drops, and distribution all in one place.
             </p>
           </div>
 
@@ -723,19 +723,19 @@ const HomePage: React.FC = () => {
                 {
                   step: 1,
                   title: 'Connect Wallet',
-                  description: 'Link your Rise wallet to authenticate and access the launchpad.',
+                  description: 'Connect your Rise wallet to access the full Stage0 platform and interact with launches and tools.',
                   icon: Wallet,
                 },
                 {
                   step: 2,
-                  title: 'Explore Projects',
-                  description: 'Browse meticulously vetted live and upcoming IDOs and their tokenomics.',
+                  title: 'Discover & Launch',
+                  description: 'Explore upcoming token and NFT launches, or create your own using Stage0\'s built-in launch and creation tools.',
                   icon: Search,
                 },
                 {
                   step: 3,
-                  title: 'Participate & Claim',
-                  description: 'Contribute efficiently and claim your tokens via our smart contracts when live.',
+                  title: 'Participate & Manage',
+                  description: 'Join launches, mint NFTs, and manage assets post-launch including distribution and locks.',
                   icon: CheckCircle2,
                 },
               ].map((item, index) => (

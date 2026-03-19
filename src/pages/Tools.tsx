@@ -63,8 +63,8 @@ const tools = [
   },
   {
     id: 'tokenLocker',
-    title: 'Token Locker',
-    description: 'Lock token liquidity to build trust with your community.',
+    title: 'Locker',
+    description: 'Lock token and liquidity.',
     icon: Lock,
     href: '/tools/token-locker',
     bgColor: 'bg-canvas-alt',

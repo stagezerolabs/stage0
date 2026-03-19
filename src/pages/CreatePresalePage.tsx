@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits, type Address } from 'viem';
-import { PresaleFactory, getContractAddresses } from '@/config';
+import { useAccount, useChainId, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { isAddress, parseUnits, type Address } from 'viem';
+import { PresaleFactory, erc20Abi, getContractAddresses } from '@/config';
 import { useWhitelistedCreator } from '@/lib/hooks/useWhitelistedCreator';
 import {
   Rocket,
@@ -15,7 +15,7 @@ import {
   ExternalLink,
   Info,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -47,10 +47,20 @@ const CreatePresalePage: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
   const chainId = useChainId();
   const contracts = getContractAddresses(chainId);
+  const [searchParams] = useSearchParams();
 
   const { isWhitelisted, isLoading: isCheckingWhitelist } = useWhitelistedCreator(userAddress);
 
-  const [saleToken, setSaleToken] = useState('');
+  const querySaleToken = useMemo(() => {
+    const tokenAddress = searchParams.get('token')?.trim();
+    if (!tokenAddress || !isAddress(tokenAddress)) return '';
+    return tokenAddress;
+  }, [searchParams]);
+
+  const queryTokenSymbol = useMemo(() => searchParams.get('symbol')?.trim() ?? '', [searchParams]);
+  const queryTokenName = useMemo(() => searchParams.get('name')?.trim() ?? '', [searchParams]);
+
+  const [saleToken, setSaleToken] = useState(querySaleToken);
   const [paymentToken, setPaymentToken] = useState('');
   const [useNativeToken, setUseNativeToken] = useState(true);
   const [hardCap, setHardCap] = useState('');
@@ -61,6 +71,33 @@ const CreatePresalePage: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [saleAmount, setSaleAmount] = useState('');
   const [requiresWhitelist, setRequiresWhitelist] = useState(false);
+
+  useEffect(() => {
+    if (querySaleToken) {
+      setSaleToken(querySaleToken);
+    }
+  }, [querySaleToken]);
+
+  const tokenMetadataContracts = useMemo(() => {
+    if (!saleToken || !isAddress(saleToken)) return undefined;
+    return [
+      { abi: erc20Abi, address: saleToken as Address, functionName: 'name' },
+      { abi: erc20Abi, address: saleToken as Address, functionName: 'symbol' },
+    ] as const;
+  }, [saleToken]);
+
+  const { data: tokenMetadataResults } = useReadContracts({
+    contracts: tokenMetadataContracts,
+    query: {
+      enabled: Boolean(tokenMetadataContracts),
+    },
+  });
+
+  const detectedTokenName = tokenMetadataResults?.[0]?.result as string | undefined;
+  const detectedTokenSymbol = tokenMetadataResults?.[1]?.result as string | undefined;
+  const resolvedTokenName = detectedTokenName ?? queryTokenName;
+  const resolvedTokenSymbol = detectedTokenSymbol ?? queryTokenSymbol;
+  const showResolvedTokenInfo = Boolean(resolvedTokenName || resolvedTokenSymbol);
 
   const calculatedRate = useMemo(() => {
     if (!saleAmount || !hardCap) return '';
@@ -256,6 +293,14 @@ const CreatePresalePage: React.FC = () => {
             placeholder="0x..."
             className="input-field w-full font-mono text-sm"
           />
+          {showResolvedTokenInfo && (
+            <p className="text-body-sm text-ink-muted">
+              Token detected:{' '}
+              <span className="text-ink font-medium">
+                {resolvedTokenName || 'Unknown'}{resolvedTokenSymbol ? ` (${resolvedTokenSymbol})` : ''}
+              </span>
+            </p>
+          )}
         </div>
 
         {/* Native Token Toggle */}

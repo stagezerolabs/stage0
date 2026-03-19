@@ -288,7 +288,12 @@ const TokensPage: React.FC = () => {
                   >
                     Explorer <ExternalLink className="w-4 h-4" />
                   </a>
-                  <Link to={`/create/presale?token=${token.address}`} className="btn-secondary">Launch Presale</Link>
+                  <Link
+                    to={`/create/presale?token=${token.address}&symbol=${encodeURIComponent(token.symbol)}&name=${encodeURIComponent(token.name)}`}
+                    className="btn-secondary"
+                  >
+                    Launch Presale
+                  </Link>
                   <Link to={`/tools/airdrop?token=${token.address}`} className="btn-secondary">Airdrop</Link>
                   <Link to={`/tools/token-locker?token=${token.address}`} className="btn-secondary">Lock</Link>
                 </div>

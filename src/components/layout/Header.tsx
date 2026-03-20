@@ -55,7 +55,6 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/presales', label: 'Launchpad' },
     { path: '/tools', label: 'Tools' },
-    { path: '/staking', label: 'Staking' },
   ];
 
   const navItems = isConnected

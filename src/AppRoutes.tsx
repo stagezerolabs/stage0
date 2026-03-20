@@ -17,7 +17,6 @@ import NFTDetailPage from './pages/NFTDetailPage';
 import TokenLockerPage from './pages/TokenLockerPage';
 import LockDetailPage from './pages/LockDetailPage';
 import AirdropPage from './pages/AirdropPage';
-import Staking from './pages/Staking';
 import Tools from './pages/Tools';
 import ProjectPage from './pages/ProjectPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -53,7 +52,6 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
           <Route path="/locks/:id" element={<LockDetailPage />} />
           <Route path="/tools/airdrop" element={<AirdropPage />} />
           <Route path="/tools" element={<Tools />} />
-          <Route path="/staking" element={<Staking />} />
           <Route path="/project/:address" element={<ProjectPage />} />
           <Route path="/tokens" element={<TokensPage />} />
           <Route path="/my-nfts" element={<MyNFTsPage />} />

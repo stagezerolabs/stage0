@@ -829,35 +829,6 @@ const HomePage: React.FC = () => {
           </div>
         </motion.section>
 
-        {/* ─── CTA Banner ─── */}
-        <motion.section
-          variants={itemVariants}
-          initial={{ opacity: 0, scale: 0.95, y: 40 }}
-          whileInView={{ opacity: 1, scale: 1, y: 0 }}
-          viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="relative overflow-hidden rounded-[3rem] border border-accent/20 bg-canvas-alt"
-        >
-          <div className="relative z-10 p-12 md:p-20 flex flex-col lg:flex-row items-center justify-between gap-12">
-            <div className="space-y-6 max-w-2xl text-center lg:text-left">
-              <h3 className="font-display text-4xl md:text-6xl text-ink leading-tight font-bold">
-                Stake to unlock <br />
-                <span className="text-accent">exclusive allocations</span>
-              </h3>
-              <p className="text-lg text-ink-muted max-w-xl mx-auto lg:mx-0">
-                Level up your tier status for guaranteed allocations and priority access to the most
-                anticipated launches on Stage0.
-              </p>
-            </div>
-
-            <div className="flex-shrink-0">
-              <MagneticButton as="link" to="/staking" className="btn-primary py-5 px-10 text-xl rounded-2xl shadow-[0_0_40px_rgba(255,138,0,0.3)] hover:shadow-[0_0_60px_rgba(255,138,0,0.5)] transition-shadow">
-                Start Staking Now
-              </MagneticButton>
-            </div>
-          </div>
-        </motion.section>
-
       </motion.div>
     </div>
   );

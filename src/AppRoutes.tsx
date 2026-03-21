@@ -44,17 +44,21 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
         <Route element={<PrivateRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/presales/manage/:address" element={<ManagePresalePage />} />
-          <Route path="/create/token" element={<CreateTokenPage />} />
-          <Route path="/create/presale" element={<CreatePresalePage />} />
           <Route path="/create/nft" element={<CreateNFTPage />} />
           <Route path="/nfts/manage/:address" element={<ManageNFTPage />} />
-          <Route path="/tools/token-locker" element={<TokenLockerPage />} />
           <Route path="/locks/:id" element={<LockDetailPage />} />
-          <Route path="/tools/airdrop" element={<AirdropPage />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/project/:address" element={<ProjectPage />} />
           <Route path="/tokens" element={<TokensPage />} />
           <Route path="/my-nfts" element={<MyNFTsPage />} />
+
+          {/* Temporarily admin-only tools */}
+          <Route element={<AdminRoute />}>
+            <Route path="/create/token" element={<CreateTokenPage />} />
+            <Route path="/create/presale" element={<CreatePresalePage />} />
+            <Route path="/tools/token-locker" element={<TokenLockerPage />} />
+            <Route path="/tools/airdrop" element={<AirdropPage />} />
+          </Route>
         </Route>
 
         {/* Admin routes */}

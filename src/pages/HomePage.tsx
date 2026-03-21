@@ -204,11 +204,11 @@ const itemVariants = {
 /* ─── Creator Tools Data ─── */
 
 const creatorTools = [
-  { title: 'NFT Deploy', icon: ImageIcon, href: '/create/nft', description: 'Launch NFT collections seamlessly.', enabledForAll: true },
-  { title: 'Create Token', icon: DollarSign, href: '/create/token', description: 'Deploy ERC20 tokens natively.', enabledForAll: false },
-  { title: 'Create Launch', icon: Sliders, href: '/create/presale', description: 'Configure and publish token launches.', enabledForAll: false },
-  { title: 'Locker', icon: Lock, href: '/tools/token-locker', description: 'Lock token and liquidity.', enabledForAll: false },
-  { title: 'Airdrop', icon: Send, href: '/tools/airdrop', description: 'Multi-send tokens to your users.', enabledForAll: false },
+  { title: 'NFT Launch', icon: ImageIcon, href: '/create/nft', description: 'Deploy and manage NFT collections with whitelist and public mint support.', enabledForAll: true },
+  { title: 'Token Launch', icon: Sliders, href: '/create/presale', description: 'Run presales and fair launches with flexible configurations.', enabledForAll: false },
+  { title: 'Create Token', icon: DollarSign, href: '/create/token', description: 'Deploy a token contract with custom supply and parameters.', enabledForAll: false },
+  { title: 'Locker', icon: Lock, href: '/tools/token-locker', description: 'Lock tokens or liquidity to secure assets onchain.', enabledForAll: false },
+  { title: 'Distribution', icon: Send, href: '/tools/airdrop', description: 'Send tokens to multiple wallets in a single transaction.', enabledForAll: false },
 ];
 
 /* ─── Rise Glow Orbs (dark mode only) ─── */
@@ -530,10 +530,10 @@ const HomePage: React.FC = () => {
             transition={{ duration: 0.8, delay: 1, ease: [0.16, 1, 0.3, 1] }}
           >
             <MagneticButton as="link" to="/presales" className="btn-primary py-4 px-8 text-lg rounded-full shadow-lg shadow-accent/20">
-              Explore Projects
+              Explore Launches
             </MagneticButton>
             <MagneticButton as="link" to="/create/nft" className="btn-secondary py-4 px-8 text-lg rounded-full bg-canvas-alt border border-border/40 hover:bg-canvas-alt">
-              Create NFT
+              Start Building
             </MagneticButton>
           </motion.div>
         </motion.div>
@@ -775,7 +775,7 @@ const HomePage: React.FC = () => {
             </div>
             <h2 className="font-display text-3xl md:text-5xl text-ink">Creator Suite</h2>
             <p className="text-lg text-ink-muted max-w-2xl">
-              NFT deployment is live. Additional creator tools are rolling out soon.
+              Create tokens, run fair launches, deploy NFTs, distribute and lock assets in one place.
             </p>
           </div>
 

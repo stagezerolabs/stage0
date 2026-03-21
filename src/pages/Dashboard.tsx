@@ -12,36 +12,15 @@ import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
-import { motion } from 'framer-motion';
 import { ArrowRight, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.3,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 40, filter: 'blur(4px)' },
-  visible: {
-    opacity: 1,
-    y: 0,
-    filter: 'blur(0px)',
-    transition: {
-      duration: 1,
-      ease: [0.16, 1, 0.3, 1] as const,
-    },
-  },
-};
+const COUNTDOWN_TICK_INTERVAL_MS = 10000;
+const DASHBOARD_QUERY_STALE_TIME = 15000;
+const DASHBOARD_QUERY_GC_TIME = 5 * 60 * 1000;
 
 const ConnectWalletPlaceholder: React.FC<{ message: string }> = ({ message }) => (
   <div className="flex flex-col items-center justify-center text-center py-12 bg-canvas-alt rounded-3xl border border-border">
@@ -97,7 +76,13 @@ const Dashboard: React.FC = () => {
 
   const { data: balance, isLoading: isBalanceLoading } = useBalance({
     address: safeAddress,
-    query: { enabled: Boolean(address) },
+    query: {
+      enabled: Boolean(address),
+      staleTime: DASHBOARD_QUERY_STALE_TIME,
+      gcTime: DASHBOARD_QUERY_GC_TIME,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
   });
 
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
@@ -120,7 +105,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowSec(Math.floor(Date.now() / 1000));
-    }, 1000);
+    }, COUNTDOWN_TICK_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -130,6 +115,10 @@ const Dashboard: React.FC = () => {
     ],
     query: {
       enabled: stakingAddress !== zeroAddress,
+      staleTime: DASHBOARD_QUERY_STALE_TIME,
+      gcTime: DASHBOARD_QUERY_GC_TIME,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   });
 
@@ -146,6 +135,10 @@ const Dashboard: React.FC = () => {
       : [],
     query: {
       enabled: Boolean(stakingToken && address),
+      staleTime: DASHBOARD_QUERY_STALE_TIME,
+      gcTime: DASHBOARD_QUERY_GC_TIME,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   });
 
@@ -180,6 +173,10 @@ const Dashboard: React.FC = () => {
     contracts: contributionQueries,
     query: {
       enabled: contributionQueries.length > 0,
+      staleTime: DASHBOARD_QUERY_STALE_TIME,
+      gcTime: DASHBOARD_QUERY_GC_TIME,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   });
 
@@ -221,6 +218,10 @@ const Dashboard: React.FC = () => {
     contracts: tokenMetaQueries,
     query: {
       enabled: tokenMetaQueries.length > 0,
+      staleTime: DASHBOARD_QUERY_STALE_TIME,
+      gcTime: DASHBOARD_QUERY_GC_TIME,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   });
 
@@ -265,14 +266,9 @@ const Dashboard: React.FC = () => {
     : `0 ${nativeToken}`;
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-12"
-    >
+    <div className="space-y-12">
       {/* Hero Section */}
-      <motion.section variants={itemVariants} className="space-y-2">
+      <section className="space-y-2">
         <h1 className="font-display text-display-md sm:text-display-lg text-ink">
           {address ? (
             <>
@@ -289,13 +285,13 @@ const Dashboard: React.FC = () => {
             </>
           )}
         </h1>
-      </motion.section>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-12 gap-y-12">
         {/* === Left Column: Sidebar === */}
         <div className="lg:col-span-1 space-y-12">
           {/* Overview */}
-          <motion.section variants={itemVariants} className="space-y-6">
+          <section className="space-y-6">
             <h2 className="font-display text-display-md text-ink">Overview</h2>
             {isConnected ? (
               <div className="space-y-4">
@@ -314,13 +310,13 @@ const Dashboard: React.FC = () => {
             ) : (
               <ConnectWalletPlaceholder message="Connect your wallet to see your balance." />
             )}
-          </motion.section>
+          </section>
         </div>
 
         {/* === Right Column: Main Content === */}
         <div className="lg:col-span-2 space-y-12">
           {/* Allocations Table */}
-          <motion.section variants={itemVariants} className="space-y-6">
+          <section className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-display-md text-ink">Your Allocations</h2>
             </div>
@@ -468,12 +464,12 @@ const Dashboard: React.FC = () => {
             ) : (
               <ConnectWalletPlaceholder message="Connect your wallet to view your launch allocations." />
             )}
-          </motion.section>
+          </section>
         </div>
       </div>
 
       {/* My Token Creations */}
-      <motion.section variants={itemVariants} className="space-y-6">
+      <section className="space-y-6">
         <h2 className="font-display text-display-md text-ink">My Token Creations</h2>
         {isConnected ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
@@ -658,10 +654,10 @@ const Dashboard: React.FC = () => {
         ) : (
           <ConnectWalletPlaceholder message="Connect your wallet to manage your created tokens, launches, and locks." />
         )}
-      </motion.section>
+      </section>
 
       {/* My NFTs */}
-      <motion.section variants={itemVariants} className="space-y-6">
+      <section className="space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="font-display text-display-md text-ink">My NFTs</h2>
           <div className="flex items-center gap-2">
@@ -838,10 +834,10 @@ const Dashboard: React.FC = () => {
         ) : (
           <ConnectWalletPlaceholder message="Connect your wallet to manage your NFT collections." />
         )}
-      </motion.section>
+      </section>
 
       {/* Creator Tools */}
-      <motion.section variants={itemVariants} className="space-y-6">
+      <section className="space-y-6">
         <div className="space-y-2">
           <p className="text-label text-ink-faint uppercase tracking-wider">For Builders</p>
           <h2 className="font-display text-display-md text-ink">Creator Tools</h2>
@@ -861,8 +857,8 @@ const Dashboard: React.FC = () => {
           </div>
           <ArrowRight className="w-5 h-5 text-ink-muted group-hover:text-ink transition-colors duration-300" />
         </Link>
-      </motion.section>
-    </motion.div>
+      </section>
+    </div>
   );
 };
 

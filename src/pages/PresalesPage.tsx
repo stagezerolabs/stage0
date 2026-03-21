@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   useLaunchpadPresales,
@@ -20,31 +19,9 @@ import {
   Shield,
 } from 'lucide-react';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.28,
-      ease: [0.16, 1, 0.3, 1] as const,
-    },
-  },
-};
-
 type TabFilter = 'all' | 'live' | 'upcoming' | 'ended';
 type LaunchTypeFilter = 'token' | 'nft';
+const COUNTDOWN_TICK_INTERVAL_MS = 10000;
 
 const tabs: { label: string; value: TabFilter }[] = [
   { label: 'All', value: 'all' },
@@ -122,7 +99,7 @@ const PresalesPage: React.FC = () => {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowSec(Math.floor(Date.now() / 1000));
-    }, 1000);
+    }, COUNTDOWN_TICK_INTERVAL_MS);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -152,22 +129,17 @@ const PresalesPage: React.FC = () => {
   const hasLaunches = visiblePresales.length > 0 || visibleNFTDeployments.length > 0;
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-8"
-    >
+    <div className="space-y-8">
       {/* Header */}
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Launchpad</h1>
+      <section className="space-y-2">
+        <h1 className="font-display text-display-lg text-ink">Launches</h1>
         <p className="text-body-lg text-ink-muted">
-          Discover and participate in the latest token launches on Stage0.
+          Discover and participate in token and NFT launches on Stage0.
         </p>
-      </motion.section>
+      </section>
 
       {/* Filter Tabs */}
-      <motion.section variants={itemVariants}>
+      <section>
         <div className="flex items-center gap-2 flex-wrap mb-3">
               {tabs.map((tab) => (
                 <button
@@ -208,10 +180,10 @@ const PresalesPage: React.FC = () => {
             </button>
           ))}
         </div>
-      </motion.section>
+      </section>
 
       {/* Launches Grid */}
-      <motion.section variants={itemVariants}>
+      <section>
         {isLoading && !hasLaunches ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <Loader2 className="w-8 h-8 text-accent animate-spin" />
@@ -444,8 +416,8 @@ const PresalesPage: React.FC = () => {
             })}
           </div>
         )}
-      </motion.section>
-    </motion.div>
+      </section>
+    </div>
   );
 };
 

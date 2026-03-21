@@ -11,7 +11,9 @@ import {
   type PresaleStatus
 } from '@/lib/store/launchpad-presale-store';
 
-const AUTO_REFRESH_INTERVAL = 10000;
+const AUTO_REFRESH_INTERVAL = 20000;
+const QUERY_STALE_TIME = 15000;
+const QUERY_GC_TIME = 5 * 60 * 1000;
 
 const PRESALE_CREATED_EVENT = parseAbiItem(
   'event PresaleCreated(address indexed creator, address indexed presale, address indexed saleToken, address paymentToken, bool requiresWhitelist)'
@@ -92,9 +94,10 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
     queryKey: ['goldsky', 'presales'],
     queryFn: fetchIndexedPresales,
     enabled: isIndexerConfigured,
-    staleTime: AUTO_REFRESH_INTERVAL,
+    staleTime: QUERY_STALE_TIME,
+    gcTime: QUERY_GC_TIME,
     refetchInterval: isIndexerConfigured ? AUTO_REFRESH_INTERVAL : false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 
@@ -136,8 +139,10 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
     functionName: 'totalPresales',
     query: {
       enabled: shouldFetchAddresses,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
       refetchInterval: shouldFetchAddresses ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   });
@@ -159,8 +164,10 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
     contracts: addressQueries,
     query: {
       enabled: addressQueries.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
       refetchInterval: addressQueries.length > 0 ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   });
@@ -268,8 +275,10 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
     contracts: presaleDataQueries,
     query: {
       enabled: presaleDataQueries.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
       refetchInterval: presaleDataQueries.length > 0 ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   });
@@ -356,6 +365,8 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
     contracts: tokenInfoQueries,
     query: {
       enabled: tokenInfoQueries.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
     },
   });
 
@@ -540,8 +551,10 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
     contracts: presaleDataQueries,
     query: {
       enabled: presaleDataQueries.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
       refetchInterval: presaleDataQueries.length > 0 ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   });
@@ -609,6 +622,8 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
     contracts: tokenInfoQueries,
     query: {
       enabled: tokenInfoQueries.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
     },
   });
 
@@ -731,6 +746,10 @@ export function useUserPresaleContribution(
     contracts: userDataQueries,
     query: {
       enabled: userDataQueries.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   });
 

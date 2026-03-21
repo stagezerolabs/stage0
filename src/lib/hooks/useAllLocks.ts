@@ -16,7 +16,9 @@ interface LockResult {
   description: string;
 }
 
-const AUTO_REFRESH_INTERVAL = 10000;
+const AUTO_REFRESH_INTERVAL = 20000;
+const QUERY_STALE_TIME = 15000;
+const QUERY_GC_TIME = 5 * 60 * 1000;
 
 export function useAllLocks(forceRefetch = false) {
   const { tokenLocker } = useChainContracts();
@@ -38,8 +40,10 @@ export function useAllLocks(forceRefetch = false) {
     contracts: lockQueries,
     query: {
       enabled: !!lockIds && lockIds.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
       refetchInterval: lockQueries.length > 0 ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     }
   });
@@ -73,6 +77,8 @@ export function useAllLocks(forceRefetch = false) {
     contracts: tokenInfoQueries,
     query: {
       enabled: uniqueTokenAddresses.length > 0,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
     }
   });
 

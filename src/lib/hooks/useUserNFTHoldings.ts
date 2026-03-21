@@ -4,6 +4,9 @@ import { useReadContracts } from 'wagmi';
 import { NFTCollectionContract } from '@/config';
 import { useNFTDeployments, type NFTDeploymentWithMetadata } from '@/lib/hooks/useNFTDeployments';
 
+const QUERY_STALE_TIME = 15000;
+const QUERY_GC_TIME = 5 * 60 * 1000;
+
 export type UserNFTHolding = NFTDeploymentWithMetadata & {
   ownedCount: bigint;
   mintedCount: bigint;
@@ -54,7 +57,9 @@ export function useUserNFTHoldings(userAddress?: Address, enabled = true) {
     contracts: holdingQueries as readonly any[],
     query: {
       enabled: holdingQueries.length > 0,
-      refetchOnWindowFocus: true,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   });

@@ -23,12 +23,16 @@ import {
 } from '@/lib/indexer/goldsky';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-const AUTO_REFRESH_INTERVAL = 10000;
+const AUTO_REFRESH_INTERVAL = 20000;
+const QUERY_STALE_TIME = 15000;
+const QUERY_GC_TIME = 5 * 60 * 1000;
 
 type NFTContractMetadata = {
   image?: string;
   description?: string;
 };
+
+const deploymentMetadataCache = new Map<string, NFTContractMetadata | null>();
 
 export interface NFTDeploymentWithMetadata {
   address: Address;
@@ -288,7 +292,9 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   const { creator, enabled = true } = options;
   const { nftFactoryLens } = useChainContracts();
   const publicClient = usePublicClient();
-  const [metadataByAddress, setMetadataByAddress] = useState<Record<string, NFTContractMetadata | null>>({});
+  const [metadataByAddress, setMetadataByAddress] = useState<Record<string, NFTContractMetadata | null>>(() =>
+    Object.fromEntries(deploymentMetadataCache.entries())
+  );
   const [isMetadataLoading, setIsMetadataLoading] = useState(false);
 
   // Normalize lens address to checksum format. Lowercasing first avoids
@@ -338,8 +344,10 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       return result as unknown as RawCollectionInfo[];
     },
     enabled: canReadFromChain,
+    staleTime: QUERY_STALE_TIME,
+    gcTime: QUERY_GC_TIME,
     refetchInterval: canReadFromChain ? AUTO_REFRESH_INTERVAL : false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     retry: 2,
   });
@@ -367,9 +375,10 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     queryKey: ['goldsky', 'nftCollections', creator?.toLowerCase() ?? 'all'],
     queryFn: () => fetchIndexedNftCollections(creator),
     enabled: shouldFallbackToIndexer,
-    staleTime: AUTO_REFRESH_INTERVAL,
+    staleTime: QUERY_STALE_TIME,
+    gcTime: QUERY_GC_TIME,
     refetchInterval: shouldFallbackToIndexer ? AUTO_REFRESH_INTERVAL : false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 
@@ -403,7 +412,8 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   useEffect(() => {
     const pending = rawDeployments.filter((deployment) => {
       const key = deployment.address.toLowerCase();
-      return deployment.contractURI.trim().length > 0 && metadataByAddress[key] === undefined;
+      const cachedMetadata = metadataByAddress[key] ?? deploymentMetadataCache.get(key);
+      return deployment.contractURI.trim().length > 0 && cachedMetadata === undefined;
     });
 
     if (pending.length === 0) {
@@ -465,6 +475,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       setMetadataByAddress((previous) => {
         const next = { ...previous };
         for (const [key, value] of results) {
+          deploymentMetadataCache.set(key, value);
           next[key] = value;
         }
         return next;
@@ -483,7 +494,8 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
 
   const deployments = useMemo((): NFTDeploymentWithMetadata[] => {
     return rawDeployments.map((deployment) => {
-      const metadata = metadataByAddress[deployment.address.toLowerCase()];
+      const addressKey = deployment.address.toLowerCase();
+      const metadata = metadataByAddress[addressKey] ?? deploymentMetadataCache.get(addressKey);
       return {
         ...deployment,
         metadataImage: metadata?.image,

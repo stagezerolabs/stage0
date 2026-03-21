@@ -5,7 +5,9 @@ import { TokenFactory } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useBlockchainStore } from '@/lib/store/blockchain-store';
 
-const AUTO_REFRESH_INTERVAL = 10000;
+const AUTO_REFRESH_INTERVAL = 20000;
+const QUERY_STALE_TIME = 15000;
+const QUERY_GC_TIME = 5 * 60 * 1000;
 
 export function useUserTokens(forceRefetch = false) {
   const { address } = useAccount();
@@ -30,8 +32,10 @@ export function useUserTokens(forceRefetch = false) {
     args: [address as `0x${string}`],
     query: {
       enabled: shouldFetch,
+      staleTime: QUERY_STALE_TIME,
+      gcTime: QUERY_GC_TIME,
       refetchInterval: shouldFetch ? AUTO_REFRESH_INTERVAL : false,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   });

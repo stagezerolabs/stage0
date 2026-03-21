@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, Lock, Sliders, Send, Image, ArrowRight, ShieldAlert } from 'lucide-react';
+import { DollarSign, Lock, Sliders, Send, Image, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import type { Address } from 'viem';
@@ -53,7 +53,6 @@ const tools = [
     bgColor: 'bg-canvas-alt',
     textColor: 'text-ink',
     iconBg: 'bg-ink/10',
-    adminOnly: false,
   },
   {
     id: 'createToken',
@@ -64,18 +63,16 @@ const tools = [
     bgColor: 'bg-canvas-alt',
     textColor: 'text-ink',
     iconBg: 'bg-ink/10',
-    adminOnly: true,
   },
   {
     id: 'createPresale',
-    title: 'Create a Presale',
-    description: 'Launch a presale for your token to raise funds from the community.',
+    title: 'Create Launch',
+    description: 'Launch your token sale with configurable onchain parameters.',
     icon: Sliders,
     href: '/create/presale',
     bgColor: 'bg-canvas-alt',
     textColor: 'text-ink',
     iconBg: 'bg-ink/10',
-    adminOnly: true,
   },
   {
     id: 'tokenLocker',
@@ -86,7 +83,6 @@ const tools = [
     bgColor: 'bg-canvas-alt',
     textColor: 'text-ink',
     iconBg: 'bg-ink/10',
-    adminOnly: true,
   },
   {
     id: 'airdrop',
@@ -97,16 +93,14 @@ const tools = [
     bgColor: 'bg-canvas-alt',
     textColor: 'text-ink',
     iconBg: 'bg-ink/10',
-    adminOnly: true,
   },
 ];
 
 const Tools: React.FC = () => {
   const { address } = useAccount();
-  const { isAdmin, isLoading: isCheckingAdmin } = useIsAdmin(address as Address | undefined);
-
+  const { isAdmin } = useIsAdmin(address as Address | undefined);
   const featuredTool = tools[0];
-  const adminOnlyTools = tools.filter((tool) => tool.adminOnly);
+  const pausedTools = tools.slice(1);
   const FeaturedIcon = featuredTool.icon;
 
   return (
@@ -122,7 +116,7 @@ const Tools: React.FC = () => {
           Create & Manage
         </h1>
         <p className="text-body-lg text-ink-muted max-w-2xl">
-          NFT creation is currently open. Other tools are temporarily on hold for non-admin wallets.
+          NFT creation is currently live. Additional launch tools are rolling out soon.
         </p>
       </motion.section>
 
@@ -139,9 +133,6 @@ const Tools: React.FC = () => {
               <div className={`${featuredTool.iconBg} w-14 h-14 rounded-full flex items-center justify-center mb-5 group-hover:bg-accent/20 group-hover:text-accent transition-colors`}>
                 <FeaturedIcon className="w-7 h-7" />
               </div>
-              <p className="text-body-sm text-accent font-medium mb-2 uppercase tracking-[0.12em]">
-                Primary Tool
-              </p>
               <h3 className="font-display text-3xl md:text-4xl font-semibold mb-3 group-hover:text-accent transition-colors">
                 {featuredTool.title}
               </h3>
@@ -156,32 +147,20 @@ const Tools: React.FC = () => {
         </motion.div>
       </motion.section>
 
-      {!isAdmin && !isCheckingAdmin && (
-        <motion.section variants={itemVariants}>
-          <div className="rounded-2xl border border-status-upcoming/30 bg-status-upcoming-bg p-4 md:p-5 flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-status-upcoming mt-0.5" />
-            <p className="text-body-sm text-status-upcoming">
-              Create Token, Create Presale, Locker, and Airdrop tools are temporarily restricted to the admin wallet.
-            </p>
-          </div>
-        </motion.section>
-      )}
+      <motion.section variants={itemVariants} className="space-y-4">
+        <h2 className="font-display text-display-sm text-ink">{isAdmin ? 'Creator Tools' : 'Coming Soon'}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {pausedTools.map((tool) => {
+            const IconComponent = tool.icon;
+            const isEnabled = isAdmin;
 
-      {isAdmin && (
-        <motion.section variants={itemVariants} className="space-y-4">
-          <h2 className="font-display text-display-sm text-ink">Admin Wallet Tools</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {adminOnlyTools.map((tool) => {
-              const IconComponent = tool.icon;
+            if (isEnabled) {
               return (
                 <motion.div key={tool.id} variants={cardVariants}>
                   <Link
                     to={tool.href}
                     className={`${tool.bgColor} ${tool.textColor} rounded-3xl border border-border p-6 md:p-8 text-left relative overflow-hidden group transition-all duration-500 backdrop-blur-md shadow-float hover:shadow-float-hover hover:-translate-y-2 hover:border-accent hover:ring-1 hover:ring-accent/30 block`}
                   >
-                    <div className="absolute top-4 right-4 text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-1 rounded-full bg-accent/15 text-accent">
-                      Admin
-                    </div>
                     <div className={`${tool.iconBg} w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:bg-accent/20 group-hover:text-accent transition-colors`}>
                       <IconComponent className="w-6 h-6" />
                     </div>
@@ -197,10 +176,35 @@ const Tools: React.FC = () => {
                   </Link>
                 </motion.div>
               );
-            })}
-          </div>
-        </motion.section>
-      )}
+            }
+
+            return (
+              <motion.div key={tool.id} variants={cardVariants}>
+                <div
+                  aria-disabled="true"
+                  className={`${tool.bgColor} ${tool.textColor} rounded-3xl border border-border p-6 md:p-8 text-left relative overflow-hidden backdrop-blur-md shadow-float opacity-60 grayscale select-none cursor-not-allowed`}
+                >
+                  <div className="absolute top-4 right-4 text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-1 rounded-full bg-ink/10 text-ink-muted">
+                    Soon
+                  </div>
+                  <div className={`${tool.iconBg} w-12 h-12 rounded-full flex items-center justify-center mb-4`}>
+                    <IconComponent className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-display text-display-sm font-semibold mb-2">
+                    {tool.title}
+                  </h3>
+                  <p className="text-body-sm opacity-80 mb-6">
+                    {tool.description}
+                  </p>
+                  <div className="absolute bottom-6 right-6">
+                    <ArrowRight className="w-5 h-5" />
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </motion.section>
 
     </motion.div>
   );

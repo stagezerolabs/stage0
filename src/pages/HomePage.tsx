@@ -1,5 +1,6 @@
 import Dither from '@/components/animated/Dither';
 import CountUp from '@/components/ui/CountUp';
+import { useIsAdmin } from '@/lib/utils/admin';
 import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { projects } from '@/lib/projects';
@@ -28,7 +29,8 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { formatUnits } from 'viem';
+import { formatUnits, type Address } from 'viem';
+import { useAccount } from 'wagmi';
 
 /* ─── Shared Hooks ─── */
 
@@ -202,11 +204,11 @@ const itemVariants = {
 /* ─── Creator Tools Data ─── */
 
 const creatorTools = [
-  { title: 'Create Token', icon: DollarSign, href: '/create/token', description: 'Deploy ERC20 tokens natively.' },
-  { title: 'Launch Presale', icon: Sliders, href: '/create/presale', description: 'Raise community funds with zero coding.' },
-  { title: 'Token Locker', icon: Lock, href: '/tools/token-locker', description: 'Lock liquidity & build trust.' },
-  { title: 'Airdrop', icon: Send, href: '/tools/airdrop', description: 'Multi-send tokens to your users.' },
-  { title: 'NFT Deploy', icon: ImageIcon, href: '/create/nft', description: 'Launch NFT collections seamlessly.' },
+  { title: 'NFT Deploy', icon: ImageIcon, href: '/create/nft', description: 'Launch NFT collections seamlessly.', enabledForAll: true },
+  { title: 'Create Token', icon: DollarSign, href: '/create/token', description: 'Deploy ERC20 tokens natively.', enabledForAll: false },
+  { title: 'Create Launch', icon: Sliders, href: '/create/presale', description: 'Configure and publish token launches.', enabledForAll: false },
+  { title: 'Locker', icon: Lock, href: '/tools/token-locker', description: 'Lock token and liquidity.', enabledForAll: false },
+  { title: 'Airdrop', icon: Send, href: '/tools/airdrop', description: 'Multi-send tokens to your users.', enabledForAll: false },
 ];
 
 /* ─── Rise Glow Orbs (dark mode only) ─── */
@@ -284,6 +286,8 @@ function toCompactStatDisplay(value: number): CompactStatDisplay {
 /* ─── Main Component ─── */
 
 const HomePage: React.FC = () => {
+  const { address } = useAccount();
+  const { isAdmin } = useIsAdmin(address as Address | undefined);
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
   const { totalDeployments, activeDeployments, estimatedEthRaised } = useUserNFTs();
   const reducedMotion = useReducedMotion();
@@ -419,7 +423,7 @@ const HomePage: React.FC = () => {
   const lineProgress = useSpring(sectionScrollY, { stiffness: 100, damping: 30, restDelta: 0.001 });
 
   // Title words for hero
-  const titleWords = 'Community Driven Launches on'.split(' ');
+  const titleWords = 'The Launch Layer for'.split(' ');
 
   return (
     <div className="w-full relative text-ink min-h-screen pb-20">
@@ -508,14 +512,6 @@ const HomePage: React.FC = () => {
             >
               {!shouldDisableAnimations && <RiseGlowOrbs />}
               Rise
-            </motion.span>{' '}
-            <motion.span
-              className="inline-block"
-              initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              transition={{ duration: 0.8, delay: 0.2 + (titleWords.length + 1) * 0.05, ease: [0.16, 1, 0.3, 1] }}
-            >
-              Chain
             </motion.span>
           </h1>
           <motion.p
@@ -524,8 +520,8 @@ const HomePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            Stage0 is the ultimate launchpad for high-conviction onchain projects. Discover promising
-            teams, join fair launches, and ship faster with integrated creator tooling.
+            Launch tokens and NFTs on Rise with built-in distribution, liquidity, and onchain tooling.
+            Stage0 is the infrastructure layer for projects from day one.
           </motion.p>
           <motion.div
             className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6"
@@ -536,8 +532,8 @@ const HomePage: React.FC = () => {
             <MagneticButton as="link" to="/presales" className="btn-primary py-4 px-8 text-lg rounded-full shadow-lg shadow-accent/20">
               Explore Projects
             </MagneticButton>
-            <MagneticButton as="link" to="/create/token" className="btn-secondary py-4 px-8 text-lg rounded-full bg-canvas-alt border border-border/40 hover:bg-canvas-alt">
-              Launch Token
+            <MagneticButton as="link" to="/create/nft" className="btn-secondary py-4 px-8 text-lg rounded-full bg-canvas-alt border border-border/40 hover:bg-canvas-alt">
+              Create NFT
             </MagneticButton>
           </motion.div>
         </motion.div>
@@ -779,7 +775,7 @@ const HomePage: React.FC = () => {
             </div>
             <h2 className="font-display text-3xl md:text-5xl text-ink">Creator Suite</h2>
             <p className="text-lg text-ink-muted max-w-2xl">
-              Launch natively on Rise Chain with our powerful, no-code tooling suite. Lock liquidity, deploy tokens, and drop NFTs instantly.
+              NFT deployment is live. Additional creator tools are rolling out soon.
             </p>
           </div>
 
@@ -800,29 +796,47 @@ const HomePage: React.FC = () => {
                 'md:-translate-y-1',
               ];
               const isFeatureCard = idx === 0;
+              const isToolEnabled = tool.enabledForAll || isAdmin;
 
               return (
                 <motion.div
                   key={tool.href}
-                  className={`relative overflow-hidden rounded-3xl group border border-white/5 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${
+                  className={`relative overflow-hidden rounded-3xl group border border-white/5 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${isToolEnabled ? (
                     themeMode === 'light'
                       ? 'hover:border-purple-500'
                       : 'hover:border-amber-700'
-                  }`}
-                  whileHover={shouldDisableAnimations ? {} : { scale: 0.99 }}
+                  ) : 'opacity-60 grayscale'}`}
+                  whileHover={shouldDisableAnimations || !isToolEnabled ? {} : { scale: 0.99 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <Link to={tool.href} className="block w-full h-full relative">
+                  {isToolEnabled ? (
+                    <Link to={tool.href} className="block w-full h-full relative">
+                      <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
+
+                      <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
+                        <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
+                          <tool.icon className="w-7 h-7" />
+                        </div>
+                        <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
+                        <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div aria-disabled="true" className="block w-full h-full relative cursor-not-allowed select-none">
+                      <div className="absolute top-4 right-4 text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-1 rounded-full bg-ink/10 text-ink-muted z-20">
+                        Soon
+                      </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
 
                     <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
-                      <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
+                      <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
                         <tool.icon className="w-7 h-7" />
                       </div>
                       <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
                       <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
                     </div>
-                  </Link>
+                    </div>
+                  )}
                 </motion.div>
               );
             })}

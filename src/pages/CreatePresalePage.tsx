@@ -185,7 +185,7 @@ const CreatePresalePage: React.FC = () => {
         className="max-w-2xl mx-auto space-y-8"
       >
         <motion.section variants={itemVariants} className="space-y-2">
-          <h1 className="font-display text-display-lg text-ink">Create Presale</h1>
+          <h1 className="font-display text-display-lg text-ink">Create Launch</h1>
         </motion.section>
         <motion.div
           variants={itemVariants}
@@ -197,12 +197,12 @@ const CreatePresalePage: React.FC = () => {
           <div className="space-y-2">
             <h2 className="font-display text-display-md text-ink">Not Whitelisted</h2>
             <p className="text-body text-ink-muted max-w-md mx-auto">
-              Your wallet is not whitelisted to create presales. Please contact the Stage0 team
+              Your wallet is not whitelisted to create launches. Please contact the Stage0 team
               to request creator access.
             </p>
           </div>
           <Link to="/presales" className="btn-secondary inline-flex items-center gap-2">
-            Browse Presales
+            Browse Launchpad
           </Link>
         </motion.div>
       </motion.div>
@@ -226,13 +226,13 @@ const CreatePresalePage: React.FC = () => {
             <CheckCircle2 className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h2 className="font-display text-display-md text-ink">Presale Created!</h2>
+            <h2 className="font-display text-display-md text-ink">Launch Created!</h2>
             <p className="text-body text-ink-muted">
-              Your presale has been deployed. Remember to deposit sale tokens before it starts.
+              Your launch has been deployed. Remember to deposit sale tokens before it starts.
             </p>
           </div>
           <div className="bg-ink/[0.03] rounded-2xl p-4">
-            <p className="text-body-sm text-ink-muted mb-1">Presale Address</p>
+            <p className="text-body-sm text-ink-muted mb-1">Launch Address</p>
             <code className="text-body font-mono text-ink break-all">
               {createdPresaleAddress}
             </code>
@@ -242,7 +242,7 @@ const CreatePresalePage: React.FC = () => {
               to={`/presales/${createdPresaleAddress}`}
               className="btn-primary inline-flex items-center gap-2"
             >
-              View Presale <ExternalLink className="w-4 h-4" />
+              View Launch <ExternalLink className="w-4 h-4" />
             </Link>
             <button
               onClick={() => {
@@ -267,9 +267,9 @@ const CreatePresalePage: React.FC = () => {
     >
       {/* Header */}
       <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Create Presale</h1>
+        <h1 className="font-display text-display-lg text-ink">Create Launch</h1>
         <p className="text-body-lg text-ink-muted">
-          Launch your token sale on Stage0. Configure your presale parameters below.
+          Launch your token sale on Stage0. Configure your launch parameters below.
         </p>
       </motion.section>
 
@@ -465,14 +465,14 @@ const CreatePresalePage: React.FC = () => {
           {isPending || isConfirming ? (
             <span className="inline-flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              {isConfirming ? 'Confirming...' : 'Creating Presale...'}
+              {isConfirming ? 'Confirming...' : 'Creating Launch...'}
             </span>
           ) : !isConnected ? (
             'Connect Wallet First'
           ) : (
             <span className="inline-flex items-center gap-2">
               <Rocket className="w-4 h-4" />
-              Create Presale
+              Create Launch
             </span>
           )}
         </button>

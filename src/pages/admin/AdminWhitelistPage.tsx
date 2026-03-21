@@ -75,7 +75,7 @@ const AdminWhitelistPage: React.FC = () => {
         <div>
           <h1 className="font-display text-display-lg text-ink">Whitelist Creators</h1>
           <p className="text-body text-ink-muted">
-            Control who can create presales directly from Stage0.
+            Control who can create launches directly from Stage0.
           </p>
         </div>
       </div>
@@ -123,7 +123,7 @@ const AdminWhitelistPage: React.FC = () => {
             <h2 className="font-display text-display-sm text-ink">Add Creator</h2>
           </div>
           <p className="text-body-sm text-ink-muted">
-            Whitelisted creators can create presales without an approval step.
+            Whitelisted creators can create launches without an approval step.
           </p>
           <input
             value={addInput}
@@ -146,7 +146,7 @@ const AdminWhitelistPage: React.FC = () => {
             <h2 className="font-display text-display-sm text-ink">Remove Creator</h2>
           </div>
           <p className="text-body-sm text-ink-muted">
-            Removing a creator prevents them from launching new presales.
+            Removing a creator prevents them from launching new projects.
           </p>
           <input
             value={removeInput}

@@ -80,7 +80,7 @@ function PresaleCard({ presale, isFeeRecipient }: { presale: PresaleWithStatus; 
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h3 className="font-display text-display-sm text-ink">
-              {presale.saleTokenSymbol ?? 'Token'} Presale
+              {presale.saleTokenSymbol ?? 'Token'} Launch
             </h3>
             <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[presale.status] ?? statusColors.ended}`}>
               {presale.status}
@@ -92,7 +92,7 @@ function PresaleCard({ presale, isFeeRecipient }: { presale: PresaleWithStatus; 
           to={`/presales/${presale.address}`}
           className="btn-secondary text-sm inline-flex items-center gap-2"
         >
-          View Presale <ExternalLink className="w-3.5 h-3.5" />
+          View Launch <ExternalLink className="w-3.5 h-3.5" />
         </Link>
       </div>
 
@@ -113,7 +113,7 @@ function PresaleCard({ presale, isFeeRecipient }: { presale: PresaleWithStatus; 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 pt-2 border-t border-border/50">
         <div className="space-y-1">
-          <p className="text-body-sm text-ink-muted">Presale Address</p>
+          <p className="text-body-sm text-ink-muted">Launch Address</p>
           <code className="block text-body-sm font-mono text-ink break-all bg-ink/5 p-3 rounded-xl">
             {presale.address}
           </code>
@@ -212,8 +212,8 @@ const AdminPresalesPage: React.FC = () => {
         </Link>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="font-display text-display-lg text-ink">Admin Presales</h1>
-            <p className="text-body text-ink-muted">Monitor and update presale fee settings.</p>
+            <h1 className="font-display text-display-lg text-ink">Admin Launches</h1>
+            <p className="text-body text-ink-muted">Monitor and update launch fee settings.</p>
           </div>
           <button onClick={() => refetch()} className="btn-secondary inline-flex items-center gap-2">
             <RefreshCcw className="w-4 h-4" />
@@ -241,11 +241,11 @@ const AdminPresalesPage: React.FC = () => {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 space-y-3">
           <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-          <p className="text-body-sm text-ink-muted">Loading presales...</p>
+          <p className="text-body-sm text-ink-muted">Loading launches...</p>
         </div>
       ) : filteredPresales.length === 0 ? (
         <div className="glass-card rounded-3xl p-10 text-center">
-          <p className="text-body text-ink-muted">No presales found for this filter.</p>
+          <p className="text-body text-ink-muted">No launches found for this filter.</p>
         </div>
       ) : (
         <div className="space-y-6">

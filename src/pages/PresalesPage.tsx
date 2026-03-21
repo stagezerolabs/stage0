@@ -54,7 +54,7 @@ const tabs: { label: string; value: TabFilter }[] = [
 ];
 
 const launchTypeTabs: { label: string; value: LaunchTypeFilter }[] = [
-  { label: 'Token Presales', value: 'token' },
+  { label: 'Token Launches', value: 'token' },
   { label: 'NFT Drops', value: 'nft' },
 ];
 
@@ -225,7 +225,7 @@ const PresalesPage: React.FC = () => {
             <h3 className="font-display text-display-sm text-ink">No Launches Found</h3>
             <p className="text-body text-ink-muted max-w-md mx-auto">
               {effectiveLaunchType === 'token'
-                ? 'No token presales match this filter.'
+                ? 'No token launches match this filter.'
                 : effectiveLaunchType === 'nft'
                 ? 'No NFT deployments match this filter.'
                 : 'No token or NFT launches match the current filters.'}

@@ -373,7 +373,7 @@ const Dashboard: React.FC = () => {
                             </div>
                             <div>
                               <p className="text-body font-medium text-ink group-hover:text-accent transition-colors duration-300">
-                                {presale.saleTokenName ?? presale.saleTokenSymbol ?? 'Presale'}
+                                {presale.saleTokenName ?? presale.saleTokenSymbol ?? 'Launch'}
                               </p>
                               <p className="text-body-sm text-ink-muted font-mono">{saleSymbol}</p>
                             </div>
@@ -466,7 +466,7 @@ const Dashboard: React.FC = () => {
                 </div>
               )
             ) : (
-              <ConnectWalletPlaceholder message="Connect your wallet to view your presale allocations." />
+              <ConnectWalletPlaceholder message="Connect your wallet to view your launch allocations." />
             )}
           </motion.section>
         </div>
@@ -523,14 +523,14 @@ const Dashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Created Presales */}
+            {/* Created Launches */}
             <div className="bg-canvas-alt rounded-2xl border border-border p-5 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center">
                   <Plus className="w-5 h-5 text-ink-muted" />
                 </div>
                 <div>
-                  <h3 className="font-display text-body text-ink">Created Presales</h3>
+                  <h3 className="font-display text-body text-ink">Created Launches</h3>
                   <p className="text-body-sm text-ink-muted">
                     {isPresalesLoading ? 'Loading…' : `${createdPresales.length} total`}
                   </p>
@@ -538,10 +538,10 @@ const Dashboard: React.FC = () => {
               </div>
 
               {isPresalesLoading && createdPresales.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">Loading presales…</p>
+                <p className="text-body-sm text-ink-muted">Loading launches…</p>
               ) : createdPresales.length === 0 ? (
                 <p className="text-body-sm text-ink-muted">
-                  Launch your next IDO or manage existing presales.
+                  Launch your next IDO or manage existing launches.
                 </p>
               ) : (
                 <div className="space-y-2 max-h-40 overflow-auto no-scrollbar">
@@ -560,7 +560,7 @@ const Dashboard: React.FC = () => {
                       >
                         <span className="flex items-center gap-2">
                           <Settings className="w-3.5 h-3.5 text-ink-muted" />
-                          {presale.saleTokenSymbol ?? 'Presale'}
+                          {presale.saleTokenSymbol ?? 'Launch'}
                         </span>
                         <Badge variant={statusVariant}>{presale.status}</Badge>
                       </Link>
@@ -571,10 +571,10 @@ const Dashboard: React.FC = () => {
 
               {createdPresales.length > 0 ? (
                 <Link to="/create/presale" className="btn-secondary w-full">
-                  Create Another Presale
+                  Create Another Launch
                 </Link>
               ) : (
-                <Link to="/create/presale" className="btn-secondary w-full">Create Presale</Link>
+                <Link to="/create/presale" className="btn-secondary w-full">Create Launch</Link>
               )}
             </div>
 
@@ -656,7 +656,7 @@ const Dashboard: React.FC = () => {
 
           </div>
         ) : (
-          <ConnectWalletPlaceholder message="Connect your wallet to manage your created tokens, presales, and locks." />
+          <ConnectWalletPlaceholder message="Connect your wallet to manage your created tokens, launches, and locks." />
         )}
       </motion.section>
 

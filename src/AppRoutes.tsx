@@ -51,8 +51,7 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
           <Route path="/project/:address" element={<ProjectPage />} />
           <Route path="/tokens" element={<TokensPage />} />
           <Route path="/my-nfts" element={<MyNFTsPage />} />
-
-          {/* Temporarily admin-only tools */}
+          {/* Admin-only tool access */}
           <Route element={<AdminRoute />}>
             <Route path="/create/token" element={<CreateTokenPage />} />
             <Route path="/create/presale" element={<CreatePresalePage />} />

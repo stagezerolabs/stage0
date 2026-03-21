@@ -292,7 +292,7 @@ const TokensPage: React.FC = () => {
                     to={`/create/presale?token=${token.address}&symbol=${encodeURIComponent(token.symbol)}&name=${encodeURIComponent(token.name)}`}
                     className="btn-secondary"
                   >
-                    Launch Presale
+                    Create Launch
                   </Link>
                   <Link to={`/tools/airdrop?token=${token.address}`} className="btn-secondary">Airdrop</Link>
                   <Link to={`/tools/token-locker?token=${token.address}`} className="btn-secondary">Lock</Link>

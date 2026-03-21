@@ -167,13 +167,13 @@ const AdminDashboard: React.FC = () => {
         <p className="text-label text-ink-faint uppercase tracking-wider">Admin</p>
         <h1 className="font-display text-display-lg text-ink">Stage0 Admin</h1>
         <p className="text-body text-ink-muted max-w-3xl">
-          Manage presales, whitelisted creators, and NFT launchpad fee defaults from one place.
+          Manage launches, whitelisted creators, and NFT launchpad fee defaults from one place.
         </p>
       </motion.section>
 
       <motion.section variants={itemVariants} className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="stat-card">
-          <p className="text-body-sm text-ink-muted">Total Presales</p>
+          <p className="text-body-sm text-ink-muted">Total Launches</p>
           <p className="font-display text-display-sm text-ink">
             {isLoadingPresales ? '...' : totalPresales}
           </p>
@@ -212,7 +212,7 @@ const AdminDashboard: React.FC = () => {
                 <Coins className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-body font-medium text-ink">Manage Presales</p>
+                <p className="text-body font-medium text-ink">Manage Launches</p>
                 <p className="text-body-sm text-ink-muted">Edit fees and status</p>
               </div>
             </div>

@@ -231,12 +231,12 @@ const PresaleDetailPage: React.FC = () => {
   const timelineRows: Array<{ label: string; value: string }> = [];
   if (presaleStatus === 'upcoming') {
     timelineRows.push({
-      label: 'Presale starts in',
+      label: 'Launch starts in',
       value: formatCountdown(presale?.startTime, nowSec),
     });
   } else if (presaleStatus === 'live') {
     timelineRows.push({
-      label: 'Presale ends in',
+      label: 'Launch ends in',
       value: formatCountdown(presale?.endTime, nowSec),
     });
   } else {
@@ -263,7 +263,7 @@ const PresaleDetailPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center py-32 space-y-4">
         <Loader2 className="w-8 h-8 text-accent animate-spin" />
-        <p className="text-body text-ink-muted">Loading presale details...</p>
+        <p className="text-body text-ink-muted">Loading launch details...</p>
       </div>
     );
   }
@@ -282,7 +282,7 @@ const PresaleDetailPage: React.FC = () => {
           className="inline-flex items-center gap-2 text-body text-ink-muted hover:text-ink transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Presales
+          Back to Launchpad
         </Link>
       </motion.div>
 
@@ -294,7 +294,7 @@ const PresaleDetailPage: React.FC = () => {
               {presale.saleTokenName || presale.saleTokenSymbol || 'Token Sale'}
             </h1>
             <p className="text-body text-ink-muted">
-              {presale.saleTokenSymbol || 'Unknown'} Presale
+              {presale.saleTokenSymbol || 'Unknown'} Launch
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -303,7 +303,7 @@ const PresaleDetailPage: React.FC = () => {
                 to={`/presales/manage/${presaleAddress}`}
                 className="btn-secondary text-sm"
               >
-                Manage Presale
+                Manage Launch
               </Link>
             )}
             {getStatusBadge(presaleStatus)}
@@ -531,7 +531,7 @@ const PresaleDetailPage: React.FC = () => {
                   }
                   className="btn-secondary text-status-error border-status-error/30 hover:bg-status-error-bg"
                 >
-                  Cancel Presale
+                  Cancel Launch
                 </button>
                 <button
                   onClick={() => presaleAddress && withdrawProceeds(presaleAddress)}
@@ -702,7 +702,7 @@ const PresaleDetailPage: React.FC = () => {
             >
               <Users className="w-8 h-8 text-accent mx-auto" />
               <p className="text-body text-ink-muted">
-                Connect your wallet to participate in this presale.
+                Connect your wallet to participate in this launch.
               </p>
             </motion.div>
           )}

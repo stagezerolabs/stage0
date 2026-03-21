@@ -232,9 +232,9 @@ const ManagePresalePage: React.FC = () => {
   useEffect(() => {
     if (isOwnerSuccess && activeOwnerAction) {
       const labels: Record<string, string> = {
-        finalize: 'Presale finalized. Enable claims when ready.',
+        finalize: 'Launch finalized. Enable claims when ready.',
         enableClaims: 'Claims enabled',
-        cancel: 'Presale cancelled',
+        cancel: 'Launch cancelled',
         withdrawProceeds: 'Proceeds withdrawn',
         withdrawTokens: 'Unsold tokens withdrawn',
       };
@@ -439,9 +439,9 @@ const ManagePresalePage: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto glass-card rounded-3xl p-8 text-center space-y-4">
         <AlertTriangle className="w-8 h-8 text-status-upcoming mx-auto" />
-        <h2 className="font-display text-display-md text-ink">Invalid Presale Address</h2>
+        <h2 className="font-display text-display-md text-ink">Invalid Launch Address</h2>
         <Link to="/presales" className="btn-primary inline-block">
-          Back to Presales
+          Back to Launchpad
         </Link>
       </div>
     );
@@ -451,7 +451,7 @@ const ManagePresalePage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center py-32 space-y-4">
         <Loader2 className="w-8 h-8 text-accent animate-spin" />
-        <p className="text-body text-ink-muted">Loading presale data...</p>
+        <p className="text-body text-ink-muted">Loading launch data...</p>
       </div>
     );
   }
@@ -460,12 +460,12 @@ const ManagePresalePage: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto glass-card rounded-3xl p-8 text-center space-y-4">
         <AlertTriangle className="w-8 h-8 text-status-upcoming mx-auto" />
-        <h2 className="font-display text-display-md text-ink">Presale Not Found</h2>
+        <h2 className="font-display text-display-md text-ink">Launch Not Found</h2>
         <p className="text-body text-ink-muted">
-          Could not find a presale at the specified address.
+          Could not find a launch at the specified address.
         </p>
         <Link to="/presales" className="btn-primary inline-block">
-          Back to Presales
+          Back to Launchpad
         </Link>
       </div>
     );
@@ -477,13 +477,13 @@ const ManagePresalePage: React.FC = () => {
         <ShieldAlert className="w-8 h-8 text-status-upcoming mx-auto" />
         <h2 className="font-display text-display-md text-ink">Access Denied</h2>
         <p className="text-body text-ink-muted">
-          Only the presale owner can access management controls.
+          Only the launch owner can access management controls.
         </p>
         <Link
           to={`/presales/${presaleAddress}`}
           className="btn-primary inline-flex items-center gap-2"
         >
-          View Presale
+          View Launch
         </Link>
       </div>
     );
@@ -504,7 +504,7 @@ const ManagePresalePage: React.FC = () => {
           className="inline-flex items-center gap-2 text-body text-ink-muted hover:text-ink transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Presale
+          Back to Launch
         </Link>
       </motion.div>
 
@@ -514,14 +514,14 @@ const ManagePresalePage: React.FC = () => {
             <div className="w-10 h-10 rounded-2xl bg-accent-muted text-accent flex items-center justify-center">
               <Settings className="w-5 h-5" />
             </div>
-            <h1 className="font-display text-display-lg text-ink">Manage Presale</h1>
+            <h1 className="font-display text-display-lg text-ink">Manage Launch</h1>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.color}`}>
             {statusInfo.text}
           </span>
         </div>
         <p className="text-body text-ink-muted">
-          {presale.saleTokenName || saleTokenSymbol} Presale &mdash;{' '}
+          {presale.saleTokenName || saleTokenSymbol} Launch &mdash;{' '}
           <a
             href={`${explorerUrl}/address/${presaleAddress}`}
             target="_blank"
@@ -648,7 +648,7 @@ const ManagePresalePage: React.FC = () => {
       <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-4">
         <h2 className="font-display text-display-sm text-ink flex items-center gap-2">
           <Shield className="w-5 h-5 text-accent" />
-          Presale Actions
+          Launch Actions
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
@@ -661,7 +661,7 @@ const ManagePresalePage: React.FC = () => {
             className="btn-primary inline-flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
-            Finalize Presale
+            Finalize Launch
           </button>
           <button
             onClick={handleEnableClaims}
@@ -684,7 +684,7 @@ const ManagePresalePage: React.FC = () => {
             className="btn-secondary inline-flex items-center justify-center gap-2 border-status-error text-status-error hover:bg-status-error/10"
           >
             <Ban className="w-4 h-4" />
-            Cancel Presale
+            Cancel Launch
           </button>
         </div>
 

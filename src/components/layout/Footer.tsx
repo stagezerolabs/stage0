@@ -8,8 +8,8 @@ const Footer: React.FC = () => {
 
   const footerLinks = [
     { label: 'Documentation', href: 'https://stagezerolabs.gitbook.io/stagezero-docs/' },
-    { label: 'Terms', href: '#' },
-    { label: 'Privacy', href: '#' },
+    { label: 'Terms', href: 'https://stagezerolabs.gitbook.io/stagezero-docs/platform/terms-of-service' },
+    { label: 'Privacy', href: 'https://stagezerolabs.gitbook.io/stagezero-docs/platform/privacy-policy' },
   ];
 
   const socialLinks = [

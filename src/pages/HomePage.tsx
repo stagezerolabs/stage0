@@ -511,7 +511,7 @@ const HomePage: React.FC = () => {
               transition={{ duration: 0.8, delay: 0.2 + titleWords.length * 0.05, ease: [0.16, 1, 0.3, 1] }}
             >
               {!shouldDisableAnimations && <RiseGlowOrbs />}
-              Rise
+              RISE
             </motion.span>
           </h1>
           <motion.p
@@ -520,7 +520,7 @@ const HomePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            Launch tokens and NFTs on Rise with built-in distribution, liquidity, and onchain tooling.
+            Launch tokens and NFTs on RISE with built-in distribution, liquidity, and onchain tooling.
             Stage0 is the infrastructure layer for projects from day one.
           </motion.p>
           <motion.div
@@ -702,7 +702,7 @@ const HomePage: React.FC = () => {
           <div className="text-center space-y-4 max-w-2xl mx-auto">
             <h2 className="font-display text-3xl md:text-5xl text-ink">How Stage0 Works</h2>
             <p className="text-lg text-ink-muted">
-              Launching and participating in early-stage projects on Rise is simple. Stage0 provides the infrastructure for token launches, NFT drops, and distribution all in one place.
+              Launching and participating in early-stage projects on RISE is simple. Stage0 provides the infrastructure for token launches, NFT drops, and distribution all in one place.
             </p>
           </div>
 
@@ -719,7 +719,7 @@ const HomePage: React.FC = () => {
                 {
                   step: 1,
                   title: 'Connect Wallet',
-                  description: 'Connect your Rise wallet to access the full Stage0 platform and interact with launches and tools.',
+                  description: 'Connect your RISE wallet to access the full Stage0 platform and interact with launches and tools.',
                   icon: Wallet,
                 },
                 {

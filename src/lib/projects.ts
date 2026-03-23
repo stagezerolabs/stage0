@@ -113,7 +113,7 @@ export const projects: Project[] = [
     vesting: '20% TGE, 80% over 4 months',
     startDate: 'Feb 20, 2026',
     endDate: 'Mar 10, 2026',
-    chain: 'Rise',
+    chain: 'RISE',
     links: {
       website: '#',
       twitter: '#',
@@ -126,7 +126,7 @@ export const projects: Project[] = [
     name: 'Voltex Finance',
     symbol: 'VLTX',
     status: 'Live',
-    description: 'Voltex Finance is a next-generation perpetual DEX with up to 50x leverage, powered by an oracle-based pricing model. Designed for fast settlement and minimal slippage on Rise Chain.',
+    description: 'Voltex Finance is a next-generation perpetual DEX with up to 50x leverage, powered by an oracle-based pricing model. Designed for fast settlement and minimal slippage on RISE Chain.',
     targetRaise: '$20,000',
     raised: '$9,000',
     raisePercentage: 45,
@@ -137,7 +137,7 @@ export const projects: Project[] = [
     vesting: '15% TGE, 85% over 6 months',
     startDate: 'Feb 25, 2026',
     endDate: 'Mar 15, 2026',
-    chain: 'Rise',
+    chain: 'RISE',
     links: {
       website: '#',
       twitter: '#',
@@ -161,7 +161,7 @@ export const projects: Project[] = [
     vesting: '10% TGE, 90% over 9 months',
     startDate: 'Mar 15, 2026',
     endDate: 'Mar 30, 2026',
-    chain: 'Rise',
+    chain: 'RISE',
     links: {
       website: '#',
       twitter: '#',

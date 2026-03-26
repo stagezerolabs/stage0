@@ -1,9 +1,9 @@
 import Dither from '@/components/animated/Dither';
 import CountUp from '@/components/ui/CountUp';
-import { useIsAdmin } from '@/lib/utils/admin';
-import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
+import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
 import { projects } from '@/lib/projects';
+import { useIsAdmin } from '@/lib/utils/admin';
 import {
   motion,
   useInView,
@@ -27,7 +27,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';
 import { useAccount } from 'wagmi';

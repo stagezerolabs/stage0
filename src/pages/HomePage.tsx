@@ -27,11 +27,13 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';
 import { useAccount } from 'wagmi';
 
+const riseLogoWhite = "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_White_d1vlcb.png"
+const riseLogoBlack = "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_Black_v4snqi.png"
 /* ─── Shared Hooks ─── */
 
 // function useMousePosition() {
@@ -63,7 +65,7 @@ function useTiltCard(strength: number = 6) {
       const now = performance.now();
       if (now - lastUpdate.current < 16) return; // Throttle to ~60fps
       lastUpdate.current = now;
-      
+
       const el = ref.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -105,7 +107,7 @@ const MagneticButton: React.FC<{
       const now = performance.now();
       if (now - lastUpdate.current < 16) return; // Throttle to ~60fps
       lastUpdate.current = now;
-      
+
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
@@ -257,6 +259,7 @@ const RiseGlowOrbs: React.FC = () => (
   </span>
 );
 
+
 type CompactStatDisplay = {
   value: number;
   decimals: number;
@@ -292,7 +295,7 @@ const HomePage: React.FC = () => {
   const { totalDeployments, activeDeployments, estimatedEthRaised } = useUserNFTs();
   const reducedMotion = useReducedMotion();
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
-  const prefersReducedMotion = typeof window !== 'undefined' && 
+  const prefersReducedMotion = typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const shouldDisableAnimations = reducedMotion || prefersReducedMotion;
 
@@ -511,7 +514,12 @@ const HomePage: React.FC = () => {
               transition={{ duration: 0.8, delay: 0.2 + titleWords.length * 0.05, ease: [0.16, 1, 0.3, 1] }}
             >
               {!shouldDisableAnimations && <RiseGlowOrbs />}
-              RISE
+              <img
+                src={themeMode === 'light' ? riseLogoBlack : riseLogoWhite}
+                alt="RISE"
+                draggable={false}
+                style={{ height: '0.8em', width: 'auto', display: 'inline-block', verticalAlign: 'baseline' }}
+              />
             </motion.span>
           </h1>
           <motion.p
@@ -826,15 +834,15 @@ const HomePage: React.FC = () => {
                       <div className="absolute top-4 right-4 text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-1 rounded-full bg-ink/10 text-ink-muted z-20">
                         Soon
                       </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
 
-                    <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
-                      <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
-                        <tool.icon className="w-7 h-7" />
+                      <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
+                        <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
+                          <tool.icon className="w-7 h-7" />
+                        </div>
+                        <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
+                        <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
                       </div>
-                      <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
-                      <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
-                    </div>
                     </div>
                   )}
                 </motion.div>

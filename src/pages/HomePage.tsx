@@ -32,6 +32,8 @@ import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';
 import { useAccount } from 'wagmi';
 
+const riseLogoWhite = "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_White_d1vlcb.png"
+const riseLogoBlack = "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_Black_v4snqi.png"
 /* ─── Shared Hooks ─── */
 
 // function useMousePosition() {
@@ -513,7 +515,7 @@ const HomePage: React.FC = () => {
             >
               {!shouldDisableAnimations && <RiseGlowOrbs />}
               <img
-                src={themeMode === 'light' ? "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_Black_v4snqi.png" : "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_White_d1vlcb.png"}
+                src={themeMode === 'light' ? riseLogoBlack : riseLogoWhite}
                 alt="RISE"
                 draggable={false}
                 style={{ height: '0.8em', width: 'auto', display: 'inline-block', verticalAlign: 'baseline' }}

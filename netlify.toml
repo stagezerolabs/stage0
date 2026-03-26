@@ -3,6 +3,11 @@
   publish = "dist"
 
 [[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "img-src 'self' data: blob: res.cloudinary.com"
+
+[[headers]]
   for = "/assets/*.js"
   [headers.values]
     Content-Type = "application/javascript; charset=utf-8"

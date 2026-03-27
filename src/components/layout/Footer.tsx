@@ -58,7 +58,7 @@ const Footer: React.FC = () => {
               />
             </Link>
             <p className="text-body-sm text-ink-faint">
-              {currentYear} Stage0 Labs. All rights reserved.
+              {currentYear} Stage0 Labs. All Rights Reserved.
             </p>
           </div>
 

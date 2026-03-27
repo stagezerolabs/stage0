@@ -89,13 +89,20 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
   return (
     <header
-      className={`sticky top-0 z-50 py-5 border-b border-transparent transition-colors duration-300 ${headerSurfaceClass}`}
+      className={`sticky top-0 z-50 py-2 border-b border-transparent transition-colors duration-300 ${headerSurfaceClass}`}
     >
       <nav className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
         {/* Logo */}
         <Link to="/" className="group inline-flex items-center">
-          <span className="text-xl font-bold tracking-[0.18em] text-ink leading-none text-engraved">STAGE</span>
-          <span className="font-black text-accent leading-none" style={{ fontSize: '1.75rem', marginLeft: '-0.05em', filter: 'drop-shadow(0 0 8px rgba(255,138,0,0.30))' }}>0</span>
+          <img
+            src={
+              themeMode === 'dark'
+                ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_white_and_orange_zahkba.png'
+                : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_black_and_green_h6xpme.png'
+            }
+            alt="STAGE0"
+            className="h-[70px] w-auto"
+          />
         </Link>
 
         {/* Desktop Navigation */}

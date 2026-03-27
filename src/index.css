@@ -99,13 +99,13 @@
     --color-ink-faint: 120 129 145;
     --color-border: 208 198 184;
     --color-border-strong: 186 174 158;
-    --color-accent: 108 120 224;
-    --color-accent-hover: 93 104 206;
+    --color-accent: 4 223 131;
+    --color-accent-hover: 3 195 115;
     --color-accent-foreground: 248 250 252;
     --color-accent-secondary: 59 130 246;
     --color-accent-secondary-hover: 37 99 235;
-    --color-accent-tertiary: 139 124 255;
-    --color-accent-tertiary-hover: 123 109 245;
+    --color-accent-tertiary: 4 223 131;
+    --color-accent-tertiary-hover: 3 195 115;
     --noise-opacity: 0.01;
     --layout-top-glow:
       radial-gradient(ellipse 80% 55% at 50% -20%, rgba(79, 70, 229, 0.12), transparent 62%),
@@ -444,6 +444,27 @@
     box-shadow:
       var(--shadow-float-hover),
       0 0 0 1px rgba(139, 124, 255, 0.3);
+  }
+
+  /* Active Participants card - green in light mode */
+  :root[data-theme='light'] .ambient-stat-card--purple::before {
+    background: radial-gradient(
+      52% 52% at 100% 0%,
+      rgba(4, 223, 131, 0.14) 0%,
+      rgba(100, 240, 185, 0.08) 36%,
+      transparent 62%
+    );
+  }
+
+  :root[data-theme='light'] .ambient-stat-card--purple {
+    border-color: rgba(4, 223, 131, 0.3);
+  }
+
+  :root[data-theme='light'] .ambient-stat-card--purple:hover {
+    border-color: rgba(4, 223, 131, 0.6);
+    box-shadow:
+      var(--shadow-float-hover),
+      0 0 0 1px rgba(4, 223, 131, 0.3);
   }
 
   /* Project card styling */

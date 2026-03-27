@@ -581,14 +581,14 @@ const ManagePresalePage: React.FC = () => {
         <p className="text-body-sm text-ink-muted">
           Approve and deposit {saleTokenSymbol} tokens so contributors can claim after finalization.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="stat-card p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="stat-card p-4 space-y-1.5">
             <p className="text-body-sm text-ink-muted">Sale Amount</p>
             <p className="text-body font-semibold text-ink">
               {formatUnits(saleAmount, saleTokenDecimals)} {saleTokenSymbol}
             </p>
           </div>
-          <div className="stat-card p-4">
+          <div className="stat-card p-4 space-y-1.5">
             <p className="text-body-sm text-ink-muted">Launchpad Fee (2%)</p>
             <p className="text-body font-semibold text-ink">
               {formatUnits(launchpadFee, saleTokenDecimals)} {saleTokenSymbol}

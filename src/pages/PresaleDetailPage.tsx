@@ -56,6 +56,16 @@ const itemVariants = {
   },
 };
 
+const RATE_DIVISOR = 100n;
+
+function formatRatePerOnePayment(rate: bigint): string {
+  if (rate <= 0n) return '0';
+  const whole = rate / RATE_DIVISOR;
+  const fractional = rate % RATE_DIVISOR;
+  if (fractional === 0n) return whole.toString();
+  return `${whole.toString()}.${fractional.toString().padStart(2, '0').replace(/0+$/, '')}`;
+}
+
 function formatTimestamp(timestamp?: bigint): string {
   if (!timestamp || timestamp <= 0n) return '--';
   return new Date(Number(timestamp) * 1000).toLocaleString();
@@ -137,6 +147,13 @@ const PresaleDetailPage: React.FC = () => {
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
   const paymentDecimals = presale?.paymentTokenDecimals ?? 18;
+  const paymentSymbolForRate = presale?.paymentTokenSymbol || (presale?.isPaymentETH ? 'NATIVE' : 'PAYMENT');
+  const saleSymbolForRate = presale?.saleTokenSymbol || 'TOKEN';
+  const humanReadableRate = useMemo(() => {
+    if (!presale?.rate || presale.rate <= 0n) return '--';
+    return `1 ${paymentSymbolForRate} = ${formatRatePerOnePayment(presale.rate)} ${saleSymbolForRate}`;
+  }, [paymentSymbolForRate, presale?.rate, saleSymbolForRate]);
+
   const parsedAmount = useMemo(() => {
     try {
       return contributeAmount ? parseUnits(contributeAmount, paymentDecimals) : 0n;
@@ -375,7 +392,7 @@ const PresaleDetailPage: React.FC = () => {
                 },
                 {
                   label: 'Rate',
-                  value: presale.rate ? `${presale.rate.toString()} tokens per 100 payment` : '--',
+                  value: humanReadableRate,
                   icon: Target,
                 },
                 {

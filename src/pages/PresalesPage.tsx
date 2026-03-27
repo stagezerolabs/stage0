@@ -71,24 +71,87 @@ function getStatusBadge(status: string) {
   }
 }
 
-function formatCountdown(targetTime: bigint | undefined, nowSec: number): string {
-  if (!targetTime || targetTime <= 0n) return '--';
+function formatAmount(value: bigint | undefined, decimals: number): string {
+  if (!value || value <= 0n) return '0';
+  const formatted = formatUnits(value, decimals);
+  if (!formatted.includes('.')) return formatted;
+  return formatted.replace(/(\.\d{0,4})\d+/, '$1').replace(/\.?0+$/, '');
+}
 
-  const diff = Number(targetTime) - nowSec;
-  if (diff <= 0) return '00h 00m 00s';
+function formatPresaleRate(rate: bigint | undefined): string {
+  if (!rate || rate <= 0n) return '--';
+  const whole = rate / 100n;
+  const fractional = rate % 100n;
+  if (fractional === 0n) return whole.toString();
+  return `${whole.toString()}.${fractional.toString().padStart(2, '0').replace(/0+$/, '')}`;
+}
 
-  const days = Math.floor(diff / 86400);
-  const hours = Math.floor((diff % 86400) / 3600);
-  const minutes = Math.floor((diff % 3600) / 60);
-  const seconds = diff % 60;
-
-  if (days > 0) {
-    return `${days}d ${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+function resolvePresaleSaleCountdown(status: string, startTime: bigint, endTime: bigint) {
+  switch (status) {
+    case 'live':
+      return {
+        label: 'Sale ends in',
+        targetTime: endTime > 0n ? endTime : undefined,
+        fallbackLabel: 'End date TBD',
+        completedLabel: 'Sale Ended',
+      };
+    case 'upcoming':
+      return {
+        label: 'Sale starts in',
+        targetTime: startTime > 0n ? startTime : undefined,
+        fallbackLabel: 'Start date TBD',
+        completedLabel: 'Sale Live',
+      };
+    case 'cancelled':
+      return {
+        label: 'Sale status',
+        stoppedMessage: 'Cancelled',
+        completedLabel: 'Cancelled',
+      };
+    case 'ended':
+    case 'finalized':
+      return {
+        label: 'Sale status',
+        stoppedMessage: 'Sale Ended',
+        completedLabel: 'Sale Ended',
+      };
+    default:
+      return {
+        label: 'Sale status',
+        fallbackLabel: 'Status unavailable',
+      };
   }
+}
 
-  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds
-    .toString()
-    .padStart(2, '0')}s`;
+function getPresaleCardAction(status: string) {
+  switch (status) {
+    case 'live':
+      return {
+        label: 'Buy Tokens',
+        className: 'btn-primary',
+      };
+    case 'upcoming':
+      return {
+        label: 'Pending',
+        className: 'btn-secondary border-status-upcoming/35 text-status-upcoming bg-status-upcoming-bg/50',
+      };
+    case 'cancelled':
+      return {
+        label: 'Cancelled',
+        className: 'btn-secondary border-status-error/35 text-status-error bg-status-error-bg/50',
+      };
+    case 'ended':
+    case 'finalized':
+      return {
+        label: 'View Results',
+        className: 'btn-primary',
+      };
+    default:
+      return {
+        label: 'View Sale',
+        className: 'btn-secondary',
+      };
+  }
 }
 
 const PresalesPage: React.FC = () => {
@@ -205,83 +268,120 @@ const PresalesPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visiblePresales.map((presale) => (
-              <div key={presale.address}>
-                <Link to={`/presales/${presale.address}`}>
-                  <div className="project-card rounded-3xl p-6 space-y-4 h-full">
-                    {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <h3 className="font-display text-display-sm text-ink">
-                          {presale.saleTokenSymbol || 'Unknown'}
-                        </h3>
-                        <p className="text-body-sm text-ink-muted">
-                          {presale.saleTokenName || 'Token Sale'}
-                        </p>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent mt-1">
-                          Token
-                        </span>
-                      </div>
-                      {getStatusBadge(presale.status)}
-                    </div>
+            {visiblePresales.map((presale) => {
+              const tokenImage = presale.logo;
+              const saleTokenSymbol = presale.saleTokenSymbol || 'TOKEN';
+              const paymentSymbol = presale.paymentTokenSymbol || 'ETH';
+              const paymentDecimals = presale.paymentTokenDecimals ?? 18;
+              const saleProgress = Math.min(Math.max(presale.progress ?? 0, 0), 100);
+              const saleCountdown = resolvePresaleSaleCountdown(
+                presale.status,
+                presale.startTime,
+                presale.endTime
+              );
+              const saleCardAction = getPresaleCardAction(presale.status);
 
-                    {/* Progress */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-body-sm">
-                        <span className="text-ink-muted">Progress</span>
-                        <span className="text-ink font-medium">{presale.progress}%</span>
-                      </div>
-                      <div className="w-full h-2.5 bg-ink/5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-accent rounded-full transition-all duration-500"
-                          style={{ width: `${presale.progress}%` }}
+              return (
+                <div key={presale.address}>
+                  <Link to={`/presales/${presale.address}`} className="block h-full">
+                    <div className="project-card rounded-3xl overflow-hidden space-y-0 h-full flex flex-col">
+                      {tokenImage ? (
+                        <img
+                          src={tokenImage}
+                          alt={presale.saleTokenName || saleTokenSymbol}
+                          className="w-full h-36 object-cover bg-ink/5"
                         />
-                      </div>
-                    </div>
+                      ) : (
+                        <div className="w-full h-36 flex items-center justify-center bg-ink/5">
+                          <Image className="w-10 h-10 text-ink-faint" />
+                        </div>
+                      )}
 
-                    {/* Raised / Hard Cap */}
-                    <div className="flex justify-between text-body-sm">
-                      <div>
-                        <p className="text-ink-muted">Raised</p>
-                        <p className="text-ink font-medium">
-                          {presale.totalRaised
-                            ? formatUnits(presale.totalRaised, presale.paymentTokenDecimals ?? 18)
-                            : '0'}{' '}
-                          {presale.paymentTokenSymbol || ''}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-ink-muted">Hard Cap</p>
-                        <p className="text-ink font-medium">
-                          {presale.hardCap
-                            ? formatUnits(presale.hardCap, presale.paymentTokenDecimals ?? 18)
-                            : '0'}{' '}
-                          {presale.paymentTokenSymbol || ''}
-                        </p>
-                      </div>
-                    </div>
+                      <div className="p-6 space-y-4 flex-1 flex flex-col">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <h3 className="font-display text-display-sm text-ink">
+                              {saleTokenSymbol}
+                            </h3>
+                            <p className="text-body-sm text-ink-muted">
+                              {presale.saleTokenName || 'Token Sale'}
+                            </p>
+                            <p className="text-body-sm text-ink-faint line-clamp-2">
+                              Onchain token launch.
+                            </p>
+                          </div>
+                          {getStatusBadge(presale.status)}
+                        </div>
 
-                    {/* Time Remaining */}
-                    <div className="pt-2 border-t border-ink/5">
-                      <div className="flex items-center gap-2 text-body-sm text-ink-muted">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>
-                          {presale.status === 'upcoming'
-                            ? presale.startTime
-                              ? `Starts in ${formatCountdown(presale.startTime, nowSec)}`
-                              : 'Start date TBD'
-                            : presale.status === 'live'
-                            ? presale.endTime
-                              ? `Ends in ${formatCountdown(presale.endTime, nowSec)}`
-                              : 'End date TBD'
-                            : 'Ended'}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
+                            Token
+                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-ink/10 text-ink-muted">
+                            {presale.requiresWhitelist ? 'Whitelist' : 'Public'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-body-sm">
+                            <span className="text-ink-muted">Sale Progress</span>
+                            <span className="text-ink font-medium">{saleProgress}%</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-ink/5 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-accent rounded-full transition-all duration-500"
+                              style={{ width: `${saleProgress}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between text-body-sm">
+                          <div>
+                            <p className="text-ink-muted">Raised</p>
+                            <p className="text-ink font-medium">
+                              {formatAmount(presale.totalRaised, paymentDecimals)} {paymentSymbol}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-ink-muted">Hard Cap</p>
+                            <p className="text-ink font-medium">
+                              {formatAmount(presale.hardCap, paymentDecimals)} {paymentSymbol}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-accent/5 border border-accent/10 px-3 py-2 text-body-sm space-y-1.5">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-ink-muted">Presale Price</span>
+                            <span className="font-medium text-ink whitespace-nowrap">
+                              1 {paymentSymbol} = {formatPresaleRate(presale.rate)} {saleTokenSymbol}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-ink/5">
+                          <PhaseCountdown
+                            compact
+                            label={saleCountdown.label}
+                            targetTime={saleCountdown.targetTime}
+                            nowSec={nowSec}
+                            fallbackLabel={saleCountdown.fallbackLabel}
+                            completedLabel={saleCountdown.completedLabel}
+                            stoppedMessage={saleCountdown.stoppedMessage}
+                          />
+                        </div>
+
+                        <div className="mt-auto pt-3 border-t border-ink/5">
+                          <div className={`${saleCardAction.className} w-full text-center text-sm py-2`}>
+                            {saleCardAction.label}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
+                  </Link>
+                </div>
+              );
+            })}
 
             {visibleNFTDeployments.map((deployment) => {
               const mintedPercent =

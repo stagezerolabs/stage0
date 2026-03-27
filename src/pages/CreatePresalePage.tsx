@@ -43,6 +43,14 @@ const itemVariants = {
 
 const RATE_DIVISOR = 100;
 
+function formatDisplayRate(rate: number): string {
+  if (!Number.isFinite(rate) || rate <= 0) return '';
+  return rate.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  });
+}
+
 const CreatePresalePage: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
   const chainId = useChainId();
@@ -86,6 +94,13 @@ const CreatePresalePage: React.FC = () => {
     ] as const;
   }, [saleToken]);
 
+  const paymentTokenMetadataContracts = useMemo(() => {
+    if (useNativeToken || !paymentToken || !isAddress(paymentToken)) return undefined;
+    return [
+      { abi: erc20Abi, address: paymentToken as Address, functionName: 'symbol' },
+    ] as const;
+  }, [paymentToken, useNativeToken]);
+
   const { data: tokenMetadataResults } = useReadContracts({
     contracts: tokenMetadataContracts,
     query: {
@@ -93,19 +108,30 @@ const CreatePresalePage: React.FC = () => {
     },
   });
 
+  const { data: paymentTokenMetadataResults } = useReadContracts({
+    contracts: paymentTokenMetadataContracts,
+    query: {
+      enabled: Boolean(paymentTokenMetadataContracts),
+    },
+  });
+
   const detectedTokenName = tokenMetadataResults?.[0]?.result as string | undefined;
   const detectedTokenSymbol = tokenMetadataResults?.[1]?.result as string | undefined;
+  const detectedPaymentTokenSymbol = paymentTokenMetadataResults?.[0]?.result as string | undefined;
   const resolvedTokenName = detectedTokenName ?? queryTokenName;
   const resolvedTokenSymbol = detectedTokenSymbol ?? queryTokenSymbol;
   const showResolvedTokenInfo = Boolean(resolvedTokenName || resolvedTokenSymbol);
 
   const calculatedRate = useMemo(() => {
     if (!saleAmount || !hardCap) return '';
-    const sa = parseFloat(saleAmount);
-    const hc = parseFloat(hardCap);
-    if (hc === 0) return '';
-    return ((sa * RATE_DIVISOR) / hc).toFixed(2);
+    const sa = Number(saleAmount);
+    const hc = Number(hardCap);
+    if (!Number.isFinite(sa) || !Number.isFinite(hc) || hc <= 0) return '';
+    return formatDisplayRate(sa / hc);
   }, [saleAmount, hardCap]);
+
+  const saleTokenLabel = resolvedTokenSymbol || 'SALE';
+  const paymentTokenLabel = useNativeToken ? 'NATIVE' : detectedPaymentTokenSymbol || 'PAYMENT';
 
   const {
     data: hash,
@@ -412,8 +438,7 @@ const CreatePresalePage: React.FC = () => {
           <div className="flex items-center gap-2 p-3 rounded-xl bg-accent/5 text-accent text-sm">
             <Info className="w-4 h-4 flex-shrink-0" />
             <span>
-              Calculated rate: <strong>{calculatedRate}</strong> tokens per {RATE_DIVISOR} payment tokens
-              (RATE_DIVISOR = {RATE_DIVISOR})
+              Calculated rate: <strong>1 {paymentTokenLabel} = {calculatedRate} {saleTokenLabel}</strong>
             </span>
           </div>
         )}

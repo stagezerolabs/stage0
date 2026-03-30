@@ -540,7 +540,7 @@ const HomePage: React.FC = () => {
             <MagneticButton as="link" to="/presales" className="btn-primary py-4 px-8 text-lg rounded-full shadow-lg shadow-accent/20">
               Explore Launches
             </MagneticButton>
-            <MagneticButton as="link" to="/create/nft" className="btn-secondary py-4 px-8 text-lg rounded-full bg-canvas-alt border border-border/40 hover:bg-canvas-alt">
+            <MagneticButton as="link" to="/create/nft" className="btn-secondary py-4 px-8 text-lg rounded-full bg-canvas-alt border border-border/40 hover:bg-canvas-alt !text-accent !border-accent/40 hover:!border-accent hover:!bg-accent/10">
               Start Building
             </MagneticButton>
           </motion.div>

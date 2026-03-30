@@ -97,8 +97,8 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
           <img
             src={
               themeMode === 'dark'
-                ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_white_and_orange_zahkba.png'
-                : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_black_and_green_h6xpme.png'
+                ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_black_and_green_h6xpme.png'
+                : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_white_and_orange_zahkba.png'
             }
             alt="STAGE0"
             className="h-[70px] w-auto"
@@ -141,7 +141,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleTheme}
-            className="hidden md:inline-flex btn-ghost p-2"
+            className={`hidden md:inline-flex btn-ghost p-2 ${themeMode === 'dark' ? 'hover:text-[#FF8A00]' : 'hover:text-[#04DF83]'}`}
             aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
@@ -308,7 +308,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
             <div className="max-w-7xl mx-auto px-6 py-4 space-y-1">
               <button
                 onClick={handleMobileThemeToggle}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-body font-medium text-ink-muted hover:text-ink hover:bg-canvas/40 transition-colors duration-200"
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-body font-medium text-ink-muted hover:bg-canvas/40 transition-colors duration-200 ${themeMode === 'dark' ? 'hover:text-[#FF8A00]' : 'hover:text-[#04DF83]'}`}
               >
                 {themeMode === 'dark' ? (
                   <>

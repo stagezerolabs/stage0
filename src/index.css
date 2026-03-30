@@ -33,13 +33,13 @@
     --color-ink-faint: 107 114 128;
     --color-border: 31 41 51;
     --color-border-strong: 43 56 70;
-    --color-accent: 255 138 0;
-    --color-accent-hover: 245 124 0;
+    --color-accent: 4 223 131;
+    --color-accent-hover: 3 195 115;
     --color-accent-foreground: 11 14 17;
-    --color-accent-secondary: 59 130 246;
-    --color-accent-secondary-hover: 37 99 235;
-    --color-accent-tertiary: 139 124 255;
-    --color-accent-tertiary-hover: 123 109 245;
+    --color-accent-secondary: 255 170 50;
+    --color-accent-secondary-hover: 245 155 30;
+    --color-accent-tertiary: 255 200 80;
+    --color-accent-tertiary-hover: 240 185 60;
     --color-status-live: 34 197 94;
     --color-status-upcoming: 245 158 11;
     --color-status-closed: 156 163 175;
@@ -47,13 +47,13 @@
     --noise-opacity: 0.018;
     --layout-top-glow:
       radial-gradient(ellipse 80% 55% at 50% -20%, rgba(255, 138, 0, 0.18), transparent 62%),
-      radial-gradient(ellipse 70% 50% at 20% -10%, rgba(139, 124, 255, 0.10), transparent 62%),
-      radial-gradient(ellipse 70% 50% at 80% -10%, rgba(255, 138, 0, 0.06), transparent 66%),
-      radial-gradient(ellipse 50% 40% at 50% 10%, rgba(120, 200, 255, 0.05), transparent 55%);
+      radial-gradient(ellipse 70% 50% at 20% -10%, rgba(255, 170, 50, 0.10), transparent 62%),
+      radial-gradient(ellipse 70% 50% at 80% -10%, rgba(255, 138, 0, 0.08), transparent 66%),
+      radial-gradient(ellipse 50% 40% at 50% 10%, rgba(255, 200, 80, 0.05), transparent 55%);
     --brand-gradient:
-      linear-gradient(90deg, #ff8a00 0%, #ffb547 45%, #3b82f6 100%);
+      linear-gradient(90deg, #ff8a00 0%, #ffb547 45%, #ffd080 100%);
     --brand-glow: 0 0 16px rgba(255, 138, 0, 0.35),
-      0 0 24px rgba(59, 130, 246, 0.16);
+      0 0 24px rgba(255, 170, 50, 0.16);
     --hero-image-opacity: 0.56;
     --hero-grid-opacity: 0.10;
     --hero-overlay-top: 0.08;
@@ -71,15 +71,15 @@
 
     /* Atmospheric sky gradient */
     --layout-sky:
-      radial-gradient(ellipse 120% 80% at 50% -30%, rgba(38, 22, 82, 0.40), transparent 70%),
-      radial-gradient(ellipse 80% 60% at 15% 20%, rgba(20, 14, 45, 0.30), transparent 65%),
+      radial-gradient(ellipse 120% 80% at 50% -30%, rgba(40, 20, 5, 0.40), transparent 70%),
+      radial-gradient(ellipse 80% 60% at 15% 20%, rgba(20, 10, 0, 0.30), transparent 65%),
       radial-gradient(ellipse 60% 50% at 85% 15%, rgba(255, 138, 0, 0.10), transparent 60%),
-      radial-gradient(ellipse 40% 40% at 50% 60%, rgba(120, 200, 255, 0.04), transparent 55%);
+      radial-gradient(ellipse 40% 40% at 50% 60%, rgba(255, 200, 80, 0.04), transparent 55%);
 
     /* Bioluminescent glows */
     --glow-orange: 0 0 20px rgba(255, 138, 0, 0.30), 0 0 60px rgba(255, 138, 0, 0.10);
-    --glow-blue: 0 0 20px rgba(120, 200, 255, 0.25), 0 0 60px rgba(120, 200, 255, 0.08);
-    --glow-purple: 0 0 20px rgba(139, 124, 255, 0.25), 0 0 60px rgba(139, 124, 255, 0.08);
+    --glow-blue: 0 0 20px rgba(255, 170, 50, 0.25), 0 0 60px rgba(255, 170, 50, 0.08);
+    --glow-purple: 0 0 20px rgba(255, 200, 80, 0.25), 0 0 60px rgba(255, 200, 80, 0.08);
 
     /* Deep float shadows */
     --shadow-float: 0 20px 60px rgba(5, 5, 12, 0.40), 0 8px 20px rgba(5, 5, 12, 0.25);
@@ -92,34 +92,34 @@
 
   :root[data-theme='light'] {
     color-scheme: light;
-    --color-canvas: 244 240 232;
-    --color-canvas-alt: 233 227 216;
+    --color-canvas: 255 255 255;
+    --color-canvas-alt: 247 247 247;
     --color-ink: 28 37 50;
     --color-ink-muted: 83 92 108;
     --color-ink-faint: 120 129 145;
-    --color-border: 208 198 184;
-    --color-border-strong: 186 174 158;
-    --color-accent: 4 223 131;
-    --color-accent-hover: 3 195 115;
+    --color-border: 229 229 229;
+    --color-border-strong: 212 212 212;
+    --color-accent: 255 138 0;
+    --color-accent-hover: 245 124 0;
     --color-accent-foreground: 0 0 0;
-    --color-accent-secondary: 59 130 246;
-    --color-accent-secondary-hover: 37 99 235;
-    --color-accent-tertiary: 4 223 131;
-    --color-accent-tertiary-hover: 3 195 115;
+    --color-accent-secondary: 255 170 50;
+    --color-accent-secondary-hover: 245 155 30;
+    --color-accent-tertiary: 255 138 0;
+    --color-accent-tertiary-hover: 245 124 0;
     --noise-opacity: 0.01;
     --layout-top-glow:
-      radial-gradient(ellipse 80% 55% at 50% -20%, rgba(79, 70, 229, 0.12), transparent 62%),
-      radial-gradient(ellipse 70% 50% at 15% -10%, rgba(37, 99, 235, 0.1), transparent 64%),
-      radial-gradient(ellipse 70% 50% at 85% -10%, rgba(219, 39, 119, 0.08), transparent 64%),
-      radial-gradient(ellipse 60% 45% at 50% -30%, rgba(217, 119, 6, 0.08), transparent 66%),
-      radial-gradient(ellipse 55% 40% at 70% -25%, rgba(202, 138, 4, 0.07), transparent 72%);
-    --brand-glow: 0 0 8px rgba(123, 102, 227, 0.12),
-      0 0 14px rgba(91, 122, 215, 0.09),
-      0 0 20px rgba(212, 127, 166, 0.08);
+      radial-gradient(ellipse 80% 55% at 50% -20%, rgba(255, 138, 0, 0.14), transparent 62%),
+      radial-gradient(ellipse 70% 50% at 15% -10%, rgba(255, 170, 50, 0.10), transparent 64%),
+      radial-gradient(ellipse 70% 50% at 85% -10%, rgba(255, 138, 0, 0.08), transparent 64%),
+      radial-gradient(ellipse 60% 45% at 50% -30%, rgba(255, 200, 80, 0.08), transparent 66%),
+      radial-gradient(ellipse 55% 40% at 70% -25%, rgba(245, 124, 0, 0.07), transparent 72%);
+    --brand-glow: 0 0 8px rgba(255, 138, 0, 0.18),
+      0 0 14px rgba(255, 170, 50, 0.12),
+      0 0 20px rgba(255, 200, 80, 0.08);
     --layout-sky:
-      radial-gradient(ellipse 120% 80% at 50% -30%, rgba(200, 190, 235, 0.20), transparent 70%),
-      radial-gradient(ellipse 80% 60% at 15% 20%, rgba(180, 170, 220, 0.12), transparent 65%),
-      radial-gradient(ellipse 60% 50% at 85% 15%, rgba(255, 200, 130, 0.08), transparent 60%);
+      radial-gradient(ellipse 120% 80% at 50% -30%, rgba(255, 200, 130, 0.12), transparent 70%),
+      radial-gradient(ellipse 80% 60% at 15% 20%, rgba(255, 180, 80, 0.08), transparent 65%),
+      radial-gradient(ellipse 60% 50% at 85% 15%, rgba(255, 138, 0, 0.08), transparent 60%);
     --shadow-float: 0 20px 60px rgba(0, 0, 0, 0.08), 0 8px 20px rgba(0, 0, 0, 0.05);
     --shadow-float-hover: 0 28px 80px rgba(0, 0, 0, 0.12), 0 12px 30px rgba(0, 0, 0, 0.06);
     --hero-image-opacity: 0.42;

@@ -59,7 +59,7 @@ function App() {
             borderRadius: 'large',
           })
         : darkTheme({
-            accentColor: '#FF8A00',
+            accentColor: '#04DF83',
             accentColorForeground: '#0B0E11',
             borderRadius: 'large',
           }),

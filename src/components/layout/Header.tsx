@@ -97,8 +97,8 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
           <img
             src={
               themeMode === 'dark'
-                ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_black_and_green_h6xpme.png'
-                : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774625083/STAGE0_white_and_orange_zahkba.png'
+                ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_white_green_vilwwf.png'
+                : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_black_orange_wiqr1i.png'
             }
             alt="STAGE0"
             className="h-[70px] w-auto"

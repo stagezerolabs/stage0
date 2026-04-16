@@ -1,8 +1,9 @@
 import Dither from '@/components/animated/Dither';
 import CountUp from '@/components/ui/CountUp';
-import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
+import { NFT_COLLECTION_IMAGES } from '@/config';
+import { useNFTDeployments, type NFTDeploymentWithMetadata } from '@/lib/hooks/useNFTDeployments';
+import { useLaunchpadPresales, type PresaleWithStatus } from '@/lib/hooks/useLaunchpadPresales';
 import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
-import { projects } from '@/lib/projects';
 import { useIsAdmin } from '@/lib/utils/admin';
 import {
   motion,
@@ -19,6 +20,8 @@ import {
   DollarSign,
   Image as ImageIcon,
   Lock,
+  Pin,
+  PinOff,
   Rocket,
   Search,
   Send,
@@ -27,7 +30,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';
 import { useAccount } from 'wagmi';
@@ -144,40 +147,6 @@ const MagneticButton: React.FC<{
   );
 };
 
-/* ─── StatGauge ─── */
-
-const StatGauge: React.FC<{ fill: number; color: string }> = ({ fill, color }) => {
-  const ref = useRef<SVGSVGElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-50px' });
-  const circumference = 2 * Math.PI * 45;
-  const offset = circumference - (fill / 100) * circumference;
-
-  return (
-    <svg
-      ref={ref}
-      className="absolute inset-0 m-auto progress-ring"
-      width="100"
-      height="100"
-      viewBox="0 0 100 100"
-      style={{ opacity: 0.15 }}
-    >
-      <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" opacity={0.1} />
-      <circle
-        cx="50"
-        cy="50"
-        r="45"
-        fill="none"
-        stroke={color}
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={isInView ? offset : circumference}
-        style={{ transition: 'stroke-dashoffset 2s cubic-bezier(0.16, 1, 0.3, 1)' }}
-      />
-    </svg>
-  );
-};
-
 /* ─── Animation Variants ─── */
 
 const containerVariants = {
@@ -260,6 +229,89 @@ const RiseGlowOrbs: React.FC = () => (
 );
 
 
+/* ─── Pinned Presale Hook ─── */
+
+const PINNED_PRESALE_KEY = 'stage0_pinned_presale';
+
+function usePinnedPresale() {
+  const [pinnedAddress, setPinnedAddressState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(PINNED_PRESALE_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  const setPinnedAddress = useCallback((address: string | null) => {
+    setPinnedAddressState(address);
+    try {
+      if (address) {
+        localStorage.setItem(PINNED_PRESALE_KEY, address);
+      } else {
+        localStorage.removeItem(PINNED_PRESALE_KEY);
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
+
+  return { pinnedAddress, setPinnedAddress };
+}
+
+/* ─── Unified Featured Launch type ─── */
+
+type FeaturedLaunch = {
+  type: 'token' | 'nft';
+  address: string;
+  name: string;
+  symbol: string;
+  status: string;
+  progress: number;
+  raisedDisplay: string;
+  capDisplay: string;
+  image?: string;
+  link: string;
+  /** Normalized raised value in ETH for sorting */
+  sortRaised: number;
+};
+
+function tokenPresaleToFeatured(p: PresaleWithStatus): FeaturedLaunch {
+  const paymentDecimals = p.paymentTokenDecimals ?? 18;
+  const paymentSymbol = p.paymentTokenSymbol || 'ETH';
+  return {
+    type: 'token',
+    address: p.address,
+    name: p.saleTokenName || 'Unknown Project',
+    symbol: p.saleTokenSymbol || 'UNK',
+    status: p.status,
+    progress: p.progress ?? 0,
+    raisedDisplay: `${formatUnits(p.totalRaised ?? 0n, paymentDecimals)} ${paymentSymbol}`,
+    capDisplay: `${formatUnits(p.hardCap ?? 0n, paymentDecimals)} ${paymentSymbol}`,
+    image: p.logo,
+    link: `/presales/${p.address}`,
+    sortRaised: Number(formatUnits(p.totalRaised ?? 0n, paymentDecimals)),
+  };
+}
+
+function nftDeploymentToFeatured(d: NFTDeploymentWithMetadata): FeaturedLaunch {
+  const mintedPercent = d.maxSupply > 0n
+    ? Math.min(Number((d.totalMinted * 100n) / d.maxSupply), 100)
+    : 0;
+  return {
+    type: 'nft',
+    address: d.address,
+    name: d.name || 'NFT Collection',
+    symbol: d.symbol || 'NFT',
+    status: d.status,
+    progress: mintedPercent,
+    raisedDisplay: `${d.totalMinted.toString()} / ${d.maxSupply.toString()} minted`,
+    capDisplay: `${formatUnits(d.mintPrice, 18)} ETH each`,
+    image: d.metadataImage || NFT_COLLECTION_IMAGES[d.address.toLowerCase()],
+    link: `/nfts/${d.address}`,
+    sortRaised: Number(formatUnits(d.mintPrice * d.totalMinted, 18)),
+  };
+}
+
 type CompactStatDisplay = {
   value: number;
   decimals: number;
@@ -292,7 +344,9 @@ const HomePage: React.FC = () => {
   const { address } = useAccount();
   const { isAdmin } = useIsAdmin(address as Address | undefined);
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
+  const { deployments: nftDeployments, isLoading: isNFTLoading } = useNFTDeployments();
   const { totalDeployments, activeDeployments, estimatedEthRaised } = useUserNFTs();
+  const { pinnedAddress, setPinnedAddress } = usePinnedPresale();
   const reducedMotion = useReducedMotion();
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
   const prefersReducedMotion = typeof window !== 'undefined' &&
@@ -327,21 +381,30 @@ const HomePage: React.FC = () => {
 
   const livePresales = presales.filter((p) => p.status === 'live');
   const upcomingPresales = presales.filter((p) => p.status === 'upcoming');
-  const featuredPresales = [...livePresales, ...upcomingPresales]
-    .sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'live' ? -1 : 1;
-      return Number(a.startTime ?? 0n) - Number(b.startTime ?? 0n);
-    })
-    .slice(0, 3);
-  const fallbackFeaturedPresales = projects
-    .filter((project) => project.status === 'Live' || project.status === 'Upcoming')
-    .slice(0, 3);
-  const featuredItems =
-    featuredPresales.length > 0
-      ? featuredPresales
-      : isPresalesLoading
-        ? []
-        : fallbackFeaturedPresales;
+  const isFeaturedLoading = isPresalesLoading || isNFTLoading;
+
+  // Featured launches: merge token presales + NFT deployments, pinned first, sorted by highest raised
+  const featuredLaunches = useMemo((): FeaturedLaunch[] => {
+    const tokenItems = presales.map(tokenPresaleToFeatured);
+    const nftItems = nftDeployments.map(nftDeploymentToFeatured);
+    const all = [...tokenItems, ...nftItems];
+
+    // Sort by raised value descending
+    all.sort((a, b) => b.sortRaised - a.sortRaised);
+
+    // If there's a pinned launch, ensure it's first
+    if (pinnedAddress) {
+      const pinnedIndex = all.findIndex(
+        (item) => item.address.toLowerCase() === pinnedAddress.toLowerCase()
+      );
+      if (pinnedIndex > 0) {
+        const [pinned] = all.splice(pinnedIndex, 1);
+        all.unshift(pinned);
+      }
+    }
+
+    return all.slice(0, 3);
+  }, [presales, nftDeployments, pinnedAddress]);
 
   const presaleRaisedEth = presales.reduce((sum, presale) => {
     if (!presale.isPaymentETH) return sum;
@@ -570,7 +633,7 @@ const HomePage: React.FC = () => {
                     rotateY: shouldDisableAnimations ? 0 : springY,
                     transformPerspective: 800,
                     backgroundColor: themeMode === 'light'
-                      ? 'rgba(220, 215, 205, 1)'
+                      ? 'rgba(252, 248, 240, 0.98)'
                       : 'rgba(14, 14, 26, 1)',
                   }}
                   onMouseMove={shouldDisableAnimations ? undefined : handleMouseMove}
@@ -578,16 +641,19 @@ const HomePage: React.FC = () => {
                   whileHover={shouldDisableAnimations ? {} : {
                     scale: 1.02,
                     backgroundColor: themeMode === 'light'
-                      ? 'rgba(228, 222, 212, 1)'
+                      ? 'rgba(255, 251, 244, 1)'
                       : 'rgba(20, 20, 36, 1)',
                   }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20, duration: 0.7 }}
                 >
-                  <span className="absolute -top-12 -right-8 text-[10rem] font-bold text-white/5 select-none pointer-events-none" aria-hidden="true">
+                  <span
+                    className="absolute -top-12 -right-8 text-[10rem] font-bold select-none pointer-events-none"
+                    style={{ color: themeMode === 'light' ? 'rgba(28, 37, 50, 0.04)' : 'rgba(255, 255, 255, 0.05)' }}
+                    aria-hidden="true"
+                  >
                     {stat.ghost}
                   </span>
                   <div className="relative z-10">
-                    <StatGauge fill={stat.gaugeFill} color={stat.gaugeColor} />
                     <div className={`w-14 h-14 rounded-2xl ${stat.iconBg} mx-auto flex items-center justify-center mb-6`}>
                       <stat.icon className="w-7 h-7" />
                     </div>
@@ -612,7 +678,7 @@ const HomePage: React.FC = () => {
         <motion.section variants={itemVariants} className="space-y-10">
           <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ink/5 border border-ink/10 text-xs font-semibold uppercase tracking-widest text-ink-muted">
                 Featured
               </div>
               <h2 className="font-display text-3xl md:text-5xl text-ink">Live &amp; Upcoming IDOs</h2>
@@ -630,74 +696,113 @@ const HomePage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {isPresalesLoading && featuredItems.length === 0
+            {isFeaturedLoading && featuredLaunches.length === 0
               ? Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={`featured-skeleton-${index}`}
-                  className="rounded-[2.5rem] border border-white/5 bg-canvas-alt/70 overflow-hidden"
-                >
-                  <div className="h-48 bg-ink/10 animate-pulse" />
-                  <div className="p-8 space-y-4">
-                    <div className="h-6 w-3/4 rounded bg-ink/10 animate-pulse" />
-                    <div className="h-4 w-1/3 rounded bg-ink/10 animate-pulse" />
-                    <div className="h-20 rounded-2xl bg-ink/10 animate-pulse" />
-                  </div>
-                </div>
+                <FeaturedCardSkeleton key={`featured-skeleton-${index}`} />
               ))
-              : (
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                featuredItems.map((item: any, index) => {
-                  const isLive = item.status === 'live' || item.status === 'Live';
-                  const symbol = item.saleTokenSymbol || item.symbol || 'UNK';
-                  const name = item.saleTokenName || item.name || 'Unknown Project';
-                  const progress = item.progress || item.raisePercentage || 0;
-                  const link = item.address ? `/presales/${item.address}` : `/project/${item.id}`;
+              : featuredLaunches.length === 0 && !isFeaturedLoading
+                ? (
+                  <div className="col-span-full text-center py-16">
+                    <p className="text-ink-muted text-lg">No launches available yet.</p>
+                    <Link to="/presales" className="text-accent hover:underline mt-2 inline-block">
+                      View all launches
+                    </Link>
+                  </div>
+                )
+                : (
+                  featuredLaunches.map((item, index) => {
+                    const isLive = item.status === 'live';
+                    const isEnded = item.status === 'ended' || item.status === 'finalized';
+                    const isPinned = pinnedAddress?.toLowerCase() === item.address.toLowerCase();
 
-                  return (
-                    <PresaleCard key={item.address || item.id} index={index} reducedMotion={!!shouldDisableAnimations}>
-                      <Link to={link}>
-                        <div className="group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-white/5 transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
-                          {/* Presale Card Image Header */}
-                          <div className="relative h-48 w-full overflow-hidden">
-                            <img
-                              src={`https://placehold.co/600x400/111/444?text=${symbol}`}
-                              alt={name}
-                              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
-                            <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${isLive
-                              ? 'bg-status-live-bg text-status-live border border-status-live/20'
-                              : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
-                              }`}>
-                              {isLive ? 'Live Now' : 'Upcoming'}
-                            </span>
-                          </div>
-
-                          {/* Presale Details */}
-                          <div className="p-8 pt-4 flex-1 flex flex-col justify-between space-y-6 relative z-10">
-                            <div>
-                              <h3 className="font-display text-2xl font-bold text-ink">{name}</h3>
-                              <p className="text-sm font-semibold text-accent mt-1">${symbol}</p>
-                            </div>
-
-                            <div className="space-y-3 bg-white/5 rounded-2xl p-5 border border-white/5">
-                              <div className="flex justify-between text-sm font-semibold">
-                                <span className="text-ink-muted">Progress</span>
-                                <span className="text-accent">{progress}%</span>
+                    return (
+                      <PresaleCard key={item.address} index={index} reducedMotion={!!shouldDisableAnimations}>
+                        <div className="relative h-full">
+                          {/* Admin pin button */}
+                          {isAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setPinnedAddress(isPinned ? null : item.address);
+                              }}
+                              className={`absolute top-5 left-5 z-20 p-2 rounded-full backdrop-blur-sm transition-all ${
+                                isPinned
+                                  ? 'bg-accent text-accent-foreground shadow-lg'
+                                  : 'bg-black/40 text-white/70 hover:bg-black/60 hover:text-white'
+                              }`}
+                              title={isPinned ? 'Unpin from homepage' : 'Pin to homepage'}
+                            >
+                              {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                            </button>
+                          )}
+                          <Link to={item.link}>
+                            <div className="group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-border transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
+                              {/* Card Image Header */}
+                              <div className="relative h-48 w-full overflow-hidden">
+                                {item.image ? (
+                                  <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-ink/5">
+                                    <span className="font-display text-4xl font-bold text-ink/20">{item.symbol}</span>
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
+                                {/* Status badge */}
+                                <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${
+                                  isLive
+                                    ? 'bg-status-live-bg text-status-live border border-status-live/20'
+                                    : isEnded
+                                      ? 'bg-ink/10 text-ink-muted border border-ink/10'
+                                      : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
+                                }`}>
+                                  {isLive ? 'Live Now' : isEnded ? 'Ended' : 'Upcoming'}
+                                </span>
+                                {/* Launch type pill */}
+                                <span className={`absolute bottom-4 right-5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${
+                                  item.type === 'nft'
+                                    ? 'bg-accent-secondary/90 text-accent-foreground border-accent-secondary/20'
+                                    : 'bg-accent/90 text-accent-foreground border-accent/20'
+                                }`}>
+                                  {item.type === 'nft' ? 'NFT' : 'Token'}
+                                </span>
+                                {isPinned && (
+                                  <span className="absolute top-5 left-5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-accent/90 text-accent-foreground border border-accent/20 shadow-lg flex items-center gap-1">
+                                    <Pin className="w-3 h-3" /> Pinned
+                                  </span>
+                                )}
                               </div>
-                              <ProgressBar progress={progress} />
-                              <div className="flex justify-between text-xs font-medium text-ink-muted">
-                                <span>Raised: {item.totalRaised ? formatUnits(item.totalRaised, item.paymentTokenDecimals ?? 18) : (item.raised || '0')}</span>
-                                <span>Cap: {item.hardCap ? formatUnits(item.hardCap, item.paymentTokenDecimals ?? 18) : (item.targetRaise || '0')}</span>
+
+                              {/* Launch Details */}
+                              <div className="p-8 pt-4 flex-1 flex flex-col justify-between space-y-6 relative z-10">
+                                <div>
+                                  <h3 className="font-display text-2xl font-bold text-ink">{item.name}</h3>
+                                  <p className="text-sm font-semibold text-accent mt-1">${item.symbol}</p>
+                                </div>
+
+                                <div className="space-y-3 bg-ink/[0.03] rounded-2xl p-5 border border-ink/5">
+                                  <div className="flex justify-between text-sm font-semibold">
+                                    <span className="text-ink-muted">Progress</span>
+                                    <span className="text-accent">{item.progress}%</span>
+                                  </div>
+                                  <ProgressBar progress={item.progress} />
+                                  <div className="flex justify-between text-xs font-medium text-ink-muted">
+                                    <span>{item.raisedDisplay}</span>
+                                    <span>{item.capDisplay}</span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          </Link>
                         </div>
-                      </Link>
-                    </PresaleCard>
-                  );
-                })
-              )}
+                      </PresaleCard>
+                    );
+                  })
+                )}
           </div>
         </motion.section>
 
@@ -716,7 +821,7 @@ const HomePage: React.FC = () => {
 
           <div className="relative max-w-6xl mx-auto">
             {/* Scroll animated horizontal line (Desktop) */}
-            <div className="hidden md:block absolute top-[4.5rem] left-[16.67%] right-[16.67%] h-1 bg-white/5 rounded-full" />
+            <div className="hidden md:block absolute top-[4.5rem] left-[16.67%] right-[16.67%] h-1 bg-ink/[0.06] rounded-full" />
             <motion.div
               className="hidden md:block absolute top-[4.5rem] left-[16.67%] right-[16.67%] h-1 bg-gradient-to-r from-accent via-accent-secondary to-accent-tertiary rounded-full origin-left z-10 shadow-[0_0_15px_rgba(255,138,0,0.5)]"
               style={{ scaleX: lineProgress }}
@@ -752,12 +857,12 @@ const HomePage: React.FC = () => {
                   className="flex flex-col items-center text-center space-y-6"
                 >
                   <div className="relative w-36 h-36 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-canvas-alt rounded-full border border-white/10" />
+                    <div className="absolute inset-0 bg-canvas-alt rounded-full border border-border/70" />
                     <div
                       className="absolute inset-2 rounded-full bg-accent/10 border border-accent/20"
                       style={{ willChange: 'transform' }}
                     />
-                    <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-canvas to-canvas-alt shadow-inner flex items-center justify-center border border-white/5 text-accent">
+                    <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-canvas to-canvas-alt shadow-inner flex items-center justify-center border border-border/50 text-accent">
                       <item.icon className="w-8 h-8" />
                     </div>
                     {/* Step badge */}
@@ -778,7 +883,7 @@ const HomePage: React.FC = () => {
         {/* ─── Creator Tools — Bento Layout ─── */}
         <motion.section variants={itemVariants} className="space-y-10">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-canvas-alt/80 border border-border/70 text-xs font-semibold uppercase tracking-widest text-ink-muted">
               For Builders
             </div>
             <h2 className="font-display text-3xl md:text-5xl text-ink">Creator Suite</h2>
@@ -809,7 +914,7 @@ const HomePage: React.FC = () => {
               return (
                 <motion.div
                   key={tool.href}
-                  className={`relative overflow-hidden rounded-3xl group border border-white/5 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${isToolEnabled ? (
+                  className={`relative overflow-hidden rounded-3xl group border border-border/70 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${isToolEnabled ? (
                     themeMode === 'light'
                       ? 'hover:border-purple-500'
                       : 'hover:border-amber-700'
@@ -868,8 +973,13 @@ const PresaleCard: React.FC<{
   return (
     <motion.div
       ref={ref}
-      variants={itemVariants}
-      custom={index}
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.7,
+        delay: index * 0.12,
+        ease: [0.16, 1, 0.3, 1],
+      }}
       style={{
         rotateX: reducedMotion ? 0 : springX,
         rotateY: reducedMotion ? 0 : springY,
@@ -891,17 +1001,46 @@ const ProgressBar: React.FC<{ progress: number }> = ({ progress }) => {
   const isInView = useInView(ref, { once: true, margin: '-20px' });
 
   return (
-    <div ref={ref} className="w-full h-2.5 bg-black/40 rounded-full overflow-hidden relative border border-white/5 shadow-inner">
+    <div ref={ref} className="w-full h-2.5 bg-ink/10 rounded-full overflow-hidden relative border border-ink/5">
       <motion.div
         className="h-full bg-gradient-to-r from-accent to-accent-secondary rounded-full relative"
         initial={{ width: 0 }}
         animate={isInView ? { width: `${progress}%` } : { width: 0 }}
         transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
-      >
-        <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse blur-[2px]" />
-      </motion.div>
+      />
     </div>
   );
 };
+
+/* ─── Skeleton Card for Featured Launches ─── */
+
+const FeaturedCardSkeleton: React.FC = () => (
+  <div className="rounded-[2.5rem] border border-border bg-canvas-alt overflow-hidden animate-pulse">
+    {/* Image header skeleton */}
+    <div className="h-48 bg-ink/[0.06]" />
+    {/* Body skeleton */}
+    <div className="p-8 pt-4 space-y-6">
+      {/* Title + symbol */}
+      <div className="space-y-2.5">
+        <div className="h-7 w-3/4 rounded-lg bg-ink/[0.08]" />
+        <div className="h-4 w-1/4 rounded bg-ink/[0.08]" />
+      </div>
+      {/* Progress block */}
+      <div className="space-y-3 bg-ink/[0.03] rounded-2xl p-5 border border-ink/5">
+        <div className="flex justify-between">
+          <div className="h-4 w-16 rounded bg-ink/[0.08]" />
+          <div className="h-4 w-10 rounded bg-ink/[0.08]" />
+        </div>
+        <div className="w-full h-2.5 bg-ink/[0.06] rounded-full overflow-hidden">
+          <div className="h-full w-2/5 bg-ink/[0.1] rounded-full" />
+        </div>
+        <div className="flex justify-between">
+          <div className="h-3 w-28 rounded bg-ink/[0.08]" />
+          <div className="h-3 w-20 rounded bg-ink/[0.08]" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default HomePage;

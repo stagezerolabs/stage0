@@ -94,15 +94,17 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
       <nav className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
         {/* Logo */}
         <Link to="/" className="group inline-flex items-center">
-          <img
-            src={
-              themeMode === 'dark'
-                ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_white_green_vilwwf.png'
-                : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_black_orange_wiqr1i.png'
-            }
-            alt="STAGE0"
-            className="h-[70px] w-auto"
-          />
+          <span className="block h-10 md:h-12 aspect-[466/165]">
+            <img
+              src={
+                themeMode === 'dark'
+                  ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_white_green_vilwwf.png'
+                  : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_black_orange_wiqr1i.png'
+              }
+              alt="STAGE0"
+              className="h-full w-full object-contain"
+            />
+          </span>
         </Link>
 
         {/* Desktop Navigation */}

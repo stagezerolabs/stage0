@@ -5,7 +5,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "img-src 'self' data: blob: res.cloudinary.com"
+    Content-Security-Policy = "img-src 'self' data: blob: https:;"
 
 [[headers]]
   for = "/assets/*.js"

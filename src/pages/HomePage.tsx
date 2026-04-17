@@ -681,7 +681,7 @@ const HomePage: React.FC = () => {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ink/5 border border-ink/10 text-xs font-semibold uppercase tracking-widest text-ink-muted">
                 Featured
               </div>
-              <h2 className="font-display text-3xl md:text-5xl text-ink">Live &amp; Upcoming IDOs</h2>
+              <h2 className="font-display text-3xl md:text-5xl text-ink">Live &amp; Upcoming Launches</h2>
             </div>
             <Link to="/presales" className="btn-ghost group inline-flex items-center gap-2 text-sm uppercase tracking-wider font-semibold">
               View All
@@ -726,11 +726,10 @@ const HomePage: React.FC = () => {
                                 e.stopPropagation();
                                 setPinnedAddress(isPinned ? null : item.address);
                               }}
-                              className={`absolute top-5 left-5 z-20 p-2 rounded-full backdrop-blur-sm transition-all ${
-                                isPinned
+                              className={`absolute top-5 left-5 z-20 p-2 rounded-full backdrop-blur-sm transition-all ${isPinned
                                   ? 'bg-accent text-accent-foreground shadow-lg'
                                   : 'bg-black/40 text-white/70 hover:bg-black/60 hover:text-white'
-                              }`}
+                                }`}
                               title={isPinned ? 'Unpin from homepage' : 'Pin to homepage'}
                             >
                               {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
@@ -753,21 +752,19 @@ const HomePage: React.FC = () => {
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
                                 {/* Status badge */}
-                                <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${
-                                  isLive
+                                <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${isLive
                                     ? 'bg-status-live-bg text-status-live border border-status-live/20'
                                     : isEnded
                                       ? 'bg-ink/10 text-ink-muted border border-ink/10'
                                       : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
-                                }`}>
+                                  }`}>
                                   {isLive ? 'Live Now' : isEnded ? 'Ended' : 'Upcoming'}
                                 </span>
                                 {/* Launch type pill */}
-                                <span className={`absolute bottom-4 right-5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${
-                                  item.type === 'nft'
+                                <span className={`absolute bottom-4 right-5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${item.type === 'nft'
                                     ? 'bg-accent-secondary/90 text-accent-foreground border-accent-secondary/20'
                                     : 'bg-accent/90 text-accent-foreground border-accent/20'
-                                }`}>
+                                  }`}>
                                   {item.type === 'nft' ? 'NFT' : 'Token'}
                                 </span>
                                 {isPinned && (

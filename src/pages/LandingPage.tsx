@@ -102,7 +102,7 @@ const LandingPage: React.FC = () => {
             </div>
             <h3 className="font-display text-display-sm text-ink">Explore Projects</h3>
             <p className="text-body text-ink-muted">
-              Browse upcoming IDOs and find the next big thing.
+              Browse upcoming Launches and find the next big thing.
             </p>
           </div>
           <div className="space-y-4">
@@ -111,7 +111,7 @@ const LandingPage: React.FC = () => {
             </div>
             <h3 className="font-display text-display-sm text-ink">Participate & Build</h3>
             <p className="text-body text-ink-muted">
-              Participate in IDOs, stake your tokens, or build your own project with our tools.
+              Participate in Launches, stake your tokens, or build your own project with our tools.
             </p>
           </div>
         </div>
@@ -125,7 +125,7 @@ const LandingPage: React.FC = () => {
               Active Raises
             </p>
             <h2 className="font-display text-display-md text-ink">
-              Upcoming IDOs
+              Upcoming Launches
             </h2>
           </div>
           <button className="btn-ghost">
@@ -148,7 +148,7 @@ const LandingPage: React.FC = () => {
 
 
 
-            {/* Featured Banner */}
+      {/* Featured Banner */}
       <motion.section variants={itemVariants}>
         <div className="relative overflow-hidden rounded-3xl border border-border bg-canvas-alt p-8 md:p-12">
           <div

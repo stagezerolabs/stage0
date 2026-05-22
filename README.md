@@ -1,5 +1,5 @@
 # Stage0
-Launch layer on Sepolia (dev) with production-ready chain abstraction.
+Launch layer on RISE testnet (dev) with production-ready chain abstraction.
 
 ## Goldsky Rise indexer
 

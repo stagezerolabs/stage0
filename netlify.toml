@@ -2,6 +2,67 @@
   command = "npm run build"
   publish = "dist"
 
+# Netlify evaluates _redirects before netlify.toml. To make a site-wide
+# rate-limit rule apply to this SPA, keep the catch-all routing rule here.
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
+
+  [redirects.rate_limit]
+    # Tighter protection for the homepage document request.
+    window_limit = 20
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/index.html"
+  to = "/index.html"
+  status = 200
+
+  [redirects.rate_limit]
+    window_limit = 20
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/presales"
+  to = "/index.html"
+  status = 200
+
+  [redirects.rate_limit]
+    # Tighter protection for the presales listing page.
+    window_limit = 20
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/presales/*"
+  to = "/index.html"
+  status = 200
+
+  [redirects.rate_limit]
+    # Covers presale detail and manage pages without tightening the whole site.
+    window_limit = 20
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/*"
+  to = "/:splat"
+
+  [redirects.rate_limit]
+    # Broad fallback protection for the entire site.
+    # On non-Enterprise plans, Netlify supports per-IP+domain aggregation.
+    window_limit = 120
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]

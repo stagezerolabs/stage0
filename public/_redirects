@@ -1,1 +1,7 @@
-/* /index.html 200
+# Netlify site-wide rate limiting is defined in netlify.toml.
+# Leaving an active catch-all rule here would run before netlify.toml and
+# prevent the TOML-based rule from applying.
+#
+# If you later deploy this repo to Cloudflare Pages instead of Netlify,
+# restore the SPA fallback below:
+# /* /index.html 200

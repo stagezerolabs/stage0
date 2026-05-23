@@ -2,6 +2,20 @@
   command = "npm run build"
   publish = "dist"
 
+# Redirect the default Netlify subdomain to the custom domain while preserving
+# path and query string. Keep these rules before the SPA rewrites below.
+[[redirects]]
+  from = "http://stage-zero.netlify.app/*"
+  to = "https://stage0.xyz/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://stage-zero.netlify.app/*"
+  to = "https://stage0.xyz/:splat"
+  status = 301
+  force = true
+
 # Netlify evaluates _redirects before netlify.toml. To make a site-wide
 # rate-limit rule apply to this SPA, keep the catch-all routing rule here.
 [[redirects]]

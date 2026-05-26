@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, Lock, Sliders, Send, Image, ArrowRight } from 'lucide-react';
+import { DollarSign, Globe, Lock, Sliders, Send, Image, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import type { Address } from 'viem';
@@ -43,58 +43,80 @@ const cardVariants = {
   },
 };
 
-const tools = [
-  {
-    id: 'nft',
-    title: 'Create an NFT',
-    description: 'Deploy and manage NFT collections onchain.',
-    icon: Image,
-    href: '/create/nft',
-    bgColor: 'bg-canvas-alt',
-    textColor: 'text-ink',
-    iconBg: 'bg-ink/10',
-  },
-  {
-    id: 'createToken',
-    title: 'Create a Token',
-    description: 'Deploy a standard, mintable, burnable, or taxable ERC20 token.',
-    icon: DollarSign,
-    href: '/create/token',
-    bgColor: 'bg-canvas-alt',
-    textColor: 'text-ink',
-    iconBg: 'bg-ink/10',
-  },
-  {
-    id: 'createPresale',
-    title: 'Create Launch',
-    description: 'Launch your token sale with configurable onchain parameters.',
-    icon: Sliders,
-    href: '/create/presale',
-    bgColor: 'bg-canvas-alt',
-    textColor: 'text-ink',
-    iconBg: 'bg-ink/10',
-  },
-  {
-    id: 'tokenLocker',
-    title: 'Locker',
-    description: 'Lock token and liquidity.',
-    icon: Lock,
-    href: '/tools/token-locker',
-    bgColor: 'bg-canvas-alt',
-    textColor: 'text-ink',
-    iconBg: 'bg-ink/10',
-  },
-  {
-    id: 'airdrop',
-    title: 'Airdrop / Multi-Send',
-    description: 'Send tokens or native currency to multiple addresses at once.',
-    icon: Send,
-    href: '/tools/airdrop',
-    bgColor: 'bg-canvas-alt',
-    textColor: 'text-ink',
-    iconBg: 'bg-ink/10',
-  },
-];
+const tools: Array<{
+  id: string;
+  title: string;
+  description: string;
+  icon: typeof Globe;
+  href: string;
+  bgColor: string;
+  textColor: string;
+  iconBg: string;
+  enabledForAll?: boolean;
+}> = [
+    {
+      id: 'nft',
+      title: 'Create an NFT',
+      description: 'Deploy and manage NFT collections onchain.',
+      icon: Image,
+      href: '/create/nft',
+      bgColor: 'bg-canvas-alt',
+      textColor: 'text-ink',
+      iconBg: 'bg-ink/10',
+      enabledForAll: true,
+    },
+    {
+      id: 'domains',
+      title: 'Mint a Name',
+      description: 'Claim a test .stage0 name stored locally for your dashboard.',
+      icon: Globe,
+      href: '/domains',
+      bgColor: 'bg-canvas-alt',
+      textColor: 'text-ink',
+      iconBg: 'bg-ink/10',
+      enabledForAll: true,
+    },
+    {
+      id: 'createToken',
+      title: 'Create a Token',
+      description: 'Deploy a standard, mintable, burnable, or taxable ERC20 token.',
+      icon: DollarSign,
+      href: '/create/token',
+      bgColor: 'bg-canvas-alt',
+      textColor: 'text-ink',
+      iconBg: 'bg-ink/10',
+    },
+    {
+      id: 'createPresale',
+      title: 'Create Launch',
+      description: 'Launch your token sale with configurable onchain parameters.',
+      icon: Sliders,
+      href: '/create/presale',
+      bgColor: 'bg-canvas-alt',
+      textColor: 'text-ink',
+      iconBg: 'bg-ink/10',
+    },
+    {
+      id: 'tokenLocker',
+      title: 'Locker',
+      description: 'Lock token and liquidity.',
+      icon: Lock,
+      href: '/tools/token-locker',
+      bgColor: 'bg-canvas-alt',
+      textColor: 'text-ink',
+      iconBg: 'bg-ink/10',
+    },
+    {
+      id: 'airdrop',
+      title: 'Airdrop / Multi-Send',
+      description: 'Send tokens or native currency to multiple addresses at once.',
+      icon: Send,
+      href: '/tools/airdrop',
+      bgColor: 'bg-canvas-alt',
+      textColor: 'text-ink',
+      iconBg: 'bg-ink/10',
+    },
+  ];
 
 const Tools: React.FC = () => {
   const { address } = useAccount();
@@ -152,7 +174,7 @@ const Tools: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {pausedTools.map((tool) => {
             const IconComponent = tool.icon;
-            const isEnabled = isAdmin;
+            const isEnabled = isAdmin || Boolean(tool.enabledForAll);
 
             if (isEnabled) {
               return (

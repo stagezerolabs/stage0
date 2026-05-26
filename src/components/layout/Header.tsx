@@ -54,6 +54,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     { path: '/', label: 'Home' },
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/presales', label: 'Launchpad' },
+    { path: '/domains', label: 'Names' },
     { path: '/tools', label: 'Tools' },
   ];
 

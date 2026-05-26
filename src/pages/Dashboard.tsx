@@ -10,9 +10,10 @@ import {
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
+import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
-import { ArrowRight, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
+import { ArrowRight, Globe, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
@@ -66,6 +67,7 @@ interface DashboardLockItem {
 
 const Dashboard: React.FC = () => {
   const { address, isConnected } = useAccount();
+  const { displayName: domainDisplayName } = useUserDomain(address);
   const [nftTypeFilter, setNftTypeFilter] = useState<'all' | 'erc721' | 'erc721a'>('all');
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const safeAddress = (address ?? zeroAddress) as Address;
@@ -275,7 +277,7 @@ const Dashboard: React.FC = () => {
               <span className="text-ink-muted">Welcome back, </span>
               <br className="sm:hidden" />
               <span className="text-accent-gradient font-mono text-body-lg sm:text-display-md">
-                {address.slice(0, 6)}...{address.slice(-4)}
+                {domainDisplayName ?? `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
             </>
           ) : (
@@ -285,6 +287,15 @@ const Dashboard: React.FC = () => {
             </>
           )}
         </h1>
+        {isConnected && !domainDisplayName ? (
+          <Link
+            to="/domains"
+            className="inline-flex items-center gap-2 text-body-sm text-ink-muted hover:text-ink transition-colors"
+          >
+            <Globe className="w-4 h-4" />
+            Mint a name for your dashboard
+          </Link>
+        ) : null}
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-12 gap-y-12">
@@ -323,11 +334,11 @@ const Dashboard: React.FC = () => {
 
             {isConnected ? (
               allocations.length === 0 &&
-              nftPurchaseAllocations.length === 0 &&
-              !hasStakedAllocation &&
-              !isPresalesLoading &&
-              !isContributionsLoading &&
-              !isNftHoldingsLoading ? (
+                nftPurchaseAllocations.length === 0 &&
+                !hasStakedAllocation &&
+                !isPresalesLoading &&
+                !isContributionsLoading &&
+                !isNftHoldingsLoading ? (
                 <div className="bg-canvas-alt rounded-3xl border border-border p-8 text-center">
                   <p className="text-body text-ink-muted">No allocations yet.</p>
                 </div>
@@ -393,8 +404,8 @@ const Dashboard: React.FC = () => {
                         holding.status === 'live'
                           ? 'live'
                           : holding.status === 'upcoming'
-                          ? 'upcoming'
-                          : 'closed';
+                            ? 'upcoming'
+                            : 'closed';
 
                       return (
                         <Link
@@ -601,8 +612,8 @@ const Dashboard: React.FC = () => {
                     const timerLabel = lock.withdrawn
                       ? 'Withdrawn'
                       : isUnlockable
-                      ? 'Ready now'
-                      : `in ${formatCountdownFromSeconds(secondsUntilUnlock)}`;
+                        ? 'Ready now'
+                        : `in ${formatCountdownFromSeconds(secondsUntilUnlock)}`;
 
                     return (
                       <Link
@@ -620,13 +631,12 @@ const Dashboard: React.FC = () => {
                         </span>
                         <span className="text-right">
                           <span
-                            className={`block text-[11px] uppercase tracking-wide ${
-                              lock.withdrawn
-                                ? 'text-ink-faint'
-                                : isUnlockable
+                            className={`block text-[11px] uppercase tracking-wide ${lock.withdrawn
+                              ? 'text-ink-faint'
+                              : isUnlockable
                                 ? 'text-status-live'
                                 : 'text-status-upcoming'
-                            }`}
+                              }`}
                           >
                             {statusLabel}
                           </span>

@@ -1,9 +1,8 @@
-/assets/*
-  Content-Type: application/javascript
-  Access-Control-Allow-Origin: *
+/*
+  Content-Security-Policy: img-src 'self' data: blob: https:;
 
 /assets/*.js
-  Content-Type: application/javascript
+  Content-Type: application/javascript; charset=utf-8
 
 /assets/*.css
-  Content-Type: text/css
+  Content-Type: text/css; charset=utf-8

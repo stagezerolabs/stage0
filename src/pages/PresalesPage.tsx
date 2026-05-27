@@ -8,6 +8,7 @@ import { formatEther, formatUnits } from 'viem';
 import { NFT_COLLECTION_IMAGES } from '@/config';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import PhaseCountdown from '@/components/ui/PhaseCountdown';
+import FallbackImage from '@/components/ui/fallback-image';
 import { resolveNFTSaleCountdown } from '@/lib/utils/nft-sales';
 import {
   Clock,
@@ -285,17 +286,16 @@ const PresalesPage: React.FC = () => {
                 <div key={presale.address}>
                   <Link to={`/presales/${presale.address}`} className="block h-full">
                     <div className="project-card rounded-3xl overflow-hidden space-y-0 h-full flex flex-col">
-                      {tokenImage ? (
-                        <img
-                          src={tokenImage}
-                          alt={presale.saleTokenName || saleTokenSymbol}
-                          className="w-full h-36 object-cover bg-ink/5"
-                        />
-                      ) : (
-                        <div className="w-full h-36 flex items-center justify-center bg-ink/5">
-                          <Image className="w-10 h-10 text-ink-faint" />
-                        </div>
-                      )}
+                      <FallbackImage
+                        src={tokenImage}
+                        alt={presale.saleTokenName || saleTokenSymbol}
+                        className="w-full h-36 object-cover bg-ink/5"
+                        placeholder={(
+                          <div className="w-full h-36 flex items-center justify-center bg-ink/5">
+                            <Image className="w-10 h-10 text-ink-faint" />
+                          </div>
+                        )}
+                      />
 
                       <div className="p-6 space-y-4 flex-1 flex flex-col">
                         <div className="flex items-start justify-between gap-3">
@@ -388,8 +388,7 @@ const PresalesPage: React.FC = () => {
                 deployment.maxSupply > 0n
                   ? Math.min(Number((deployment.totalMinted * 100n) / deployment.maxSupply), 100)
                   : 0;
-              const collectionImage =
-                deployment.metadataImage || NFT_COLLECTION_IMAGES[deployment.address.toLowerCase()];
+              const fallbackCollectionImage = NFT_COLLECTION_IMAGES[deployment.address.toLowerCase()];
               const saleCountdown = resolveNFTSaleCountdown({
                 status: deployment.status,
                 whitelistEnabled: deployment.whitelistEnabled,
@@ -404,17 +403,17 @@ const PresalesPage: React.FC = () => {
                   <Link to={`/nfts/${deployment.address}`} className="block h-full">
                     <div className="project-card rounded-3xl overflow-hidden space-y-0 h-full flex flex-col">
                       {/* Collection image */}
-                      {collectionImage ? (
-                        <img
-                          src={collectionImage}
-                          alt={deployment.name}
-                          className="w-full h-36 object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-36 flex items-center justify-center bg-ink/5">
-                          <Image className="w-10 h-10 text-ink-faint" />
-                        </div>
-                      )}
+                      <FallbackImage
+                        src={deployment.metadataImage}
+                        fallbackSrc={fallbackCollectionImage}
+                        alt={deployment.name}
+                        className="w-full h-36 object-cover"
+                        placeholder={(
+                          <div className="w-full h-36 flex items-center justify-center bg-ink/5">
+                            <Image className="w-10 h-10 text-ink-faint" />
+                          </div>
+                        )}
+                      />
 
                       <div className="p-6 space-y-4 flex-1 flex flex-col">
                         <div className="flex items-start justify-between gap-3">

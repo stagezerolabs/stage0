@@ -13,9 +13,13 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
+  Image as ImageIcon,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBlockchainStore } from '@/lib/store/blockchain-store';
+import FallbackImage from '@/components/ui/fallback-image';
+import { contractUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -97,6 +101,8 @@ const CreateTokenPage: React.FC = () => {
   const [symbol, setSymbol] = useState('');
   const [decimals, setDecimals] = useState('18');
   const [initialSupply, setInitialSupply] = useState('');
+  const [tokenImageURI, setTokenImageURI] = useState('');
+  const [tokenImagePreview, setTokenImagePreview] = useState('');
   const [recipient, setRecipient] = useState('');
   const [taxWallet, setTaxWallet] = useState('');
   const [taxBps, setTaxBps] = useState('');
@@ -241,6 +247,14 @@ const CreateTokenPage: React.FC = () => {
   }, [isReceiptError, receiptError]);
 
   useEffect(() => {
+    return () => {
+      if (tokenImagePreview) {
+        URL.revokeObjectURL(tokenImagePreview);
+      }
+    };
+  }, [tokenImagePreview]);
+
+  useEffect(() => {
     if (!isSuccess || !createdTokenAddress || !userAddress) return;
     const existing = getUserTokens(userAddress) ?? [];
     if (!existing.some((addr) => addr.toLowerCase() === createdTokenAddress.toLowerCase())) {
@@ -295,6 +309,24 @@ const CreateTokenPage: React.FC = () => {
       });
     }
   };
+
+  const handleTokenImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Select an image file for the token preview.');
+      event.target.value = '';
+      return;
+    }
+
+    setTokenImagePreview(URL.createObjectURL(file));
+  };
+
+  const normalizedTokenImagePreviewUri = normalizeContractURI(tokenImageURI.trim());
+  const tokenImagePreviewSrc =
+    tokenImagePreview ||
+    (normalizedTokenImagePreviewUri ? contractUriToHttp(normalizedTokenImagePreviewUri) : '');
 
   return (
     <motion.div
@@ -387,6 +419,51 @@ const CreateTokenPage: React.FC = () => {
               placeholder="1000000"
               className="input-field w-full"
             />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-body-sm text-ink-muted font-medium">Token Image URI</label>
+            <input
+              type="text"
+              value={tokenImageURI}
+              onChange={(e) => setTokenImageURI(e.target.value)}
+              placeholder="CID, ipfs://..., or https://..."
+              className="input-field w-full"
+            />
+            <p className="text-xs text-ink-faint">
+              Optional for now. ERC20 deployments do not store this onchain yet, so this is staged for the later metadata/database hookup.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_9rem] gap-4">
+            <label className="rounded-2xl border border-dashed border-border bg-canvas-alt p-4 cursor-pointer hover:border-accent/40 transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleTokenImageFileChange}
+                className="sr-only"
+              />
+              <span className="flex items-start gap-3">
+                <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                  <Upload className="w-5 h-5" />
+                </span>
+                <span className="space-y-1">
+                  <span className="block text-body-sm font-medium text-ink">Upload token image</span>
+                  <span className="block text-xs text-ink-faint">
+                    Preview-only until you wire storage. Paste the uploaded CID or URL above when available.
+                  </span>
+                </span>
+              </span>
+            </label>
+            <div className="h-36 rounded-2xl border border-border bg-canvas-alt overflow-hidden flex items-center justify-center">
+              <FallbackImage
+                src={tokenImagePreviewSrc}
+                alt="Token image preview"
+                className="w-full h-full object-cover"
+                placeholder={<ImageIcon className="w-8 h-8 text-ink-faint" />}
+              />
+            </div>
           </div>
         </div>
 

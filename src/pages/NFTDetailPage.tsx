@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   useAccount,
   useChainId,
+  usePublicClient,
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -23,14 +24,10 @@ import {
 } from 'lucide-react';
 import { NFTCollectionContract, NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
-import {
-  contractUriToHttp,
-  getContractMetadataCandidateUrls,
-  ipfsUriToHttp,
-  normalizeContractURI,
-} from '@/lib/utils/ipfs';
+import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
 import { getNFTActiveMintPrice, getNFTSalePhase, getNFTSaleStatus, resolveNFTSaleCountdown } from '@/lib/utils/nft-sales';
 import PhaseCountdown from '@/components/ui/PhaseCountdown';
+import FallbackImage from '@/components/ui/fallback-image';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -86,42 +83,6 @@ function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'white
   );
 }
 
-function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
-  const normalized = imageUri.trim();
-  if (!normalized) return '';
-
-  if (
-    normalized.startsWith('ipfs://') ||
-    normalized.startsWith('http://') ||
-    normalized.startsWith('https://')
-  ) {
-    return ipfsUriToHttp(normalized);
-  }
-
-  const metadataHttpUri = contractUriToHttp(metadataUri);
-  if (!metadataHttpUri) return ipfsUriToHttp(normalized);
-
-  let metadataBase = metadataHttpUri;
-  try {
-    const url = new URL(metadataHttpUri);
-    const pathname = url.pathname;
-    const lastSegment = pathname.split('/').filter(Boolean).pop() ?? '';
-    const looksLikeFile = /\.[a-z0-9]+$/i.test(lastSegment);
-    if (!pathname.endsWith('/') && !looksLikeFile) {
-      url.pathname = `${pathname}/`;
-    }
-    metadataBase = url.toString();
-  } catch {
-    if (!metadataBase.endsWith('/')) metadataBase = `${metadataBase}/`;
-  }
-
-  try {
-    return new URL(normalized, metadataBase).toString();
-  } catch {
-    return ipfsUriToHttp(normalized);
-  }
-}
-
 function formatTimestamp(ts: bigint): string {
   if (!ts || ts === 0n) return 'Not set';
   return new Date(Number(ts) * 1000).toLocaleString();
@@ -152,6 +113,7 @@ const NFTDetailPage: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
   const chainId = useChainId();
   const explorerUrl = getExplorerUrl(chainId);
+  const publicClient = usePublicClient();
 
   const isValidAddress = Boolean(collectionParam && isAddress(collectionParam));
   const collectionAddress = (isValidAddress ? collectionParam : undefined) as Address | undefined;
@@ -160,6 +122,8 @@ const NFTDetailPage: React.FC = () => {
 
   const [mintQty, setMintQty] = useState(1);
   const [contractMetadata, setContractMetadata] = useState<{ image?: string; description?: string } | null>(null);
+  const [isContractMetadataLoading, setIsContractMetadataLoading] = useState(false);
+  const [collectionImageRenderFailed, setCollectionImageRenderFailed] = useState(false);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
   const queries = useMemo(() => {
@@ -285,53 +249,30 @@ const NFTDetailPage: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const rawContractURI = collection?.contractURI?.trim() ?? '';
-    const metadataUri = normalizeContractURI(rawContractURI);
-
-    if (!metadataUri) {
+    if (!collection) {
       setContractMetadata(null);
+      setIsContractMetadataLoading(false);
       return;
     }
 
+    setIsContractMetadataLoading(true);
     (async () => {
       try {
-        const candidateUrls = getContractMetadataCandidateUrls(metadataUri);
-        if (candidateUrls.length === 0) throw new Error('No metadata URI candidates');
-
-        let metadata: Record<string, unknown> | null = null;
-        let resolvedMetadataUri = metadataUri;
-
-        for (const url of candidateUrls) {
-          try {
-            const response = await fetch(url);
-            if (!response.ok) continue;
-            const text = await response.text();
-            const parsed = JSON.parse(text) as Record<string, unknown>;
-            metadata = parsed;
-            resolvedMetadataUri = url;
-            break;
-          } catch {
-            continue;
-          }
-        }
-
-        if (!metadata) throw new Error('No metadata JSON found');
-
-        const image =
-          typeof metadata.image === 'string' && metadata.image.trim().length > 0
-            ? resolveMetadataImageUri(metadata.image, resolvedMetadataUri)
-            : undefined;
-        const description =
-          typeof metadata.description === 'string' && metadata.description.trim().length > 0
-            ? metadata.description.trim()
-            : undefined;
+        const metadata = await resolveCollectionDisplayMetadata({
+          contractUri: collection?.contractURI ?? '',
+          collectionAddress,
+          totalMinted: collection?.totalMinted ?? 0n,
+          publicClient,
+        });
 
         if (!cancelled) {
-          setContractMetadata({ image, description });
+          setContractMetadata(metadata);
+          setIsContractMetadataLoading(false);
         }
       } catch {
         if (!cancelled) {
           setContractMetadata(null);
+          setIsContractMetadataLoading(false);
         }
       }
     })();
@@ -339,7 +280,11 @@ const NFTDetailPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [collection?.contractURI]);
+  }, [collection, collectionAddress, publicClient]);
+
+  useEffect(() => {
+    setCollectionImageRenderFailed(false);
+  }, [contractMetadata?.image, collectionImage, collectionAddress]);
 
   const userMinted = useMemo(() => {
     if (!userStateData || userStateData.length === 0) return 0n;
@@ -434,7 +379,26 @@ const NFTDetailPage: React.FC = () => {
     return Math.min(Number((collection.totalMinted * 100n) / collection.maxSupply), 100);
   }, [collection]);
 
-  const resolvedCollectionImage = contractMetadata?.image || collectionImage;
+  const imageMetadataWarning = useMemo(() => {
+    if (!collection) return null;
+    const hasOnchainImageCandidate = Boolean(collection.contractURI.trim()) || collection.totalMinted > 0n;
+    const imageUnavailable =
+      !isContractMetadataLoading &&
+      hasOnchainImageCandidate &&
+      (!contractMetadata?.image || collectionImageRenderFailed);
+
+    if (!imageUnavailable) return null;
+
+    return collectionImage
+      ? 'On-chain image URI could not be resolved; showing fallback artwork.'
+      : 'On-chain image URI could not be resolved. The IPFS link may be invalid or unreachable.';
+  }, [
+    collection,
+    collectionImage,
+    collectionImageRenderFailed,
+    contractMetadata?.image,
+    isContractMetadataLoading,
+  ]);
 
   if (!isValidAddress) {
     return (
@@ -524,15 +488,21 @@ const NFTDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Image — left col, mobile: 1st */}
         <motion.div variants={itemVariants} className="lg:col-span-2 order-1 glass-card rounded-3xl overflow-hidden">
-          {resolvedCollectionImage ? (
-            <img
-              src={resolvedCollectionImage}
-              alt={collection.name}
-              className="w-full object-cover max-h-80"
-            />
-          ) : (
-            <div className="w-full h-48 flex items-center justify-center bg-ink/5">
-              <Image className="w-12 h-12 text-ink-faint" />
+          <FallbackImage
+            src={contractMetadata?.image}
+            fallbackSrc={collectionImage}
+            alt={collection.name}
+            className="w-full object-cover max-h-80"
+            onImageError={() => setCollectionImageRenderFailed(true)}
+            placeholder={(
+              <div className="w-full h-48 flex items-center justify-center bg-ink/5">
+                <Image className="w-12 h-12 text-ink-faint" />
+              </div>
+            )}
+          />
+          {imageMetadataWarning && (
+            <div className="border-t border-border/60 bg-canvas-alt/60 px-4 py-2">
+              <p className="text-xs text-ink-faint">{imageMetadataWarning}</p>
             </div>
           )}
         </motion.div>

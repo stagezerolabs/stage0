@@ -1,5 +1,6 @@
 import Dither from '@/components/animated/Dither';
 import CountUp from '@/components/ui/CountUp';
+import FallbackImage from '@/components/ui/fallback-image';
 import { NFT_COLLECTION_IMAGES } from '@/config';
 import { useNFTDeployments, type NFTDeploymentWithMetadata } from '@/lib/hooks/useNFTDeployments';
 import { useLaunchpadPresales, type PresaleWithStatus } from '@/lib/hooks/useLaunchpadPresales';
@@ -270,6 +271,7 @@ type FeaturedLaunch = {
   raisedDisplay: string;
   capDisplay: string;
   image?: string;
+  fallbackImage?: string;
   link: string;
   /** Normalized raised value in ETH for sorting */
   sortRaised: number;
@@ -306,7 +308,8 @@ function nftDeploymentToFeatured(d: NFTDeploymentWithMetadata): FeaturedLaunch {
     progress: mintedPercent,
     raisedDisplay: `${d.totalMinted.toString()} / ${d.maxSupply.toString()} minted`,
     capDisplay: `${formatUnits(d.mintPrice, 18)} ETH each`,
-    image: d.metadataImage || NFT_COLLECTION_IMAGES[d.address.toLowerCase()],
+    image: d.metadataImage,
+    fallbackImage: NFT_COLLECTION_IMAGES[d.address.toLowerCase()],
     link: `/nfts/${d.address}`,
     sortRaised: Number(formatUnits(d.mintPrice * d.totalMinted, 18)),
   };
@@ -675,7 +678,13 @@ const HomePage: React.FC = () => {
         </motion.section>
 
         {/* ─── Featured Presales w/ Carousel/Grid ─── */}
-        <motion.section variants={itemVariants} className="space-y-10">
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-50px' }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          className="space-y-10"
+        >
           <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ink/5 border border-ink/10 text-xs font-semibold uppercase tracking-widest text-ink-muted">
@@ -739,17 +748,17 @@ const HomePage: React.FC = () => {
                             <div className="group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-border transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
                               {/* Card Image Header */}
                               <div className="relative h-48 w-full overflow-hidden">
-                                {item.image ? (
-                                  <img
-                                    src={item.image}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-ink/5">
-                                    <span className="font-display text-4xl font-bold text-ink/20">{item.symbol}</span>
-                                  </div>
-                                )}
+                                <FallbackImage
+                                  src={item.image}
+                                  fallbackSrc={item.fallbackImage}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                  placeholder={(
+                                    <div className="w-full h-full flex items-center justify-center bg-ink/5">
+                                      <span className="font-display text-4xl font-bold text-ink/20">{item.symbol}</span>
+                                    </div>
+                                  )}
+                                />
                                 <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
                                 {/* Status badge */}
                                 <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${isLive

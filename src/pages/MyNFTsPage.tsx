@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import FallbackImage from '@/components/ui/fallback-image';
 import { useUserOwnedNFTTokens } from '@/lib/hooks/useUserOwnedNFTTokens';
 import { ArrowRight, Image, Wallet } from 'lucide-react';
 import React, { useMemo } from 'react';
@@ -126,17 +127,16 @@ const MyNFTsPage: React.FC = () => {
                   key={`${token.collectionAddress}-${token.tokenId.toString()}`}
                   className="project-card rounded-3xl overflow-hidden flex flex-col"
                 >
-                  {token.image ? (
-                    <img
-                      src={token.image}
-                      alt={token.metadataName || `${token.collectionSymbol} #${token.tokenId.toString()}`}
-                      className="w-full h-40 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-40 bg-canvas-alt border-b border-border flex items-center justify-center">
-                      <Image className="w-8 h-8 text-ink-faint" />
-                    </div>
-                  )}
+                  <FallbackImage
+                    src={token.image}
+                    alt={token.metadataName || `${token.collectionSymbol} #${token.tokenId.toString()}`}
+                    className="w-full h-40 object-cover"
+                    placeholder={(
+                      <div className="w-full h-40 bg-canvas-alt border-b border-border flex items-center justify-center">
+                        <Image className="w-8 h-8 text-ink-faint" />
+                      </div>
+                    )}
+                  />
 
                   <div className="p-5 space-y-4 flex-1 flex flex-col">
                     <div className="flex items-start justify-between gap-3">

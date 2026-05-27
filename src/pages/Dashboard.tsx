@@ -1,6 +1,8 @@
 import { Badge } from '@/components/ui/badge';
+import FallbackImage from '@/components/ui/fallback-image';
 import {
   LaunchpadPresaleContract,
+  NFT_COLLECTION_IMAGES,
   StakingContract,
   erc20Abi,
   getExplorerUrl,
@@ -10,9 +12,11 @@ import {
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
+import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
-import { ArrowRight, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
+import { useIsAdmin } from '@/lib/utils/admin';
+import { ArrowRight, Globe, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
@@ -66,6 +70,8 @@ interface DashboardLockItem {
 
 const Dashboard: React.FC = () => {
   const { address, isConnected } = useAccount();
+  const { displayName: domainDisplayName } = useUserDomain(address);
+  const { isAdmin } = useIsAdmin(address as Address | undefined);
   const [nftTypeFilter, setNftTypeFilter] = useState<'all' | 'erc721' | 'erc721a'>('all');
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const safeAddress = (address ?? zeroAddress) as Address;
@@ -275,7 +281,7 @@ const Dashboard: React.FC = () => {
               <span className="text-ink-muted">Welcome back, </span>
               <br className="sm:hidden" />
               <span className="text-accent-gradient font-mono text-body-lg sm:text-display-md">
-                {address.slice(0, 6)}...{address.slice(-4)}
+                {domainDisplayName ?? `${address.slice(0, 6)}...${address.slice(-4)}`}
               </span>
             </>
           ) : (
@@ -285,6 +291,15 @@ const Dashboard: React.FC = () => {
             </>
           )}
         </h1>
+        {isConnected && isAdmin && !domainDisplayName ? (
+          <Link
+            to="/domains"
+            className="inline-flex items-center gap-2 text-body-sm text-ink-muted hover:text-ink transition-colors"
+          >
+            <Globe className="w-4 h-4" />
+            Mint a name for your dashboard
+          </Link>
+        ) : null}
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-12 gap-y-12">
@@ -404,11 +419,13 @@ const Dashboard: React.FC = () => {
                         >
                           <div className="col-span-4 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
-                              {holding.metadataImage ? (
-                                <img src={holding.metadataImage} alt={holding.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Image className="w-4 h-4 text-ink-muted" />
-                              )}
+                              <FallbackImage
+                                src={holding.metadataImage}
+                                fallbackSrc={NFT_COLLECTION_IMAGES[holding.address.toLowerCase()]}
+                                alt={holding.name}
+                                className="w-full h-full object-cover"
+                                placeholder={<Image className="w-4 h-4 text-ink-muted" />}
+                              />
                             </div>
                             <div>
                               <p className="text-body font-medium text-ink group-hover:text-accent transition-colors duration-300">
@@ -720,13 +737,24 @@ const Dashboard: React.FC = () => {
                         className="rounded-xl bg-canvas/40 px-3 py-3 space-y-2"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <p className="text-body-sm font-medium text-ink">
-                              {collection.name}
-                            </p>
-                            <p className="text-label text-ink-faint font-mono">
-                              {collection.symbol}
-                            </p>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden shrink-0">
+                              <FallbackImage
+                                src={collection.metadataImage}
+                                fallbackSrc={NFT_COLLECTION_IMAGES[collection.address.toLowerCase()]}
+                                alt={collection.name}
+                                className="w-full h-full object-cover"
+                                placeholder={<Image className="w-4 h-4 text-ink-muted" />}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-body-sm font-medium text-ink truncate">
+                                {collection.name}
+                              </p>
+                              <p className="text-label text-ink-faint font-mono">
+                                {collection.symbol}
+                              </p>
+                            </div>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Badge variant={statusVariant}>
@@ -810,11 +838,13 @@ const Dashboard: React.FC = () => {
                     >
                       <span className="flex items-center gap-2">
                         <span className="w-7 h-7 rounded-lg bg-canvas border border-border flex items-center justify-center overflow-hidden">
-                          {holding.metadataImage ? (
-                            <img src={holding.metadataImage} alt={holding.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <Image className="w-3.5 h-3.5 text-ink-muted" />
-                          )}
+                          <FallbackImage
+                            src={holding.metadataImage}
+                            fallbackSrc={NFT_COLLECTION_IMAGES[holding.address.toLowerCase()]}
+                            alt={holding.name}
+                            className="w-full h-full object-cover"
+                            placeholder={<Image className="w-3.5 h-3.5 text-ink-muted" />}
+                          />
                         </span>
                         <span>{holding.symbol}</span>
                       </span>

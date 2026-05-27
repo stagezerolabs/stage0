@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, Lock, Sliders, Send, Image, ArrowRight } from 'lucide-react';
+import { DollarSign, Globe, Lock, Sliders, Send, Image, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import type { Address } from 'viem';
@@ -43,7 +43,18 @@ const cardVariants = {
   },
 };
 
-const tools = [
+const tools: Array<{
+  id: string;
+  title: string;
+  description: string;
+  icon: typeof Globe;
+  href: string;
+  bgColor: string;
+  textColor: string;
+  iconBg: string;
+  enabledForAll?: boolean;
+  adminOnly?: boolean;
+}> = [
   {
     id: 'nft',
     title: 'Create an NFT',
@@ -53,6 +64,18 @@ const tools = [
     bgColor: 'bg-canvas-alt',
     textColor: 'text-ink',
     iconBg: 'bg-ink/10',
+    enabledForAll: true,
+  },
+  {
+    id: 'domains',
+    title: 'Mint a Name',
+    description: 'Claim a test .rise name stored locally for your dashboard.',
+    icon: Globe,
+    href: '/domains',
+    bgColor: 'bg-canvas-alt',
+    textColor: 'text-ink',
+    iconBg: 'bg-ink/10',
+    adminOnly: true,
   },
   {
     id: 'createToken',
@@ -100,7 +123,7 @@ const Tools: React.FC = () => {
   const { address } = useAccount();
   const { isAdmin } = useIsAdmin(address as Address | undefined);
   const featuredTool = tools[0];
-  const pausedTools = tools.slice(1);
+  const pausedTools = tools.slice(1).filter((tool) => isAdmin || !tool.adminOnly);
   const FeaturedIcon = featuredTool.icon;
 
   return (
@@ -116,7 +139,7 @@ const Tools: React.FC = () => {
           Create & Manage
         </h1>
         <p className="text-body-lg text-ink-muted max-w-2xl">
-          NFT creation is currently live. Additional launch tools are rolling out soon.
+          NFT creation and Rise names are currently live. Additional launch tools are rolling out soon.
         </p>
       </motion.section>
 
@@ -148,11 +171,11 @@ const Tools: React.FC = () => {
       </motion.section>
 
       <motion.section variants={itemVariants} className="space-y-4">
-        <h2 className="font-display text-display-sm text-ink">{isAdmin ? 'Creator Tools' : 'Coming Soon'}</h2>
+        <h2 className="font-display text-display-sm text-ink">{isAdmin ? 'Creator Tools' : 'More Tools'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {pausedTools.map((tool) => {
             const IconComponent = tool.icon;
-            const isEnabled = isAdmin;
+            const isEnabled = isAdmin || Boolean(tool.enabledForAll);
 
             if (isEnabled) {
               return (

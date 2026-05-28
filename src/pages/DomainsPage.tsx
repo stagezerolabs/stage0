@@ -422,7 +422,6 @@ const DomainsPage: React.FC = () => {
                       onClick={handleSearchSubmit}
                       className="btn-primary py-2 px-5 bg-accent hover:bg-accent-hover text-accent-foreground rounded-xl flex items-center gap-1.5 font-display text-[13px] font-semibold tracking-tight shadow-md"
                     >
-                      <Sparkles className="w-4 h-4" />
                       Search
                     </button>
                   </div>

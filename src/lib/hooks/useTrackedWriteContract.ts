@@ -29,7 +29,7 @@ export function useTrackedWriteContract() {
   const metaRef = useRef<CallMeta | null>(null);
 
   // Wrap writeContract to log at submission time
-  const writeContract: typeof wagmiWriteContract = (params) => {
+  const writeContract = ((params: any, options?: any) => {
     const { address, functionName, args, value } = params as {
       address: string;
       functionName: string;
@@ -38,8 +38,8 @@ export function useTrackedWriteContract() {
     };
     metaRef.current = { address, functionName, args, value };
     onchainLog.submit(address, functionName, args, value);
-    wagmiWriteContract(params);
-  };
+    wagmiWriteContract(params, options);
+  }) as typeof wagmiWriteContract;
 
   useEffect(() => {
     if (hash) onchainLog.hash(hash, metaRef.current?.functionName);

@@ -28,10 +28,8 @@ import {
   CornerDownLeft,
   Sparkles,
   Trash2,
-  ArrowUpDown,
   ArrowRight,
-  History,
-  Coins
+  History
 } from 'lucide-react';
 
 const itemVariants = {
@@ -86,6 +84,8 @@ const DomainsPage: React.FC = () => {
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
   const [offerAmount, setOfferAmount] = useState('');
   const [isSubmittingOffer, setIsSubmittingOffer] = useState(false);
+
+
 
   // Availability & Suffix Hook Logic
   const normalized = useMemo(() => normalizeDomainName(submittedQuery), [submittedQuery]);
@@ -195,6 +195,8 @@ const DomainsPage: React.FC = () => {
     setSubmittedQuery(name);
     addToHistory(name);
   };
+
+
 
   // Submit Offer Modal Handler
   const handleOfferSubmit = (e: React.FormEvent) => {
@@ -415,9 +417,6 @@ const DomainsPage: React.FC = () => {
                     spellCheck={false}
                   />
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-ink-faint select-none">
-                      <CornerDownLeft className="w-3.5 h-3.5" /> Enter
-                    </span>
                     <button
                       onClick={handleSearchSubmit}
                       className="btn-primary py-2 px-5 bg-accent hover:bg-accent-hover text-accent-foreground rounded-xl flex items-center gap-1.5 font-display text-[13px] font-semibold tracking-tight shadow-md"
@@ -427,9 +426,6 @@ const DomainsPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              </div>
-              <div className="flex justify-between px-2 text-[10px] text-ink-faint font-mono">
-                <span>{query.length}/100 Characters</span>
               </div>
             </div>
 
@@ -512,81 +508,75 @@ const DomainsPage: React.FC = () => {
                   ) : validation.valid ? (
                     available ? (
                       /* AVAILABLE CARD */
-                      <div className="relative overflow-hidden glass-card rounded-3xl p-6 md:p-8 border border-accent/30 hover:border-accent/60 shadow-float flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                        <div className="space-y-1.5 max-w-md">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border border-accent/40 bg-accent/15 text-accent shadow-sm">
+                      <div className="relative overflow-hidden glass-card rounded-3xl p-6 md:p-8 border border-accent/20 hover:border-accent/40 shadow-float flex flex-col justify-between gap-6">
+                        {/* Top row: Badge on left, Price & Conversion on right */}
+                        <div className="flex justify-between items-center w-full">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-[4px] text-xs font-semibold tracking-wide uppercase border border-[#4CD6FF] text-[#4CD6FF] bg-[#4CD6FF]/5 shadow-sm">
                             Available
                           </span>
-                          <div className="font-display text-2xl font-bold text-ink flex items-baseline">
-                            <span>{normalized}</span>
-                            <span className="text-accent">.rise</span>
-                          </div>
-                          <div className="text-body-sm text-ink-muted flex items-center gap-2 mt-1">
-                            <span className="font-mono text-ink-faint">
-                              (~${usdValue} USD)
-                            </span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-border-strong" />
-                            <span className="inline-flex items-center gap-1 text-ink font-semibold">
-                              <Coins className="w-3.5 h-3.5 text-accent-secondary" />
-                              {formatEther(registerPrice)} ETH / year
+
+                          <div className="flex items-center gap-2 select-none">
+                            <span className="font-display text-lg md:text-xl font-bold text-ink">
+                              {formatEther(registerPrice)} ETH
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 w-full md:w-auto shrink-0 mt-2 md:mt-0">
-                          {!isCorrectChain ? (
-                            <button
-                              type="button"
-                              onClick={() => switchChain({ chainId: riseTestnet.id })}
-                              disabled={isSwitchingChain}
-                              className="btn-secondary w-full flex items-center justify-center gap-2 text-status-error border-status-error disabled:opacity-60 disabled:cursor-not-allowed text-body-sm font-semibold"
-                            >
-                              <AlertTriangle className="w-4 h-4 shrink-0" />
-                              {isSwitchingChain ? 'Switching…' : 'Switch Network'}
-                            </button>
-                          ) : (
-                            <>
-                              {!hasSufficientBalance && !isRegisterQuoteLoading && registerPrice > 0n ? (
-                                <div className="text-right space-y-1.5 mr-2">
-                                  <p className="text-[11px] text-status-error flex items-center gap-1 font-semibold">
-                                    <AlertTriangle className="w-3.5 h-3.5" /> Insufficient ETH
-                                  </p>
-                                  <p className="text-[10px] text-ink-faint font-mono">
-                                    Need {formatEther(registerPrice)} ETH (Have {formatEther(userBalance)} ETH)
-                                  </p>
-                                </div>
-                              ) : null}
+                        {/* Bottom row: Name on left, Buttons on right */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 w-full">
+                          <div className="font-display text-2xl md:text-3xl font-bold text-ink break-all max-w-md flex flex-wrap items-baseline gap-0.5">
+                            <span>{normalized}</span>
+                            <span className="text-ink-faint font-semibold">.rise</span>
+                          </div>
+
+                          <div className="flex items-center gap-4 shrink-0 w-full md:w-auto mt-4 md:mt-0 justify-end">
+                            {!isCorrectChain ? (
                               <button
                                 type="button"
-                                onClick={handleRegister}
-                                disabled={
-                                  isRegistering ||
-                                  isOwnedLoading ||
-                                  !hasSufficientBalance ||
-                                  isRegisterQuoteLoading
-                                }
-                                className="btn-primary py-2.5 px-6 font-display font-semibold hover:scale-102 active:scale-98 transition-all flex items-center gap-2 text-body-sm flex-1 md:flex-initial"
+                                onClick={() => switchChain({ chainId: riseTestnet.id })}
+                                disabled={isSwitchingChain}
+                                className="btn-secondary w-full md:w-auto flex items-center justify-center gap-2 text-status-error border-status-error disabled:opacity-60 disabled:cursor-not-allowed text-body-sm font-semibold py-2.5 px-6"
                               >
-                                {isRegistering ? (
-                                  <>
-                                    <div className="h-4 w-4 border-2 border-accent-foreground border-t-transparent rounded-full animate-spin shrink-0" />
-                                    Confirming…
-                                  </>
-                                ) : isRegisterQuoteLoading ? (
-                                  'Loading…'
-                                ) : (
-                                  `Register`
-                                )}
+                                <AlertTriangle className="w-4 h-4 shrink-0" />
+                                {isSwitchingChain ? 'Switching…' : 'Switch Network'}
                               </button>
-                              <button
-                                type="button"
-                                className="p-2.5 border border-border hover:border-ink-muted rounded-xl bg-canvas-alt text-ink hover:text-accent transition-colors shrink-0"
-                                aria-label="Transfer or Swap Options"
-                              >
-                                <ArrowUpDown className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                            ) : (
+                              <>
+                                {!hasSufficientBalance && !isRegisterQuoteLoading && registerPrice > 0n ? (
+                                  <div className="text-right space-y-1 mr-2">
+                                    <p className="text-[11px] text-status-error flex items-center gap-1 font-semibold">
+                                      <AlertTriangle className="w-3.5 h-3.5" /> Insufficient ETH
+                                    </p>
+                                    <p className="text-[10px] text-ink-faint font-mono">
+                                      Need {formatEther(registerPrice)} ETH (Have {formatEther(userBalance)} ETH)
+                                    </p>
+                                  </div>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={handleRegister}
+                                  disabled={
+                                    isRegistering ||
+                                    isOwnedLoading ||
+                                    !hasSufficientBalance ||
+                                    isRegisterQuoteLoading
+                                  }
+                                  className="btn-primary py-2.5 px-6 bg-[#A5F95A] hover:bg-[#92E446] text-black font-semibold rounded-xl text-body-sm shadow-md shadow-[#A5F95A]/10 active:scale-98 transition-all flex items-center gap-2 flex-1 md:flex-initial"
+                                >
+                                  {isRegistering ? (
+                                    <>
+                                      <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                                      Confirming…
+                                    </>
+                                  ) : isRegisterQuoteLoading ? (
+                                    'Loading…'
+                                  ) : (
+                                    `Register`
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -629,7 +619,7 @@ const DomainsPage: React.FC = () => {
                           ) : null}
                         </div>
 
-                        <div className="w-full md:w-auto shrink-0 mt-2 md:mt-0">
+                        <div className="flex items-center gap-4 shrink-0 w-full md:w-auto mt-4 md:mt-0 justify-end">
                           <button
                             type="button"
                             disabled
@@ -759,6 +749,8 @@ const DomainsPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+
     </motion.div>
   );
 };

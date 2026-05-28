@@ -67,20 +67,21 @@ const AdminWhitelistPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-3">
+      <div className="page-hero-card">
         <Link to="/admin" className="inline-flex items-center gap-2 text-body-sm text-ink-muted hover:text-ink">
           <ArrowLeft className="w-4 h-4" />
           Back to Admin
         </Link>
-        <div>
-          <h1 className="font-display text-display-lg text-ink">Whitelist Creators</h1>
-          <p className="text-body text-ink-muted">
+        <div className="mt-4">
+          <div className="eyebrow">Access control</div>
+          <h1 className="ds-h1 mt-2">Whitelist Creators</h1>
+          <p className="text-body text-ink-muted mt-3">
             Control who can create launches directly from Stage0.
           </p>
         </div>
       </div>
 
-      <div className="glass-card rounded-3xl p-6 space-y-4">
+      <div className="tool-surface-card p-6 space-y-4">
         <h2 className="font-display text-display-sm text-ink">Check Status</h2>
         <p className="text-body-sm text-ink-muted">
           Enter a wallet to verify if it is whitelisted.
@@ -117,7 +118,7 @@ const AdminWhitelistPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="glass-card rounded-3xl p-6 space-y-4">
+        <div className="tool-surface-card p-6 space-y-4">
           <div className="flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-accent" />
             <h2 className="font-display text-display-sm text-ink">Add Creator</h2>
@@ -140,7 +141,7 @@ const AdminWhitelistPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="glass-card rounded-3xl p-6 space-y-4">
+        <div className="tool-surface-card p-6 space-y-4">
           <div className="flex items-center gap-2">
             <UserMinus className="w-5 h-5 text-status-error" />
             <h2 className="font-display text-display-sm text-ink">Remove Creator</h2>

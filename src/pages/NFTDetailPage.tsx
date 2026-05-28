@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   useAccount,
   useChainId,
+  usePublicClient,
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -19,18 +20,16 @@ import {
   Loader2,
   Shield,
   Users,
-  Layers,
 } from 'lucide-react';
 import { NFTCollectionContract, NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import {
-  contractUriToHttp,
-  getContractMetadataCandidateUrls,
-  ipfsUriToHttp,
-  normalizeContractURI,
-} from '@/lib/utils/ipfs';
+  fetchTokenDisplayMetadata,
+  resolveCollectionDisplayMetadata,
+  type TokenMetadataAttribute,
+} from '@/lib/utils/nft-metadata';
 import { getNFTActiveMintPrice, getNFTSalePhase, getNFTSaleStatus, resolveNFTSaleCountdown } from '@/lib/utils/nft-sales';
-import PhaseCountdown from '@/components/ui/PhaseCountdown';
+import FallbackImage from '@/components/ui/fallback-image';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -50,11 +49,13 @@ const itemVariants = {
   },
 };
 
+type NFTInfoTab = 'overview' | 'traits' | 'details';
+
 function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'whitelist' | 'public' | 'upcoming' | 'ended') {
   if (status === 'live' && salePhase === 'whitelist') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-accent/10 text-accent">
-        <Shield className="w-3.5 h-3.5" />
+      <span className="status-pill bg-accent/10 text-accent">
+        <Shield className="status-pill-icon" />
         Whitelist Live
       </span>
     );
@@ -62,8 +63,8 @@ function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'white
 
   if (status === 'live') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-live-bg text-status-live">
-        <span className="w-2 h-2 rounded-full bg-status-live animate-pulse" />
+      <span className="status-pill bg-status-live-bg text-status-live">
+        <span className="status-pill-dot" />
         Public Live
       </span>
     );
@@ -71,55 +72,19 @@ function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'white
 
   if (status === 'upcoming') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-upcoming-bg text-status-upcoming">
-        <Clock className="w-3.5 h-3.5" />
+      <span className="status-pill bg-status-upcoming-bg text-status-upcoming">
+        <Clock className="status-pill-icon" />
         Upcoming
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-closed-bg text-status-closed">
-      <CheckCircle2 className="w-3.5 h-3.5" />
+    <span className="status-pill bg-status-closed-bg text-status-closed">
+      <CheckCircle2 className="status-pill-icon" />
       Ended
     </span>
   );
-}
-
-function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
-  const normalized = imageUri.trim();
-  if (!normalized) return '';
-
-  if (
-    normalized.startsWith('ipfs://') ||
-    normalized.startsWith('http://') ||
-    normalized.startsWith('https://')
-  ) {
-    return ipfsUriToHttp(normalized);
-  }
-
-  const metadataHttpUri = contractUriToHttp(metadataUri);
-  if (!metadataHttpUri) return ipfsUriToHttp(normalized);
-
-  let metadataBase = metadataHttpUri;
-  try {
-    const url = new URL(metadataHttpUri);
-    const pathname = url.pathname;
-    const lastSegment = pathname.split('/').filter(Boolean).pop() ?? '';
-    const looksLikeFile = /\.[a-z0-9]+$/i.test(lastSegment);
-    if (!pathname.endsWith('/') && !looksLikeFile) {
-      url.pathname = `${pathname}/`;
-    }
-    metadataBase = url.toString();
-  } catch {
-    if (!metadataBase.endsWith('/')) metadataBase = `${metadataBase}/`;
-  }
-
-  try {
-    return new URL(normalized, metadataBase).toString();
-  } catch {
-    return ipfsUriToHttp(normalized);
-  }
 }
 
 function formatTimestamp(ts: bigint): string {
@@ -147,11 +112,29 @@ function formatCountdown(targetTime: bigint | undefined, nowSec: number): string
     .padStart(2, '0')}s`;
 }
 
+// Always shows seconds — for live ticking countdown displays.
+function formatCountdownLive(diff: number): string {
+  if (diff <= 0) return '00h 00m 00s';
+
+  const days = Math.floor(diff / 86400);
+  const hours = Math.floor((diff % 86400) / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  const seconds = diff % 60;
+
+  const hh = hours.toString().padStart(2, '0');
+  const mm = minutes.toString().padStart(2, '0');
+  const ss = seconds.toString().padStart(2, '0');
+
+  if (days > 0) return `${days}d ${hh}h ${mm}m ${ss}s`;
+  return `${hh}h ${mm}m ${ss}s`;
+}
+
 const NFTDetailPage: React.FC = () => {
   const { address: collectionParam } = useParams<{ address: string }>();
   const { address: userAddress, isConnected } = useAccount();
   const chainId = useChainId();
   const explorerUrl = getExplorerUrl(chainId);
+  const publicClient = usePublicClient();
 
   const isValidAddress = Boolean(collectionParam && isAddress(collectionParam));
   const collectionAddress = (isValidAddress ? collectionParam : undefined) as Address | undefined;
@@ -160,7 +143,12 @@ const NFTDetailPage: React.FC = () => {
 
   const [mintQty, setMintQty] = useState(1);
   const [contractMetadata, setContractMetadata] = useState<{ image?: string; description?: string } | null>(null);
+  const [isContractMetadataLoading, setIsContractMetadataLoading] = useState(false);
+  const [collectionImageRenderFailed, setCollectionImageRenderFailed] = useState(false);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+  const [infoTab, setInfoTab] = useState<NFTInfoTab>('overview');
+  const [sampleTraits, setSampleTraits] = useState<TokenMetadataAttribute[]>([]);
+  const [isSampleTraitsLoading, setIsSampleTraitsLoading] = useState(false);
 
   const queries = useMemo(() => {
     if (!collectionAddress) return [];
@@ -285,53 +273,30 @@ const NFTDetailPage: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const rawContractURI = collection?.contractURI?.trim() ?? '';
-    const metadataUri = normalizeContractURI(rawContractURI);
-
-    if (!metadataUri) {
+    if (!collection) {
       setContractMetadata(null);
+      setIsContractMetadataLoading(false);
       return;
     }
 
+    setIsContractMetadataLoading(true);
     (async () => {
       try {
-        const candidateUrls = getContractMetadataCandidateUrls(metadataUri);
-        if (candidateUrls.length === 0) throw new Error('No metadata URI candidates');
-
-        let metadata: Record<string, unknown> | null = null;
-        let resolvedMetadataUri = metadataUri;
-
-        for (const url of candidateUrls) {
-          try {
-            const response = await fetch(url);
-            if (!response.ok) continue;
-            const text = await response.text();
-            const parsed = JSON.parse(text) as Record<string, unknown>;
-            metadata = parsed;
-            resolvedMetadataUri = url;
-            break;
-          } catch {
-            continue;
-          }
-        }
-
-        if (!metadata) throw new Error('No metadata JSON found');
-
-        const image =
-          typeof metadata.image === 'string' && metadata.image.trim().length > 0
-            ? resolveMetadataImageUri(metadata.image, resolvedMetadataUri)
-            : undefined;
-        const description =
-          typeof metadata.description === 'string' && metadata.description.trim().length > 0
-            ? metadata.description.trim()
-            : undefined;
+        const metadata = await resolveCollectionDisplayMetadata({
+          contractUri: collection?.contractURI ?? '',
+          collectionAddress,
+          totalMinted: collection?.totalMinted ?? 0n,
+          publicClient,
+        });
 
         if (!cancelled) {
-          setContractMetadata({ image, description });
+          setContractMetadata(metadata);
+          setIsContractMetadataLoading(false);
         }
       } catch {
         if (!cancelled) {
           setContractMetadata(null);
+          setIsContractMetadataLoading(false);
         }
       }
     })();
@@ -339,7 +304,59 @@ const NFTDetailPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [collection?.contractURI]);
+  }, [collection, collectionAddress, publicClient]);
+
+  useEffect(() => {
+    setCollectionImageRenderFailed(false);
+  }, [contractMetadata?.image, collectionImage, collectionAddress]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!collectionAddress || !publicClient || !collection || collection.totalMinted <= 0n) {
+      setSampleTraits([]);
+      setIsSampleTraitsLoading(false);
+      return;
+    }
+
+    setIsSampleTraitsLoading(true);
+    setSampleTraits([]);
+
+    (async () => {
+      for (const tokenId of [1n, 0n]) {
+        try {
+          const tokenUri = await publicClient.readContract({
+            abi: NFTCollectionContract,
+            address: collectionAddress,
+            functionName: 'tokenURI',
+            args: [tokenId],
+          });
+
+          if (typeof tokenUri !== 'string' || !tokenUri.trim()) continue;
+
+          const tokenMetadata = await fetchTokenDisplayMetadata(tokenUri);
+          if (tokenMetadata?.attributes?.length) {
+            if (!cancelled) {
+              setSampleTraits(tokenMetadata.attributes.slice(0, 8));
+              setIsSampleTraitsLoading(false);
+            }
+            return;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (!cancelled) {
+        setSampleTraits([]);
+        setIsSampleTraitsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [collection, collectionAddress, publicClient]);
 
   const userMinted = useMemo(() => {
     if (!userStateData || userStateData.length === 0) return 0n;
@@ -434,7 +451,26 @@ const NFTDetailPage: React.FC = () => {
     return Math.min(Number((collection.totalMinted * 100n) / collection.maxSupply), 100);
   }, [collection]);
 
-  const resolvedCollectionImage = contractMetadata?.image || collectionImage;
+  const imageMetadataWarning = useMemo(() => {
+    if (!collection) return null;
+    const hasOnchainImageCandidate = Boolean(collection.contractURI.trim()) || collection.totalMinted > 0n;
+    const imageUnavailable =
+      !isContractMetadataLoading &&
+      hasOnchainImageCandidate &&
+      (!contractMetadata?.image || collectionImageRenderFailed);
+
+    if (!imageUnavailable) return null;
+
+    return collectionImage
+      ? 'On-chain image URI could not be resolved; showing fallback artwork.'
+      : 'On-chain image URI could not be resolved. The IPFS link may be invalid or unreachable.';
+  }, [
+    collection,
+    collectionImage,
+    collectionImageRenderFailed,
+    contractMetadata?.image,
+    isContractMetadataLoading,
+  ]);
 
   if (!isValidAddress) {
     return (
@@ -469,20 +505,99 @@ const NFTDetailPage: React.FC = () => {
 
   const whitelistStartsIn = collection.whitelistEnabled
     ? whitelistStartSec > nowSec
-      ? 'Scheduled'
+      ? formatCountdown(collection.whitelistStart, nowSec)
       : publicStartSec > nowSec
-      ? 'Active'
+      ? 'Live'
       : 'Ended'
     : 'Disabled';
 
-  const publicStartsIn = publicStartSec > nowSec ? 'Scheduled' : collection.status === 'ended' ? 'Ended' : 'Active';
+  const publicStartsIn =
+    publicStartSec > nowSec
+      ? formatCountdown(collection.saleStart, nowSec)
+      : collection.status === 'ended'
+      ? 'Ended'
+      : 'Live';
 
   const saleEndsIn =
     collection.saleEnd === 0n
       ? 'No end date'
       : saleEndSec > nowSec
-      ? 'Active'
+      ? formatCountdown(collection.saleEnd, nowSec)
       : 'Ended';
+
+  const collectionDescription =
+    contractMetadata?.description?.trim() ||
+    'Mint from this collection directly on RISE. Sale timing, pricing, and wallet limits are read from the collection contract.';
+
+  const salePhaseSteps = [
+    {
+      name: 'Whitelist',
+      state: !collection.whitelistEnabled
+        ? 'skipped'
+        : collection.salePhase === 'whitelist'
+        ? 'active'
+        : collection.salePhase === 'public' || collection.status === 'ended'
+        ? 'completed'
+        : 'upcoming',
+      sub: !collection.whitelistEnabled
+        ? 'Disabled for this drop'
+        : collection.salePhase === 'whitelist'
+        ? `${formatEther(collection.whitelistPrice)} ETH · live now`
+        : collection.salePhase === 'public' || collection.status === 'ended'
+        ? 'Completed'
+        : whitelistStartsIn,
+    },
+    {
+      name: 'Public mint',
+      state:
+        collection.salePhase === 'public'
+          ? 'active'
+          : collection.status === 'ended'
+          ? 'completed'
+          : 'upcoming',
+      sub:
+        collection.salePhase === 'public'
+          ? `${formatEther(collection.mintPrice)} ETH · live now`
+          : collection.status === 'ended'
+          ? 'Completed'
+          : publicStartsIn,
+    },
+    {
+      name: 'Reveal & secondary',
+      state: collection.status === 'ended' ? 'active' : 'upcoming',
+      sub: collection.status === 'ended' ? 'Sale closed' : 'After sale closes',
+    },
+  ] as const;
+
+  const detailRows = [
+    {
+      label: 'Contract',
+      value: collectionAddress ? `${collectionAddress.slice(0, 6)}...${collectionAddress.slice(-4)}` : 'Unavailable',
+      href: collectionAddress ? `${explorerUrl}/address/${collectionAddress}` : undefined,
+      mono: true,
+    },
+    { label: 'Standard', value: 'ERC-721A' },
+    { label: 'Network', value: 'RISE Testnet' },
+    { label: 'Public mint price', value: `${formatEther(collection.mintPrice)} ETH`, mono: true },
+    {
+      label: 'Whitelist mint price',
+      value: collection.whitelistEnabled ? `${formatEther(collection.whitelistPrice)} ETH` : 'Disabled',
+      mono: collection.whitelistEnabled,
+    },
+    {
+      label: 'Wallet limit',
+      value: collection.walletLimit === 0 ? 'Unlimited' : collection.walletLimit.toString(),
+    },
+    { label: 'Public start', value: formatTimestamp(collection.saleStart), mono: true },
+    { label: 'Sale end', value: formatTimestamp(collection.saleEnd), mono: true },
+    { label: 'Ends in', value: saleEndsIn, mono: true },
+    {
+      label: 'Metadata source',
+      value: collection.contractURI.trim()
+        ? 'Contract metadata + token fallback'
+        : 'First-token metadata fallback',
+    },
+  ];
 
   return (
     <motion.div
@@ -501,19 +616,17 @@ const NFTDetailPage: React.FC = () => {
         </Link>
       </motion.div>
 
-      <motion.section variants={itemVariants} className="space-y-3">
+      <motion.section variants={itemVariants} className="page-hero-card space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="font-display text-display-lg text-ink">{collection.name}</h1>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-secondary/15 text-accent-secondary">
+              <h1 className="ds-h1">{collection.name}</h1>
+              <span className="pill pill-nft">
                 NFT
               </span>
             </div>
             <p className="text-body text-ink-muted">{collection.symbol}</p>
-            {contractMetadata?.description && (
-              <p className="text-body-sm text-ink-faint max-w-2xl">{contractMetadata.description}</p>
-            )}
+            <p className="text-body-sm text-ink-faint max-w-2xl">{collectionDescription}</p>
           </div>
           <div className="flex items-center gap-2">
             {getStatusBadge(collection.status, collection.salePhase)}
@@ -524,38 +637,59 @@ const NFTDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Image — left col, mobile: 1st */}
         <motion.div variants={itemVariants} className="lg:col-span-2 order-1 glass-card rounded-3xl overflow-hidden">
-          {resolvedCollectionImage ? (
-            <img
-              src={resolvedCollectionImage}
-              alt={collection.name}
-              className="w-full object-cover max-h-80"
-            />
-          ) : (
-            <div className="w-full h-48 flex items-center justify-center bg-ink/5">
-              <Image className="w-12 h-12 text-ink-faint" />
+          <FallbackImage
+            src={contractMetadata?.image}
+            fallbackSrc={collectionImage}
+            alt={collection.name}
+            className="w-full object-cover max-h-80"
+            onImageError={() => setCollectionImageRenderFailed(true)}
+            placeholder={(
+              <div className="w-full h-48 flex items-center justify-center bg-ink/5">
+                <Image className="w-12 h-12 text-ink-faint" />
+              </div>
+            )}
+          />
+          {imageMetadataWarning && (
+            <div className="border-t border-border/60 bg-canvas-alt/60 px-4 py-2">
+              <p className="text-xs text-ink-faint">{imageMetadataWarning}</p>
             </div>
           )}
         </motion.div>
 
         {/* Mint Progress — left col, mobile: 2nd */}
-        <motion.div variants={itemVariants} className="lg:col-span-2 order-2 glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="font-display text-display-sm text-ink">Mint Progress</h2>
+        <motion.div
+          variants={itemVariants}
+          className="lg:col-span-2 order-2 bg-canvas-alt border border-border rounded-3xl p-6 space-y-5 relative overflow-hidden"
+        >
+          <span
+            aria-hidden
+            className="absolute top-0 left-6 h-[3px] w-12 rounded-b-full"
+            style={{ background: 'rgb(var(--color-accent))' }}
+          />
+          <div>
+            <div className="eyebrow" style={{ color: 'rgb(var(--color-accent))' }}>
+              Supply
+            </div>
+            <h2 className="font-display font-bold text-[22px] text-ink leading-tight mt-1.5 tracking-tight">
+              Mint progress
+            </h2>
+          </div>
           <div className="space-y-3">
             <div className="flex justify-between text-body">
               <span className="text-ink-muted">Minted</span>
-              <span className="text-ink font-medium">
+              <span className="text-ink font-mono font-bold">
                 {collection.totalMinted.toString()} / {collection.maxSupply.toString()}
               </span>
             </div>
-            <div className="w-full h-4 bg-ink/5 rounded-full overflow-hidden">
+            <div className="w-full h-3 bg-ink/5 rounded-full overflow-hidden">
               <div
                 className="h-full bg-accent rounded-full transition-all duration-500"
                 style={{ width: `${mintProgress}%` }}
               />
             </div>
             <div className="flex justify-between text-body-sm text-ink-muted">
-              <span>{mintProgress}% minted</span>
-              <span>{collection.remaining.toString()} remaining</span>
+              <span className="font-mono">{mintProgress}% minted</span>
+              <span className="font-mono">{collection.remaining.toString()} remaining</span>
             </div>
           </div>
         </motion.div>
@@ -563,68 +697,137 @@ const NFTDetailPage: React.FC = () => {
         {/* Right column — mobile: 3rd (Mint NFT before Sale Overview) */}
         <div className="space-y-6 order-3 lg:col-start-3 lg:row-start-1 lg:row-span-3">
           {collection.status === 'live' && isConnected && (
-            <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-4">
-              <h3 className="font-display text-display-sm text-ink">Mint NFT</h3>
-
-              <div className="rounded-2xl border border-border bg-canvas-alt p-4 space-y-1">
-                <p className="text-body-sm text-ink-muted">Active phase</p>
-                <p className="text-body font-medium text-ink">
-                  {collection.salePhase === 'whitelist' ? 'Whitelist mint' : 'Public mint'}
-                </p>
-                <p className="text-body-sm text-ink-muted">
-                  Current price: <span className="font-medium text-ink">{formatEther(unitPrice)} ETH</span>
-                </p>
+            <motion.div
+              variants={itemVariants}
+              className="nft-mint-card"
+            >
+              <span
+                aria-hidden
+                className="absolute top-0 left-6 h-[3px] w-12 rounded-b-full"
+                style={{ background: 'rgb(var(--color-accent))' }}
+              />
+              <div className="nft-mint-card-tag">
+                {getStatusBadge(collection.status, collection.salePhase)}
               </div>
 
-              <PhaseCountdown
-                compact
-                label={mintCardCountdown.label}
-                targetTime={mintCardCountdown.targetTime}
-                nowSec={nowSec}
-                fallbackLabel={mintCardCountdown.fallbackLabel}
-                completedLabel={mintCardCountdown.completedLabel}
-                stoppedMessage={mintCardCountdown.stoppedMessage}
-              />
+              <div>
+                <h3 className="font-display font-bold text-[24px] text-ink leading-tight tracking-tight">
+                  Mint NFT
+                </h3>
+              </div>
 
-              <div className="space-y-4">
+              <div className="nft-mint-price-row">
                 <div>
-                  <label className="text-body-sm text-ink-muted font-medium mb-1 block">
-                    Quantity
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setMintQty((q) => Math.max(1, q - 1))}
-                      disabled={mintQty <= 1}
-                      className="w-9 h-9 rounded-xl bg-ink/5 hover:bg-ink/10 text-ink font-bold disabled:opacity-30 transition-colors"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      min={1}
-                      max={Math.max(1, maxMintable)}
-                      value={mintQty}
-                      onChange={(e) => {
-                        const v = Math.max(1, Math.min(Math.max(1, maxMintable), Number(e.target.value) || 1));
-                        setMintQty(v);
-                        resetWrite();
-                      }}
-                      className="input-field w-20 text-center"
-                    />
-                    <button
-                      onClick={() => setMintQty((q) => Math.min(Math.max(1, maxMintable), q + 1))}
-                      disabled={mintQty >= Math.max(1, maxMintable)}
-                      className="w-9 h-9 rounded-xl bg-ink/5 hover:bg-ink/10 text-ink font-bold disabled:opacity-30 transition-colors"
-                    >
-                      +
-                    </button>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                    Active phase
+                  </div>
+                  <div className="font-display font-bold text-[17px] text-ink leading-tight tracking-tight mt-1.5">
+                    {collection.salePhase === 'whitelist' ? 'Whitelist mint' : 'Public mint'}
+                  </div>
+                  <div className="text-body-sm text-ink-muted mt-1.5">
+                    Current price{' '}
+                    <span className="font-mono font-bold text-ink">{formatEther(unitPrice)} ETH</span>
                   </div>
                 </div>
+              </div>
 
-                <div className="text-body-sm text-ink-muted space-y-1">
-                  <p>Price per NFT: {formatEther(unitPrice)} ETH</p>
-                  <p className="font-medium text-ink">Total: {formatEther(totalCost)} ETH</p>
-                  {collection.walletLimit > 0 && <p>Max per wallet: {collection.walletLimit}</p>}
+              <div className="launch-countdown">
+                <span className="launch-countdown-lbl">{mintCardCountdown.label}</span>
+                <span className="font-bold tabular-nums">
+                  {(() => {
+                    if (mintCardCountdown.targetTime !== undefined) {
+                      const secs = Number(mintCardCountdown.targetTime) - nowSec;
+                      if (secs > 0) return formatCountdownLive(secs);
+                      return mintCardCountdown.completedLabel ?? '—';
+                    }
+                    return (
+                      mintCardCountdown.stoppedMessage ??
+                      mintCardCountdown.fallbackLabel ??
+                      mintCardCountdown.completedLabel ??
+                      '—'
+                    );
+                  })()}
+                </span>
+              </div>
+
+              <div className="space-y-5">
+                <div className="qty-row">
+                  <div>
+                    <label className="text-body-sm text-ink-muted font-medium block">Quantity</label>
+                    <p className="text-[11px] text-ink-faint mt-1">
+                      {collection.walletLimit > 0
+                        ? `${Math.max(0, collection.walletLimit - Number(userMinted))} remaining for this wallet`
+                        : 'No wallet cap'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMintQty(Math.max(1, maxMintable));
+                      resetWrite();
+                    }}
+                    disabled={maxMintable <= 0}
+                    className="qty-max"
+                  >
+                    Max
+                  </button>
+                </div>
+
+                <div className="qty-stepper">
+                  <button
+                    onClick={() => {
+                      setMintQty((q) => Math.max(1, q - 1));
+                      resetWrite();
+                    }}
+                    disabled={mintQty <= 1}
+                    aria-label="Decrease quantity"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, maxMintable)}
+                    value={mintQty}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(Math.max(1, maxMintable), Number(e.target.value) || 1));
+                      setMintQty(v);
+                      resetWrite();
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      setMintQty((q) => Math.min(Math.max(1, maxMintable), q + 1));
+                      resetWrite();
+                    }}
+                    disabled={mintQty >= Math.max(1, maxMintable)}
+                    aria-label="Increase quantity"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div className="nft-mint-total">
+                  <div className="flex items-center justify-between text-body-sm text-ink-muted">
+                    <span>Price per NFT</span>
+                    <span className="font-mono text-ink">{formatEther(unitPrice)} ETH</span>
+                  </div>
+                  <div className="flex items-center justify-between text-body-sm text-ink-muted">
+                    <span>Quantity</span>
+                    <span className="font-mono text-ink">{mintQty}</span>
+                  </div>
+                  <div className="h-px bg-border/70" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-body-sm text-ink-muted">Total</span>
+                    <span className="font-display font-bold text-[20px] text-ink tracking-tight">
+                      {formatEther(totalCost)} ETH
+                    </span>
+                  </div>
+                  {collection.walletLimit > 0 && (
+                    <div className="text-[11px] text-ink-faint">
+                      Max per wallet: <span className="font-mono">{collection.walletLimit}</span>
+                    </div>
+                  )}
                 </div>
 
                 {!userCanMintCurrentPhase ? (
@@ -632,27 +835,27 @@ const NFTDetailPage: React.FC = () => {
                     Only whitelisted wallets can mint during the current phase.
                   </div>
                 ) : maxMintable === 0 ? (
-                  <div className="p-3 rounded-xl bg-status-closed-bg text-status-closed text-sm text-center">
+                  <div className="p-3 rounded-xl bg-status-closed-bg text-status-closed text-sm">
                     {Number(userMinted) >= collection.walletLimit && collection.walletLimit > 0
                       ? 'You have reached the wallet limit for this collection.'
                       : 'No NFTs remaining.'}
                   </div>
-                ) : (
-                  <button
-                    onClick={handleMint}
-                    disabled={isBusy || mintQty < 1}
-                    className="btn-primary w-full"
-                  >
-                    {isBusy ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {isConfirming ? 'Confirming...' : 'Minting...'}
-                      </span>
-                    ) : (
-                      `Mint ${mintQty} NFT${mintQty > 1 ? 's' : ''} · ${formatEther(totalCost)} ETH`
-                    )}
-                  </button>
-                )}
+                ) : null}
+
+                <button
+                  onClick={handleMint}
+                  disabled={isBusy || mintQty < 1 || !userCanMintCurrentPhase || maxMintable === 0}
+                  className="btn-primary w-full"
+                >
+                  {isBusy ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {isConfirming ? 'Confirming...' : 'Minting...'}
+                    </span>
+                  ) : (
+                    `Mint ${mintQty} NFT${mintQty > 1 ? 's' : ''} →`
+                  )}
+                </button>
               </div>
             </motion.div>
           )}
@@ -716,75 +919,123 @@ const NFTDetailPage: React.FC = () => {
         </div>
 
         {/* Sale Overview — left col, mobile: 4th (after Mint NFT) */}
-        <motion.div variants={itemVariants} className="lg:col-span-2 order-4 glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="font-display text-display-sm text-ink">Sale Overview</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              {
-                label: 'Public Price',
-                value: `${formatEther(collection.mintPrice)} ETH`,
-                icon: Layers,
-              },
-              {
-                label: 'Whitelist Price',
-                value: collection.whitelistEnabled ? `${formatEther(collection.whitelistPrice)} ETH` : 'Disabled',
-                icon: Shield,
-              },
-              {
-                label: 'Whitelist Start',
-                value: whitelistStartsIn,
-                sub: collection.whitelistEnabled ? formatTimestamp(collection.whitelistStart) : undefined,
-                icon: Clock,
-              },
-              {
-                label: 'Public Start',
-                value: publicStartsIn,
-                sub: formatTimestamp(collection.saleStart),
-                icon: Clock,
-              },
-              {
-                label: 'Sale End',
-                value: saleEndsIn,
-                sub: formatTimestamp(collection.saleEnd),
-                icon: Clock,
-              },
-              {
-                label: 'Wallet Limit',
-                value: collection.walletLimit === 0 ? 'Unlimited' : collection.walletLimit.toString(),
-                icon: Users,
-              },
-            ].map((item) => (
-              <div key={item.label} className="flex items-start gap-3 p-3 rounded-2xl bg-ink/[0.02]">
-                <div className="w-8 h-8 rounded-xl bg-accent-muted text-accent flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-body-sm text-ink-muted">{item.label}</p>
-                  <p className="text-body font-medium text-ink">{item.value}</p>
-                  {'sub' in item && item.sub ? (
-                    <p className="text-body-sm text-ink-faint">{item.sub}</p>
-                  ) : null}
-                </div>
+        <motion.div
+          variants={itemVariants}
+          className="lg:col-span-2 order-4 bg-canvas-alt border border-border rounded-3xl p-6 space-y-5 relative overflow-hidden"
+        >
+          <span
+            aria-hidden
+            className="absolute top-0 left-6 h-[3px] w-12 rounded-b-full"
+            style={{ background: 'rgb(var(--color-accent))' }}
+          />
+          <div className="flex flex-col gap-4">
+            <div>
+              <div className="eyebrow" style={{ color: 'rgb(var(--color-accent))' }}>
+                Collection
               </div>
-            ))}
+              <h2 className="font-display font-bold text-[22px] text-ink leading-tight mt-1.5 tracking-tight">
+                Sale details
+              </h2>
+            </div>
+            <div className="nft-sale-tabs">
+              {[
+                ['overview', 'Overview'],
+                ['traits', 'Traits'],
+                ['details', 'Sale details'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`nft-sale-tab ${infoTab === value ? 'active' : ''}`}
+                  onClick={() => setInfoTab(value as NFTInfoTab)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {collection.salePhase === 'whitelist' && (
-            <div className="rounded-2xl border border-accent/20 bg-accent/5 p-4 text-body-sm text-ink-muted">
-              Whitelist mint is currently active. Public mint opens at{' '}
-              <span className="font-medium text-ink">{formatTimestamp(collection.saleStart)}</span>.
+          {infoTab === 'overview' && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border bg-canvas/40 p-5">
+                <div className="eyebrow">About</div>
+                <p className="text-body text-ink mt-3 leading-relaxed">{collectionDescription}</p>
+              </div>
+
+              <div className="nft-phase-card">
+                <div className="eyebrow">Sale phases</div>
+                <div className="nft-phase-rail">
+                  {salePhaseSteps.map((phase) => (
+                    <div key={phase.name} className={`nft-phase ${phase.state}`}>
+                      <div className="nft-phase-dot" />
+                      <div className="nft-phase-info">
+                        <div className="nft-phase-name">{phase.name}</div>
+                        <div className="nft-phase-sub">{phase.sub}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
-          {collectionAddress && (
-            <a
-              href={`${explorerUrl}/address/${collectionAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-body-sm text-accent hover:underline"
-            >
-              View on Explorer <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+          {infoTab === 'traits' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="eyebrow">On-chain traits</div>
+                  <p className="text-body-sm text-ink-muted mt-2">
+                    Sampled from first-token metadata when attributes are available on-chain.
+                  </p>
+                </div>
+                {isSampleTraitsLoading && (
+                  <span className="text-body-sm text-ink-faint">Loading traits...</span>
+                )}
+              </div>
+
+              {sampleTraits.length > 0 ? (
+                <div className="nft-trait-grid">
+                  {sampleTraits.map((trait, index) => (
+                    <div key={`${trait.traitType}-${trait.value}-${index}`} className="nft-trait">
+                      <div className="nft-trait-name">{trait.traitType}</div>
+                      <div className="nft-trait-value">{trait.value}</div>
+                      {trait.displayType && (
+                        <div className="nft-trait-meta">{trait.displayType}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-border bg-canvas/40 p-5 text-body-sm text-ink-muted">
+                  This collection does not currently expose token attributes through first-token metadata.
+                </div>
+              )}
+            </div>
+          )}
+
+          {infoTab === 'details' && (
+            <div className="nft-detail-rows">
+              {detailRows.map((item) => (
+                <div key={item.label} className="nft-detail-row">
+                  <div className="nft-detail-k">{item.label}</div>
+                  <div className={`nft-detail-v ${item.mono ? 'font-mono' : ''}`}>
+                    {item.href ? (
+                      <a
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-accent hover:underline"
+                      >
+                        {item.value}
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    ) : (
+                      item.value
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </motion.div>
       </div>

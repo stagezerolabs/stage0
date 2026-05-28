@@ -122,10 +122,11 @@ const TokensPage: React.FC = () => {
       animate="visible"
       className="space-y-10"
     >
-      <motion.section variants={itemVariants} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="font-display text-display-lg text-ink">Token Management</h1>
-          <p className="text-body-lg text-ink-muted">
+      <motion.section variants={itemVariants} className="page-hero-card flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <div className="eyebrow">Portfolio</div>
+          <h1 className="ds-h1 mt-2">Token Management</h1>
+          <p className="text-body-lg text-ink-muted mt-3">
             Manage your created and imported tokens.
           </p>
         </div>

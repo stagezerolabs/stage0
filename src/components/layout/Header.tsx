@@ -54,6 +54,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     { path: '/', label: 'Home' },
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/presales', label: 'Launchpad' },
+    ...(isOwner ? [{ path: '/domains', label: 'Names' }] : []),
     { path: '/tools', label: 'Tools' },
   ];
 
@@ -109,34 +110,37 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className="relative px-4 py-2 text-body-sm font-medium transition-colors duration-300"
-            >
-              <span
-                className={`relative z-10 ${location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                  ? 'text-ink'
-                  : 'text-ink-muted hover:text-ink'
-                  }`}
+          {navItems.map((item) => {
+            const isActive =
+              item.path === '/'
+                ? location.pathname === '/'
+                : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className="relative px-3.5 py-2 text-[13px] font-medium tracking-tight transition-colors duration-300"
               >
-                {item.label}
-              </span>
-              <AnimatePresence>
-                {(location.pathname === item.path || location.pathname.startsWith(item.path + '/')) && (
-                  <motion.div
-                    layoutId="nav-indicator"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute inset-0 bg-canvas-alt rounded-lg"
-                  />
-                )}
-              </AnimatePresence>
-            </Link>
-          ))}
+                <span
+                  className={`relative z-10 ${isActive ? 'text-ink' : 'text-ink-muted hover:text-ink'}`}
+                >
+                  {item.label}
+                </span>
+                <AnimatePresence>
+                  {isActive && (
+                    <motion.div
+                      layoutId="nav-indicator"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute inset-0 bg-ink/[0.07] rounded-full border border-border/40"
+                    />
+                  )}
+                </AnimatePresence>
+              </Link>
+            );
+          })}
         </div>
 
         {/* Right side: Theme + Connect + Mobile menu button */}

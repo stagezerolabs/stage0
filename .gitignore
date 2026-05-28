@@ -1,5 +1,4 @@
 # Logs
-.DS_Store
 logs
 *.log
 npm-debug.log*
@@ -8,8 +7,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-.brv/
 node_modules
+.brv/
 dist
 dist-ssr
 *.local

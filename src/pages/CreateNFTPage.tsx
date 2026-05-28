@@ -11,10 +11,12 @@ import {
   Image,
   Layers,
   Loader2,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
-import { normalizeContractURI } from '@/lib/utils/ipfs';
+import { contractUriToHttp, normalizeBaseURI, normalizeContractURI } from '@/lib/utils/ipfs';
+import FallbackImage from '@/components/ui/fallback-image';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -67,7 +69,8 @@ const CreateNFTPage: React.FC = () => {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [baseURI, setBaseURI] = useState('');
-  const [contractURI, setContractURI] = useState('');
+  const [collectionImageURI, setCollectionImageURI] = useState('');
+  const [collectionImagePreview, setCollectionImagePreview] = useState('');
   const [maxSupply, setMaxSupply] = useState('');
   const [walletLimit, setWalletLimit] = useState('');
   const [payoutWallet, setPayoutWallet] = useState('');
@@ -144,11 +147,27 @@ const CreateNFTPage: React.FC = () => {
     setWhitelistStart(local.toISOString().slice(0, 16));
   }, [whitelistEnabled, whitelistStart, saleStart]);
 
+  useEffect(() => {
+    return () => {
+      if (collectionImagePreview) {
+        URL.revokeObjectURL(collectionImagePreview);
+      }
+    };
+  }, [collectionImagePreview]);
+
   const validation = useMemo<ValidationResult>(() => {
     if (!isConnected) return { valid: false, message: 'Connect your wallet to deploy.' };
     if (!name.trim()) return { valid: false, message: 'Collection name is required.' };
     if (!symbol.trim()) return { valid: false, message: 'Collection symbol is required.' };
-    if (!baseURI.trim()) return { valid: false, message: 'Base URI is required.' };
+    const normalizedBaseUri = normalizeBaseURI(baseURI.trim());
+    if (!normalizedBaseUri) return { valid: false, message: 'Base URI is required.' };
+    const normalizedCollectionImageUri = normalizeContractURI(collectionImageURI.trim());
+    if (!normalizedCollectionImageUri) {
+      return {
+        valid: false,
+        message: 'Collection image URI is required. Use a CID, ipfs:// URI, or https:// image link.',
+      };
+    }
     if (!maxSupply.trim()) return { valid: false, message: 'Max supply is required.' };
     if (!mintPrice.trim()) return { valid: false, message: 'Public mint price is required.' };
     if (!saleStart) return { valid: false, message: 'Public sale start is required.' };
@@ -174,11 +193,6 @@ const CreateNFTPage: React.FC = () => {
 
     if (payoutWallet.trim() && !isAddress(payoutWallet.trim())) {
       return { valid: false, message: 'Payout wallet must be a valid address.' };
-    }
-
-    const normalizedContractURI = contractURI.trim() ? normalizeContractURI(contractURI) : '';
-    if (contractURI.trim() && !normalizedContractURI) {
-      return { valid: false, message: 'Contract URI must be a valid ipfs:// or http(s) URL.' };
     }
 
     const saleStartTs = parseDateTimeInput(saleStart);
@@ -220,11 +234,11 @@ const CreateNFTPage: React.FC = () => {
     name,
     symbol,
     baseURI,
+    collectionImageURI,
     maxSupply,
     mintPrice,
     walletLimit,
     payoutWallet,
-    contractURI,
     saleStart,
     saleEnd,
     whitelistEnabled,
@@ -241,7 +255,8 @@ const CreateNFTPage: React.FC = () => {
     const saleStartTs = parseDateTimeInput(saleStart);
     const saleEndTs = parseDateTimeInput(saleEnd);
     const whitelistStartTs = whitelistEnabled ? parseDateTimeInput(whitelistStart) : null;
-    const normalizedContractURI = contractURI.trim() ? normalizeContractURI(contractURI) : '';
+    const normalizedBaseUri = normalizeBaseURI(baseURI.trim());
+    const normalizedCollectionImageUri = normalizeContractURI(collectionImageURI.trim());
     const walletLimitValue = walletLimit.trim() ? Number(walletLimit) : 0;
 
     if (!saleStartTs || !saleEndTs) {
@@ -251,6 +266,11 @@ const CreateNFTPage: React.FC = () => {
 
     if (whitelistEnabled && !whitelistStartTs) {
       toast.error('Whitelist start is invalid.');
+      return;
+    }
+
+    if (!normalizedBaseUri || !normalizedCollectionImageUri) {
+      toast.error('Collection URIs are invalid.');
       return;
     }
 
@@ -266,8 +286,8 @@ const CreateNFTPage: React.FC = () => {
           {
             name: name.trim(),
             symbol: symbol.trim(),
-            baseURI: baseURI.trim(),
-            contractURI: normalizedContractURI,
+            baseURI: normalizedBaseUri,
+            contractURI: normalizedCollectionImageUri,
             whitelistConfig: {
               enabled: whitelistEnabled,
               whitelistStart: BigInt(whitelistStartTs ?? 0),
@@ -289,8 +309,25 @@ const CreateNFTPage: React.FC = () => {
     }
   };
 
+  const handleCollectionImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Select an image file for the collection preview.');
+      event.target.value = '';
+      return;
+    }
+
+    setCollectionImagePreview(URL.createObjectURL(file));
+  };
+
   const saleModel = whitelistEnabled ? 'Whitelist + Public' : 'Public Only';
   const walletLimitLabel = walletLimit.trim() && Number(walletLimit) > 0 ? walletLimit : 'Unlimited';
+  const normalizedCollectionImagePreviewUri = normalizeContractURI(collectionImageURI.trim());
+  const collectionImagePreviewSrc =
+    collectionImagePreview ||
+    (normalizedCollectionImagePreviewUri ? contractUriToHttp(normalizedCollectionImagePreviewUri) : '');
 
   if (isSuccess && createdCollectionAddress) {
     return (
@@ -378,9 +415,10 @@ const CreateNFTPage: React.FC = () => {
       animate="visible"
       className="max-w-6xl mx-auto space-y-8"
     >
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Create NFT Collection</h1>
-        <p className="text-body-lg text-ink-muted">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">NFT launch</div>
+        <h1 className="ds-h1 mt-2">Create NFT Collection</h1>
+        <p className="text-body-lg text-ink-muted max-w-3xl mt-3">
           Launch an ERC721 or ERC721A collection with separate whitelist and public mint phases.
         </p>
       </motion.section>
@@ -456,20 +494,53 @@ const CreateNFTPage: React.FC = () => {
                   type="text"
                   value={baseURI}
                   onChange={(e) => setBaseURI(e.target.value)}
-                  placeholder="ipfs://.../"
+                  placeholder="CID, ipfs://.../, or https://..."
                   className="input-field w-full"
                 />
               </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-body-sm text-ink-muted font-medium">Contract URI (optional)</label>
-                <input
-                  type="text"
-                  value={contractURI}
-                  onChange={(e) => setContractURI(e.target.value)}
-                  placeholder="ipfs://CID"
-                  className="input-field w-full"
-                />
-                <p className="text-xs text-ink-faint">Used for collection-level metadata such as description and hero image.</p>
+              <div className="space-y-3 md:col-span-2">
+                <div className="space-y-1.5">
+                  <label className="text-body-sm text-ink-muted font-medium">Collection Image URI</label>
+                  <input
+                    type="text"
+                    value={collectionImageURI}
+                    onChange={(e) => setCollectionImageURI(e.target.value)}
+                    placeholder="CID, ipfs://..., or https://..."
+                    className="input-field w-full"
+                  />
+                  <p className="text-xs text-ink-faint">
+                    Required. This is stored onchain as contractURI and normalized for launch cards, collection pages, and dashboards.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_9rem] gap-4">
+                  <label className="rounded-2xl border border-dashed border-border bg-canvas-alt p-4 cursor-pointer hover:border-accent/40 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCollectionImageFileChange}
+                      className="sr-only"
+                    />
+                    <span className="flex items-start gap-3">
+                      <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                        <Upload className="w-5 h-5" />
+                      </span>
+                      <span className="space-y-1">
+                        <span className="block text-body-sm font-medium text-ink">Upload collection image</span>
+                        <span className="block text-xs text-ink-faint">
+                          Preview-only until storage/database wiring is added. Paste the uploaded CID or URL above before deployment.
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                  <div className="h-36 rounded-2xl border border-border bg-canvas-alt overflow-hidden flex items-center justify-center">
+                    <FallbackImage
+                      src={collectionImagePreviewSrc}
+                      alt="Collection image preview"
+                      className="w-full h-full object-cover"
+                      placeholder={<Image className="w-8 h-8 text-ink-faint" />}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </motion.section>

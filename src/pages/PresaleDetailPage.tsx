@@ -95,30 +95,30 @@ function getStatusBadge(status: string) {
   switch (status) {
     case 'live':
       return (
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-live-bg text-status-live">
-          <span className="w-2 h-2 rounded-full bg-status-live animate-pulse" />
+        <span className="status-pill bg-status-live-bg text-status-live">
+          <span className="status-pill-dot" />
           Live
         </span>
       );
     case 'upcoming':
       return (
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-upcoming-bg text-status-upcoming">
-          <Clock className="w-3.5 h-3.5" />
+        <span className="status-pill bg-status-upcoming-bg text-status-upcoming">
+          <Clock className="status-pill-icon" />
           Upcoming
         </span>
       );
     case 'ended':
     case 'finalized':
       return (
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-closed-bg text-status-closed">
-          <CheckCircle2 className="w-3.5 h-3.5" />
+        <span className="status-pill bg-status-closed-bg text-status-closed">
+          <CheckCircle2 className="status-pill-icon" />
           Finalized
         </span>
       );
     case 'cancelled':
       return (
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-error-bg text-status-error">
-          <XCircle className="w-3.5 h-3.5" />
+        <span className="status-pill bg-status-error-bg text-status-error">
+          <XCircle className="status-pill-icon" />
           Cancelled
         </span>
       );
@@ -304,13 +304,14 @@ const PresaleDetailPage: React.FC = () => {
       </motion.div>
 
       {/* Header */}
-      <motion.section variants={itemVariants} className="space-y-4">
+      <motion.section variants={itemVariants} className="page-hero-card space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 space-y-1">
-            <h1 className="font-display text-display-lg text-ink">
+            <div className="eyebrow">Token launch</div>
+            <h1 className="ds-h1 mt-2">
               {presale.saleTokenName || presale.saleTokenSymbol || 'Token Sale'}
             </h1>
-            <p className="text-body text-ink-muted">
+            <p className="text-body text-ink-muted mt-3">
               {presale.saleTokenSymbol || 'Unknown'} Launch
             </p>
           </div>

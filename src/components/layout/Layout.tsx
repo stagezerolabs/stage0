@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
+import AICopilot from '../AICopilot';
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -77,7 +78,9 @@ const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) =
         )}
       </main>
 
-      <Footer />
+      <Footer themeMode={themeMode} />
+
+      <AICopilot />
     </div>
   );
 };

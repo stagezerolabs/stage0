@@ -354,9 +354,10 @@ const TokenLockerPage: React.FC = () => {
       className="max-w-4xl mx-auto space-y-8"
     >
       {/* Header */}
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Token Locker</h1>
-        <p className="text-body-lg text-ink-muted">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">Locks</div>
+        <h1 className="ds-h1 mt-2">Token Locker</h1>
+        <p className="text-body-lg text-ink-muted mt-3">
           Lock your tokens for a specified duration. Build trust with your community.
         </p>
       </motion.section>

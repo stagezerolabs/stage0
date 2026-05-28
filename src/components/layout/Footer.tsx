@@ -1,9 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import CircularText from '../animated/CircularText';
 
-const Footer: React.FC = () => {
+type FooterProps = {
+  themeMode: 'dark' | 'light';
+};
+
+const Footer: React.FC<FooterProps> = ({ themeMode }) => {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = [
@@ -48,13 +51,15 @@ const Footer: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-center gap-8">
           {/* Logo & Copyright */}
           <div className="flex flex-col items-center md:items-start gap-4">
-            <Link to="/" className="inline-flex items-center">
-              <CircularText
-                text="STAGE*0*"
-                onHover="speedUp"
-                spinDuration={20}
-                size={120}
-                accentWord="0"
+            <Link to="/" className="footer-wordmark" aria-label="Stage0 home">
+              <img
+                src={
+                  themeMode === 'dark'
+                    ? 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_white_green_vilwwf.png'
+                    : 'https://res.cloudinary.com/dma1c8i6n/image/upload/v1774875763/STAGE0_black_orange_wiqr1i.png'
+                }
+                alt="STAGE0"
+                className="h-full w-full object-contain"
               />
             </Link>
             <p className="text-body-sm text-ink-faint">

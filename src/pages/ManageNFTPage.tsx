@@ -5,6 +5,7 @@ import {
   useAccount,
   useBalance,
   useChainId,
+  usePublicClient,
   useReadContracts,
   useWaitForTransactionReceipt,
   useWriteContract,
@@ -14,8 +15,10 @@ import { toast } from 'sonner';
 import { ArrowLeft, ExternalLink, Loader2, Wallet } from 'lucide-react';
 import { NFT_COLLECTION_IMAGES, NFTCollectionContract, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
+import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
 import { isWhitelistLocked } from '@/lib/utils/nft-sales';
-import { normalizeContractURI } from '@/lib/utils/ipfs';
+import { normalizeBaseURI, normalizeContractURI } from '@/lib/utils/ipfs';
+import FallbackImage from '@/components/ui/fallback-image';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,9 +57,10 @@ const ManageNFTPage: React.FC = () => {
   const { address: connectedAddress } = useAccount();
   const chainId = useChainId();
   const explorerUrl = getExplorerUrl(chainId);
+  const publicClient = usePublicClient();
   const isValidAddress = Boolean(collectionParam && isAddress(collectionParam, { strict: false }));
   const collectionAddress = (isValidAddress ? collectionParam : undefined) as Address | undefined;
-  const collectionImage = collectionAddress
+  const fallbackCollectionImage = collectionAddress
     ? NFT_COLLECTION_IMAGES[collectionAddress.toLowerCase()]
     : undefined;
 
@@ -67,6 +71,7 @@ const ManageNFTPage: React.FC = () => {
   const [whitelistWalletsInput, setWhitelistWalletsInput] = useState('');
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [initialisedFromChain, setInitialisedFromChain] = useState(false);
+  const [resolvedCollectionImage, setResolvedCollectionImage] = useState<string | undefined>(fallbackCollectionImage);
 
   const {
     data: hash,
@@ -175,6 +180,38 @@ const ManageNFTPage: React.FC = () => {
   }, [writeError]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    if (!collectionAddress || !collection) {
+      setResolvedCollectionImage(fallbackCollectionImage);
+      return;
+    }
+
+    (async () => {
+      try {
+        const metadata = await resolveCollectionDisplayMetadata({
+          contractUri: collection.contractURI,
+          collectionAddress,
+          totalMinted: collection.totalMinted,
+          publicClient,
+        });
+
+        if (!cancelled) {
+          setResolvedCollectionImage(metadata?.image || fallbackCollectionImage);
+        }
+      } catch {
+        if (!cancelled) {
+          setResolvedCollectionImage(fallbackCollectionImage);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [collectionAddress, collection, fallbackCollectionImage, publicClient]);
+
+  useEffect(() => {
     if (!hash || !isSuccess) return;
     if (handledHashRef.current === hash) return;
     handledHashRef.current = hash;
@@ -231,7 +268,8 @@ const ManageNFTPage: React.FC = () => {
 
   const handleSetBaseURI = () => {
     if (!collectionAddress) return;
-    if (!baseURIInput.trim()) {
+    const normalizedBaseUri = normalizeBaseURI(baseURIInput.trim());
+    if (!normalizedBaseUri) {
       toast.error('Base URI cannot be empty.');
       return;
     }
@@ -240,7 +278,7 @@ const ManageNFTPage: React.FC = () => {
       abi: NFTCollectionContract,
       address: collectionAddress,
       functionName: 'setBaseURI',
-      args: [baseURIInput.trim()],
+      args: [normalizedBaseUri],
     });
   };
 
@@ -360,23 +398,23 @@ const ManageNFTPage: React.FC = () => {
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 max-w-5xl">
-      <motion.section variants={itemVariants} className="space-y-3">
+      <motion.section variants={itemVariants} className="page-hero-card space-y-4">
         <Link to="/dashboard" className="inline-flex items-center gap-2 text-body-sm text-ink-muted hover:text-ink">
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
         </Link>
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div className="flex items-center gap-4">
-            {collectionImage && (
-              <img
-                src={collectionImage}
-                alt={collection.name}
-                className="w-16 h-16 rounded-2xl object-cover border border-ink/10"
-              />
-            )}
+            <FallbackImage
+              src={resolvedCollectionImage}
+              fallbackSrc={fallbackCollectionImage}
+              alt={collection.name}
+              className="w-16 h-16 rounded-2xl object-cover border border-ink/10"
+            />
             <div className="space-y-1">
-              <h1 className="font-display text-display-lg text-ink">Manage NFT Collection</h1>
-              <p className="text-body-lg text-ink-muted">
+              <div className="eyebrow">Collection controls</div>
+              <h1 className="ds-h1 mt-2">Manage NFT Collection</h1>
+              <p className="text-body-lg text-ink-muted mt-3">
                 {collection.name} ({collection.symbol})
               </p>
             </div>
@@ -539,9 +577,12 @@ const ManageNFTPage: React.FC = () => {
               <input
                 value={contractURIInput}
                 onChange={(e) => setContractURIInput(e.target.value)}
-                placeholder="ipfs://CID"
+                placeholder="CID, ipfs://..., or https://..."
                 className="input-field w-full"
               />
+              <p className="text-xs text-ink-faint">
+                Accepts collection metadata URIs or direct image URIs. CIDs and gateway links are normalized automatically.
+              </p>
               <button onClick={handleSetContractURI} disabled={isBusy} className="btn-secondary inline-flex disabled:opacity-60">
                 {pendingAction === 'setContractURI' && isBusy ? 'Updating...' : 'Update Contract URI'}
               </button>

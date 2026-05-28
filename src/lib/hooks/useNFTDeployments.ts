@@ -5,27 +5,21 @@ import { getAddress, type Address } from 'viem';
 import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import {
-  contractUriToHttp,
-  getContractMetadataCandidateUrls,
-  ipfsUriToHttp,
   normalizeContractURI,
 } from '@/lib/utils/ipfs';
+import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
 import {
   getNFTSalePhase,
   getNFTSaleStatus,
   type NFTSalePhase,
   type NFTSaleStatus,
 } from '@/lib/utils/nft-sales';
-import {
-  fetchIndexedNftCollections,
-  isGoldskyIndexerConfigured,
-  type IndexedNftCollection,
-} from '@/lib/indexer/goldsky';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const AUTO_REFRESH_INTERVAL = 20000;
 const QUERY_STALE_TIME = 15000;
 const QUERY_GC_TIME = 5 * 60 * 1000;
+const METADATA_CACHE_VERSION = 'v2';
 
 type NFTContractMetadata = {
   image?: string;
@@ -33,6 +27,7 @@ type NFTContractMetadata = {
 };
 
 const deploymentMetadataCache = new Map<string, NFTContractMetadata | null>();
+const deploymentMetadataInflight = new Set<string>();
 
 export interface NFTDeploymentWithMetadata {
   address: Address;
@@ -92,42 +87,6 @@ interface CollectionInfo {
 type RawCollectionInfo = Partial<CollectionInfo> & {
   [key: number]: unknown;
 };
-
-function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
-  const normalized = imageUri.trim();
-  if (!normalized) return '';
-
-  if (
-    normalized.startsWith('ipfs://') ||
-    normalized.startsWith('http://') ||
-    normalized.startsWith('https://')
-  ) {
-    return ipfsUriToHttp(normalized);
-  }
-
-  const metadataHttpUri = contractUriToHttp(metadataUri);
-  if (!metadataHttpUri) return ipfsUriToHttp(normalized);
-
-  let metadataBase = metadataHttpUri;
-  try {
-    const url = new URL(metadataHttpUri);
-    const pathname = url.pathname;
-    const lastSegment = pathname.split('/').filter(Boolean).pop() ?? '';
-    const looksLikeFile = /\.[a-z0-9]+$/i.test(lastSegment);
-    if (!pathname.endsWith('/') && !looksLikeFile) {
-      url.pathname = `${pathname}/`;
-    }
-    metadataBase = url.toString();
-  } catch {
-    if (!metadataBase.endsWith('/')) metadataBase = `${metadataBase}/`;
-  }
-
-  try {
-    return new URL(normalized, metadataBase).toString();
-  } catch {
-    return ipfsUriToHttp(normalized);
-  }
-}
 
 function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
   const salePhase = getNFTSalePhase({
@@ -243,56 +202,20 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
   };
 }
 
-function toIndexedDeployment(deployment: IndexedNftCollection): NFTDeploymentWithMetadata {
-  const whitelistEnabled = deployment.whitelistEnabled ?? false;
-  const whitelistStart = deployment.whitelistStart ?? 0n;
-  const whitelistPrice = deployment.whitelistPrice ?? deployment.mintPrice;
-
-  const salePhase = getNFTSalePhase({
-    maxSupply: deployment.maxSupply,
-    totalMinted: deployment.totalMinted,
-    saleStart: deployment.saleStart,
-    saleEnd: deployment.saleEnd,
-    whitelistEnabled,
-    whitelistStart,
-  });
-
-  return {
-    address: deployment.address,
-    creator: deployment.creator,
-    owner: deployment.owner,
-    payoutWallet: deployment.payoutWallet,
-    is721A: deployment.is721A,
-    name: deployment.name || 'NFT Collection',
-    symbol: deployment.symbol || 'NFT',
-    contractURI: normalizeContractURI(deployment.contractURI || ''),
-    maxSupply: deployment.maxSupply,
-    totalMinted: deployment.totalMinted,
-    remaining: deployment.remaining,
-    mintPrice: deployment.mintPrice,
-    walletLimit: Number(deployment.walletLimit),
-    saleStart: deployment.saleStart,
-    saleEnd: deployment.saleEnd,
-    whitelistEnabled,
-    whitelistStart,
-    whitelistPrice,
-    salePhase,
-    status: getNFTSaleStatus({
-      maxSupply: deployment.maxSupply,
-      totalMinted: deployment.totalMinted,
-      saleStart: deployment.saleStart,
-      saleEnd: deployment.saleEnd,
-      whitelistEnabled,
-      whitelistStart,
-    }),
-  };
+function getMetadataCacheKey(deployment: NFTDeploymentWithMetadata): string {
+  return [
+    METADATA_CACHE_VERSION,
+    deployment.address.toLowerCase(),
+    deployment.contractURI,
+    deployment.totalMinted.toString(),
+  ].join(':');
 }
 
 export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   const { creator, enabled = true } = options;
   const { nftFactoryLens } = useChainContracts();
   const publicClient = usePublicClient();
-  const [metadataByAddress, setMetadataByAddress] = useState<Record<string, NFTContractMetadata | null>>(() =>
+  const [metadataByKey, setMetadataByKey] = useState<Record<string, NFTContractMetadata | null>>(() =>
     Object.fromEntries(deploymentMetadataCache.entries())
   );
   const [isMetadataLoading, setIsMetadataLoading] = useState(false);
@@ -311,7 +234,6 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
 
   const hasLens = Boolean(lensAddress);
   const canRead = Boolean(enabled);
-  const isIndexerConfigured = isGoldskyIndexerConfigured();
   const canReadFromChain = Boolean(canRead && hasLens && publicClient);
 
   // ── On-chain reads via NFTFactoryLens (always preferred) ──────────────
@@ -358,48 +280,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     }
   }, [chainError]);
 
-  // ── Goldsky indexer fallback ───────────────────────────────────────────
-  // Prefer lens data whenever available. Use indexer only if lens cannot
-  // be read (missing/invalid lens or read error).
-  const shouldFallbackToIndexer = Boolean(
-    canRead &&
-    isIndexerConfigured &&
-    (!canReadFromChain || Boolean(chainError))
-  );
-
-  const {
-    data: indexedCollections = [],
-    isLoading: isIndexerLoading,
-    isError: isIndexerError,
-  } = useQuery({
-    queryKey: ['goldsky', 'nftCollections', creator?.toLowerCase() ?? 'all'],
-    queryFn: () => fetchIndexedNftCollections(creator),
-    enabled: shouldFallbackToIndexer,
-    staleTime: QUERY_STALE_TIME,
-    gcTime: QUERY_GC_TIME,
-    refetchInterval: shouldFallbackToIndexer ? AUTO_REFRESH_INTERVAL : false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-  });
-
-  const hasLensData = Boolean(chainRaw && chainRaw.length > 0);
-  const useIndexer = Boolean(
-    !hasLensData &&
-    shouldFallbackToIndexer &&
-    !isIndexerError &&
-    (isIndexerLoading || indexedCollections.length > 0)
-  );
-
-  const indexedDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
-    if (!useIndexer) return [];
-    return indexedCollections.map(toIndexedDeployment);
-  }, [indexedCollections, useIndexer]);
-
   const rawDeployments = useMemo((): NFTDeploymentWithMetadata[] => {
-    if (useIndexer) {
-      return indexedDeployments;
-    }
-
     if (!chainRaw || chainRaw.length === 0) return [];
 
     return [...chainRaw]
@@ -407,110 +288,77 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       .map(normalizeCollectionInfo)
       .filter((entry): entry is CollectionInfo => entry !== null)
       .map(toDeployment);
-  }, [chainRaw, indexedDeployments, useIndexer]);
+  }, [chainRaw]);
 
   useEffect(() => {
     const pending = rawDeployments.filter((deployment) => {
-      const key = deployment.address.toLowerCase();
-      const cachedMetadata = metadataByAddress[key] ?? deploymentMetadataCache.get(key);
-      return deployment.contractURI.trim().length > 0 && cachedMetadata === undefined;
+      const key = getMetadataCacheKey(deployment);
+      const cachedMetadata = metadataByKey[key] ?? deploymentMetadataCache.get(key);
+      return (
+        !deploymentMetadataInflight.has(key) &&
+        cachedMetadata === undefined &&
+        (deployment.contractURI.trim().length > 0 || deployment.totalMinted > 0n)
+      );
     });
 
     if (pending.length === 0) {
-      setIsMetadataLoading(false);
+      setIsMetadataLoading(deploymentMetadataInflight.size > 0);
       return;
     }
 
     let cancelled = false;
     setIsMetadataLoading(true);
 
-    (async () => {
-      const results = await Promise.all(
-        pending.map(async (deployment) => {
-          const key = deployment.address.toLowerCase();
-          try {
-            const metadataUri = normalizeContractURI(deployment.contractURI);
-            if (!metadataUri) return [key, null] as const;
+    pending.forEach((deployment) => {
+      const key = getMetadataCacheKey(deployment);
+      deploymentMetadataInflight.add(key);
 
-            const candidateUrls = getContractMetadataCandidateUrls(metadataUri);
-            if (candidateUrls.length === 0) return [key, null] as const;
-
-            let json: Record<string, unknown> | null = null;
-            let resolvedMetadataUri = metadataUri;
-
-            for (const url of candidateUrls) {
-              try {
-                const response = await fetch(url);
-                if (!response.ok) continue;
-                const text = await response.text();
-                const parsed = JSON.parse(text) as Record<string, unknown>;
-                json = parsed;
-                resolvedMetadataUri = url;
-                break;
-              } catch {
-                continue;
-              }
-            }
-
-            if (!json) return [key, null] as const;
-
-            const image =
-              typeof json.image === 'string' && json.image.trim().length > 0
-                ? resolveMetadataImageUri(json.image, resolvedMetadataUri)
-                : undefined;
-            const description =
-              typeof json.description === 'string' && json.description.trim().length > 0
-                ? json.description.trim()
-                : undefined;
-
-            return [key, { image, description } as NFTContractMetadata | null] as const;
-          } catch {
-            return [key, null] as const;
-          }
+      resolveCollectionDisplayMetadata({
+        contractUri: deployment.contractURI,
+        collectionAddress: deployment.address,
+        totalMinted: deployment.totalMinted,
+        publicClient,
+      })
+        .then((metadata) => (metadata as NFTContractMetadata | null) ?? null)
+        .catch(() => null)
+        .then((metadata) => {
+          deploymentMetadataCache.set(key, metadata);
+          if (cancelled) return;
+          setMetadataByKey((previous) => ({
+            ...previous,
+            [key]: metadata,
+          }));
         })
-      );
-
-      if (cancelled) return;
-
-      setMetadataByAddress((previous) => {
-        const next = { ...previous };
-        for (const [key, value] of results) {
-          deploymentMetadataCache.set(key, value);
-          next[key] = value;
-        }
-        return next;
+        .finally(() => {
+          deploymentMetadataInflight.delete(key);
+          if (!cancelled) {
+            setIsMetadataLoading(deploymentMetadataInflight.size > 0);
+          }
+        });
       });
-      setIsMetadataLoading(false);
-    })().catch(() => {
-      if (!cancelled) {
-        setIsMetadataLoading(false);
-      }
-    });
 
     return () => {
       cancelled = true;
     };
-  }, [rawDeployments, metadataByAddress]);
+  }, [rawDeployments, metadataByKey, publicClient]);
 
   const deployments = useMemo((): NFTDeploymentWithMetadata[] => {
     return rawDeployments.map((deployment) => {
-      const addressKey = deployment.address.toLowerCase();
-      const metadata = metadataByAddress[addressKey] ?? deploymentMetadataCache.get(addressKey);
+      const metadataKey = getMetadataCacheKey(deployment);
+      const metadata = metadataByKey[metadataKey] ?? deploymentMetadataCache.get(metadataKey);
       return {
         ...deployment,
         metadataImage: metadata?.image,
         metadataDescription: metadata?.description,
       };
     });
-  }, [rawDeployments, metadataByAddress]);
-
-  const isLoading = useIndexer ? isIndexerLoading : isChainLoading;
+  }, [rawDeployments, metadataByKey]);
 
   return {
     deployments,
     totalDeployments: deployments.length,
-    isLoading,
-    isLogsLoading: isLoading,
+    isLoading: isChainLoading,
+    isLogsLoading: isChainLoading,
     isMetadataLoading,
   };
 }

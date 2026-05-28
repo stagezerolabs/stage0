@@ -206,9 +206,9 @@ const DomainsPage: React.FC = () => {
       initial="hidden"
       animate="visible"
       variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-      className="space-y-10 max-w-2xl mx-auto"
+      className="space-y-8 max-w-3xl mx-auto"
     >
-      <motion.section variants={itemVariants} className="space-y-2">
+      <motion.section variants={itemVariants} className="page-hero-card">
         <div className="flex items-center gap-3">
           <div>
             <h1 className="font-display text-display-lg text-ink">Names</h1>
@@ -220,7 +220,7 @@ const DomainsPage: React.FC = () => {
       {!isConnected ? (
         <motion.div
           variants={itemVariants}
-          className="glass-card rounded-3xl p-8 text-center border border-border"
+          className="tool-surface-card p-8 text-center"
         >
           <div className="w-14 h-14 rounded-full bg-canvas-alt mx-auto mb-4 flex items-center justify-center">
             <Wallet className="w-6 h-6 text-ink-muted" />

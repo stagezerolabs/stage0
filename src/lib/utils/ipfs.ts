@@ -59,6 +59,28 @@ export function normalizeContractURI(raw: string): string {
   return ipfsPath ? `ipfs://${ipfsPath}` : '';
 }
 
+export function normalizeBaseURI(raw: string): string {
+  const normalized = normalizeContractURI(raw);
+  if (!normalized) return '';
+
+  if (normalized.endsWith('/')) {
+    return normalized;
+  }
+
+  try {
+    if (/^https?:\/\//i.test(normalized)) {
+      const url = new URL(normalized);
+      const lastSegment = url.pathname.split('/').filter(Boolean).pop() ?? '';
+      const looksLikeFile = /\.[a-z0-9]+$/i.test(lastSegment);
+      return looksLikeFile ? normalized : `${normalized}/`;
+    }
+  } catch {
+    // Fall back to a conservative slash append for non-URL values.
+  }
+
+  return `${normalized}/`;
+}
+
 export function contractUriToHttp(raw: string): string {
   const normalized = stripQueryAndHash(raw.trim());
   if (!normalized) return '';

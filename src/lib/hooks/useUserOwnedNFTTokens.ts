@@ -3,6 +3,7 @@ import { type Address } from 'viem';
 import { useReadContracts } from 'wagmi';
 import { NFTCollectionContract } from '@/config';
 import { ipfsUriToHttp } from '@/lib/utils/ipfs';
+import { fetchTokenDisplayImage } from '@/lib/utils/nft-metadata';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 
 const MAX_TOKEN_SCAN_PER_COLLECTION = 1000;
@@ -200,8 +201,10 @@ export function useUserOwnedNFTTokens(userAddress?: Address, enabled = true) {
 
             return [key, { image, name, description } as TokenMetadata] as const;
           } catch {
-            const directImage =
-              row.tokenURI && looksLikeImageUrl(row.tokenURI) ? ipfsUriToHttp(row.tokenURI) : undefined;
+            const directImage = row.tokenURI
+              ? (await fetchTokenDisplayImage(row.tokenURI)) ||
+                (looksLikeImageUrl(row.tokenURI) ? ipfsUriToHttp(row.tokenURI) : undefined)
+              : undefined;
             return [key, directImage ? ({ image: directImage } as TokenMetadata) : null] as const;
           }
         })

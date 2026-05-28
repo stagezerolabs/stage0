@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import FallbackImage from '@/components/ui/fallback-image';
 import { useUserOwnedNFTTokens } from '@/lib/hooks/useUserOwnedNFTTokens';
 import { ArrowRight, Image, Wallet } from 'lucide-react';
 import React, { useMemo } from 'react';
@@ -26,7 +27,10 @@ const MyNFTsPage: React.FC = () => {
   if (!isConnected) {
     return (
       <div className="space-y-6">
-        <h1 className="font-display text-display-lg text-ink">My NFTs</h1>
+        <section className="page-hero-card">
+          <div className="eyebrow">Collectibles</div>
+          <h1 className="ds-h1 mt-2">My NFTs</h1>
+        </section>
         <div className="glass-card rounded-3xl p-10 text-center space-y-4">
           <div className="w-14 h-14 rounded-full bg-canvas-alt border border-border mx-auto flex items-center justify-center">
             <Wallet className="w-6 h-6 text-ink-muted" />
@@ -42,9 +46,10 @@ const MyNFTsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <section className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">My NFTs</h1>
-        <p className="text-body text-ink-muted">
+      <section className="page-hero-card">
+        <div className="eyebrow">Collectibles</div>
+        <h1 className="ds-h1 mt-2">My NFTs</h1>
+        <p className="text-body text-ink-muted mt-3">
           View NFTs minted and currently held across launchpad collections.
         </p>
       </section>
@@ -126,17 +131,16 @@ const MyNFTsPage: React.FC = () => {
                   key={`${token.collectionAddress}-${token.tokenId.toString()}`}
                   className="project-card rounded-3xl overflow-hidden flex flex-col"
                 >
-                  {token.image ? (
-                    <img
-                      src={token.image}
-                      alt={token.metadataName || `${token.collectionSymbol} #${token.tokenId.toString()}`}
-                      className="w-full h-40 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-40 bg-canvas-alt border-b border-border flex items-center justify-center">
-                      <Image className="w-8 h-8 text-ink-faint" />
-                    </div>
-                  )}
+                  <FallbackImage
+                    src={token.image}
+                    alt={token.metadataName || `${token.collectionSymbol} #${token.tokenId.toString()}`}
+                    className="w-full h-40 object-cover"
+                    placeholder={(
+                      <div className="w-full h-40 bg-canvas-alt border-b border-border flex items-center justify-center">
+                        <Image className="w-8 h-8 text-ink-faint" />
+                      </div>
+                    )}
+                  />
 
                   <div className="p-5 space-y-4 flex-1 flex flex-col">
                     <div className="flex items-start justify-between gap-3">

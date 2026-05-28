@@ -1,19 +1,18 @@
+import { getExplorerUrl, riseTestnet } from '@/config';
 import {
-  DOMAIN_SUFFIX,
   formatDomainDisplay,
   normalizeDomainName,
-  validateDomainName,
+  validateDomainName
 } from '@/lib/domains/storage';
 import {
+  useRnsExpiry,
+  useRnsNameStatus,
   useRnsOwnedLabel,
   useRnsRegister,
   useRnsRegistrationQuote,
-  useRnsNameStatus,
   useRnsRelease,
   useRnsRenew,
-  useRnsExpiry,
 } from '@/lib/hooks/rns';
-import { getExplorerUrl, riseTestnet } from '@/config';
 import { motion } from 'framer-motion';
 import { AlertTriangle, Check, ExternalLink, Search, Wallet, X } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -281,9 +280,6 @@ const DomainsPage: React.FC = () => {
             variants={itemVariants}
             className="glass-card rounded-3xl p-6 border border-border space-y-5"
           >
-            <label htmlFor="domain-search" className="form-label">
-              {ownedLabel ? 'Search another name' : 'Search for a name'}
-            </label>
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint pointer-events-none" />
               <input
@@ -291,7 +287,7 @@ const DomainsPage: React.FC = () => {
                 type="text"
                 value={ownedLabel ? query : searchText}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={`my-project`}
+                placeholder={`Search for a name${ownedLabel ? ' or enter a new one' : ''}`}
                 className="input-field w-full pl-11 font-mono text-body-sm"
                 autoComplete="off"
                 spellCheck={false}

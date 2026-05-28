@@ -310,13 +310,15 @@ const DomainsPage: React.FC = () => {
       initial="hidden"
       animate="visible"
       variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-      className="space-y-10 max-w-4xl mx-auto px-4"
+      className="space-y-10 max-w-6xl mx-auto px-4"
     >
       {/* Page Hero banner */}
       <motion.section variants={itemVariants} className="space-y-3 text-left">
-        <h1 className="font-display text-display-lg text-ink">Names</h1>
-        <p className="text-body text-ink-muted max-w-xl">
-          Your identity on RISE  — powered by RNS.
+        <h1 className="font-display text-display-lg text-ink">
+          Names
+        </h1>
+        <p className="text-body-lg text-ink-muted max-w-2xl">
+          Your identity on RISE — powered by RNS.
         </p>
       </motion.section>
 
@@ -410,7 +412,7 @@ const DomainsPage: React.FC = () => {
                         handleSearchSubmit();
                       }
                     }}
-                    placeholder="Search a domain or describe your idea..."
+                    placeholder="Search a domain"
                     className="w-full bg-transparent border-0 text-ink focus:outline-none focus:ring-0 font-mono text-body-sm py-2 px-0"
                     autoComplete="off"
                     spellCheck={false}
@@ -515,12 +517,6 @@ const DomainsPage: React.FC = () => {
                           </span>
 
                           <div className="flex items-center gap-2 select-none">
-                            <span className="text-[11px] font-mono text-ink-muted">
-                              (~${usdValue} USD)
-                            </span>
-                            <div className="w-5 h-5 rounded-full bg-[#1e497b] border border-[#3b82f6] flex items-center justify-center font-bold text-[11px] text-white shrink-0 shadow-sm shadow-[#3b82f6]/20">
-                              $
-                            </div>
                             <span className="font-display text-lg md:text-xl font-bold text-ink font-mono">
                               {formatEther(registerPrice)} ETH
                             </span>

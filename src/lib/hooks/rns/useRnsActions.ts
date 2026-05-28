@@ -11,32 +11,13 @@ import type {
 } from "@/lib/rns/types";
 import { normalizeRnsLabel } from "@/lib/rns/utils";
 import { useCallback } from "react";
-import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useTrackedWriteContract } from "@/lib/hooks/useTrackedWriteContract";
 
 function useRnsWrite() {
-  const {
-    data: hash,
-    writeContract,
-    isPending: isWritePending,
-    error: writeError,
-    reset,
-  } = useWriteContract();
+  const { hash, writeContract, isPending, isConfirming, isSuccess, error, reset } =
+    useTrackedWriteContract();
 
-  const {
-    isLoading: isConfirming,
-    isSuccess,
-    error: confirmError,
-  } = useWaitForTransactionReceipt({ hash });
-
-  return {
-    hash,
-    writeContract,
-    isPending: isWritePending,
-    isConfirming,
-    isSuccess,
-    error: writeError || confirmError,
-    reset,
-  };
+  return { hash, writeContract, isPending, isConfirming, isSuccess, error, reset };
 }
 
 export function useRnsRegister() {

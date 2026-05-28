@@ -1,4 +1,4 @@
-import { DOMAIN_SUFFIX, RESERVED_NAMES } from "@/lib/rns/constants";
+import { DOMAIN_SUFFIX } from "@/lib/rns/constants";
 import { labelhash, namehash } from "viem/ens";
 import type { Hex } from "viem";
 
@@ -37,9 +37,6 @@ export function validateDomainName(name: string): DomainValidationResult {
       valid: false,
       error: "Use lowercase letters, numbers, and hyphens (not at the start or end).",
     };
-  }
-  if (RESERVED_NAMES.has(name)) {
-    return { valid: false, error: "This name is reserved." };
   }
   return { valid: true };
 }

@@ -337,7 +337,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="eyebrow">Native balance</span>
-              {isConnected && isAdmin && !domainDisplayName ? (
+              {isConnected && !domainDisplayName ? (
                 <Link
                   to="/domains"
                   className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-accent transition-colors"

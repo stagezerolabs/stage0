@@ -67,17 +67,6 @@ const tools: Array<{
       enabledForAll: true,
     },
     {
-      id: 'domains',
-      title: 'Mint a Name',
-      description: 'Claim a .rise name.',
-      icon: Globe,
-      href: '/domains',
-      bgColor: 'bg-canvas-alt',
-      textColor: 'text-ink',
-      iconBg: 'bg-ink/10',
-      enabledForAll: true,
-    },
-    {
       id: 'createToken',
       title: 'Create a Token',
       description: 'Deploy a standard, mintable, burnable, or taxable ERC20 token.',
@@ -124,8 +113,8 @@ const Tools: React.FC = () => {
   const { isAdmin } = useIsAdmin(address as Address | undefined);
 
   // Group tools into active (live) and upcoming (coming soon) categories
-  const activeTools = tools.filter((t) => t.id === 'nft' || t.id === 'domains');
-  const comingSoonTools = tools.filter((t) => t.id !== 'nft' && t.id !== 'domains');
+  const activeTools = tools.filter((t) => t.id === 'nft');
+  const comingSoonTools = tools.filter((t) => t.id !== 'nft');
 
   return (
     <motion.div
@@ -140,7 +129,7 @@ const Tools: React.FC = () => {
           Create & Manage
         </h1>
         <p className="text-body-lg text-ink-muted max-w-2xl">
-          Deploy premium NFT collections and claim your unique RNS domain name natively on RISE Testnet.
+          Deploy premium NFT collections natively on RISE Testnet.
         </p>
       </motion.section>
 

@@ -68,7 +68,7 @@ const tools: Array<{
     {
       id: 'domains',
       title: 'Mint a Name',
-      description: 'Claim a test .stage0 name stored locally for your dashboard.',
+      description: 'Claim a .rise name.',
       icon: Globe,
       href: '/domains',
       bgColor: 'bg-canvas-alt',

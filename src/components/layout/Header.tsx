@@ -14,8 +14,10 @@ type HeaderProps = {
 };
 
 const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
+  const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuOpenForPath, setMobileMenuOpenForPath] = useState<string | null>(null);
+  const isMobileMenuOpen = mobileMenuOpenForPath === location.pathname;
   const [chainInfo, setChainInfo] = useState<{
     name?: string;
     iconUrl?: string;
@@ -25,7 +27,6 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const openChainModalRef = useRef<(() => void) | null>(null);
   const openAccountModalRef = useRef<(() => void) | null>(null);
   const openConnectModalRef = useRef<(() => void) | null>(null);
-  const location = useLocation();
   const { isConnected, address } = useAccount();
   const { isAdmin: isOwner } = useIsAdmin(address as Address | undefined);
   const { connect, isPending: isRiseConnectPending } = useConnect();
@@ -40,10 +41,9 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpenForPath(null);
+  }, []);
 
   const publicNavItems = [
     { path: '/', label: 'Home' },
@@ -54,7 +54,6 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     { path: '/', label: 'Home' },
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/presales', label: 'Launchpad' },
-    { path: '/domains', label: 'Names' },
     { path: '/tools', label: 'Tools' },
   ];
 
@@ -66,23 +65,23 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     : publicNavItems;
 
   const handleMobileChainSwitch = useCallback(() => {
-    setMobileMenuOpen(false);
+    closeMobileMenu();
     openChainModalRef.current?.();
-  }, []);
+  }, [closeMobileMenu]);
 
   const handleMobileWalletAction = useCallback(() => {
-    setMobileMenuOpen(false);
+    closeMobileMenu();
     if (isConnected) {
       openAccountModalRef.current?.();
       return;
     }
     openConnectModalRef.current?.();
-  }, [isConnected]);
+  }, [closeMobileMenu, isConnected]);
 
   const handleMobileThemeToggle = useCallback(() => {
-    setMobileMenuOpen(false);
+    closeMobileMenu();
     onToggleTheme();
-  }, [onToggleTheme]);
+  }, [closeMobileMenu, onToggleTheme]);
 
   const headerSurfaceClass = scrolled || themeMode === 'light'
     ? 'bg-canvas-alt/90 backdrop-blur-xl border-border'
@@ -289,18 +288,22 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
           {/* Mobile menu toggle */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={() =>
+              setMobileMenuOpenForPath((current) =>
+                current === location.pathname ? null : location.pathname,
+              )
+            }
             className="md:hidden btn-ghost p-2"
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </nav>
 
       {/* Mobile Navigation */}
       <AnimatePresence>
-        {mobileMenuOpen && (
+        {isMobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -337,7 +340,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
               {!isConnected && riseConnector && (
                 <button
                   onClick={() => {
-                    setMobileMenuOpen(false);
+                    closeMobileMenu();
                     connect({ connector: riseConnector });
                   }}
                   disabled={isRiseConnectPending}

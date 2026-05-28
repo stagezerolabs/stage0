@@ -13,6 +13,8 @@ export default defineConfig({
     }
   },
   server: {
+    // Allow ngrok (and similar) tunnel hostnames in dev
+    allowedHosts: ['.ngrok-free.app', '.ngrok.app'],
     proxy: {
       '/api/rpc/sepolia': {
         target: sepoliaRpcTarget,

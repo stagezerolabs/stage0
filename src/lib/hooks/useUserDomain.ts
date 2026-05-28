@@ -1,43 +1,56 @@
 import {
   formatDomainDisplay,
-  getDomainForAddress,
-  mintDomain as mintDomainInStorage,
+  normalizeDomainName,
+  validateDomainName,
   type MintDomainResult,
 } from '@/lib/domains/storage';
-import { useCallback, useSyncExternalStore } from 'react';
+import { useRnsOwnedLabel } from '@/lib/hooks/rns/useRnsOwnedLabel';
+import { useCallback } from 'react';
 
-const DOMAIN_UPDATED_EVENT = 'rise:domain-updated';
-
-function subscribeToDomainRegistry(onStoreChange: () => void) {
-  window.addEventListener(DOMAIN_UPDATED_EVENT, onStoreChange);
-  return () => window.removeEventListener(DOMAIN_UPDATED_EVENT, onStoreChange);
-}
-
+/**
+ * User's `.rise` name — sourced from the Goldsky subgraph (onchain, no localStorage).
+ */
 export function useUserDomain(address?: string) {
-  const domain = useSyncExternalStore(
-    subscribeToDomainRegistry,
-    () => (address ? getDomainForAddress(address) : null),
-    () => null,
-  );
+  const {
+    label,
+    displayName,
+    isLoading,
+    refetch,
+    expiry,
+    owner,
+  } = useRnsOwnedLabel(address);
 
-  const refresh = useCallback(() => {
-    window.dispatchEvent(new CustomEvent(DOMAIN_UPDATED_EVENT));
-  }, []);
-
-  const mint = useCallback(
+  const mintDomain = useCallback(
     (name: string): MintDomainResult => {
       if (!address) {
         return { ok: false, error: 'Connect your wallet to mint a name.' };
       }
-      return mintDomainInStorage(name, address);
+      const normalized = normalizeDomainName(name);
+      const validation = validateDomainName(normalized);
+      if (!validation.valid) {
+        return { ok: false, error: validation.error ?? 'Invalid name.' };
+      }
+      if (label) {
+        return {
+          ok: false,
+          error: `You already own ${formatDomainDisplay(label)}.`,
+        };
+      }
+      return {
+        ok: false,
+        error: 'Use the register transaction on the Names page to mint onchain.',
+      };
     },
-    [address],
+    [address, label],
   );
 
   return {
-    domain,
-    displayName: domain ? formatDomainDisplay(domain) : null,
-    mintDomain: mint,
-    refresh,
+    domain: label,
+    displayName,
+    owner,
+    expiry,
+    isLoading,
+    mintDomain,
+    refresh: refetch,
   };
 }

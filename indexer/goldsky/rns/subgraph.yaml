@@ -1,0 +1,75 @@
+specVersion: 1.3.0
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: RNSRegistrar
+    network: rise-sepolia
+    source:
+      address: "0x26F762137df7821369E95263f3EB556d96C4cEbB"
+      abi: RNSRegistrar
+      startBlock: 1
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - RnsDomain
+      abis:
+        - name: RNSRegistrar
+          file: ./abis/RNSRegistrar.json
+      eventHandlers:
+        - event: NameRegistered(indexed string,indexed bytes32,indexed address,uint256)
+          handler: handleNameRegistered
+        - event: NameRenewed(indexed string,indexed bytes32,uint256)
+          handler: handleNameRenewed
+        - event: NameReleased(indexed string,indexed bytes32)
+          handler: handleNameReleased
+      file: ./src/registrar.ts
+
+  - kind: ethereum
+    name: RNSRegistry
+    network: rise-sepolia
+    source:
+      address: "0xa8d639540D11bd295d12a8F56DA5D2F53aBC0caF"
+      abi: RNSRegistry
+      startBlock: 1
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - RnsDomain
+      abis:
+        - name: RNSRegistry
+          file: ./abis/RNSRegistry.json
+      eventHandlers:
+        - event: Transfer(indexed bytes32,address)
+          handler: handleTransfer
+        - event: NewResolver(indexed bytes32,address)
+          handler: handleNewResolver
+      file: ./src/registry.ts
+
+  - kind: ethereum
+    name: RNSResolver
+    network: rise-sepolia
+    source:
+      address: "0x251c89457FbFF8930ae1D400C67E33B76498502b"
+      abi: RNSResolver
+      startBlock: 1
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - RnsDomain
+        - RnsReverseRecord
+      abis:
+        - name: RNSResolver
+          file: ./abis/RNSResolver.json
+      eventHandlers:
+        - event: AddrChanged(indexed bytes32,address)
+          handler: handleAddrChanged
+        - event: TextChanged(indexed bytes32,indexed string,string)
+          handler: handleTextChanged
+      file: ./src/resolver.ts

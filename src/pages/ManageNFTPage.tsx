@@ -398,7 +398,7 @@ const ManageNFTPage: React.FC = () => {
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 max-w-5xl">
-      <motion.section variants={itemVariants} className="space-y-3">
+      <motion.section variants={itemVariants} className="page-hero-card space-y-4">
         <Link to="/dashboard" className="inline-flex items-center gap-2 text-body-sm text-ink-muted hover:text-ink">
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
@@ -412,8 +412,9 @@ const ManageNFTPage: React.FC = () => {
               className="w-16 h-16 rounded-2xl object-cover border border-ink/10"
             />
             <div className="space-y-1">
-              <h1 className="font-display text-display-lg text-ink">Manage NFT Collection</h1>
-              <p className="text-body-lg text-ink-muted">
+              <div className="eyebrow">Collection controls</div>
+              <h1 className="ds-h1 mt-2">Manage NFT Collection</h1>
+              <p className="text-body-lg text-ink-muted mt-3">
                 {collection.name} ({collection.symbol})
               </p>
             </div>

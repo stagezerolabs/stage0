@@ -20,13 +20,11 @@ import {
   Loader2,
   Shield,
   Users,
-  Layers,
 } from 'lucide-react';
 import { NFTCollectionContract, NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
 import { getNFTActiveMintPrice, getNFTSalePhase, getNFTSaleStatus, resolveNFTSaleCountdown } from '@/lib/utils/nft-sales';
-import PhaseCountdown from '@/components/ui/PhaseCountdown';
 import FallbackImage from '@/components/ui/fallback-image';
 
 const containerVariants = {
@@ -50,8 +48,8 @@ const itemVariants = {
 function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'whitelist' | 'public' | 'upcoming' | 'ended') {
   if (status === 'live' && salePhase === 'whitelist') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-accent/10 text-accent">
-        <Shield className="w-3.5 h-3.5" />
+      <span className="status-pill bg-accent/10 text-accent">
+        <Shield className="status-pill-icon" />
         Whitelist Live
       </span>
     );
@@ -59,8 +57,8 @@ function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'white
 
   if (status === 'live') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-live-bg text-status-live">
-        <span className="w-2 h-2 rounded-full bg-status-live animate-pulse" />
+      <span className="status-pill bg-status-live-bg text-status-live">
+        <span className="status-pill-dot" />
         Public Live
       </span>
     );
@@ -68,16 +66,16 @@ function getStatusBadge(status: 'live' | 'upcoming' | 'ended', salePhase: 'white
 
   if (status === 'upcoming') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-upcoming-bg text-status-upcoming">
-        <Clock className="w-3.5 h-3.5" />
+      <span className="status-pill bg-status-upcoming-bg text-status-upcoming">
+        <Clock className="status-pill-icon" />
         Upcoming
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold bg-status-closed-bg text-status-closed">
-      <CheckCircle2 className="w-3.5 h-3.5" />
+    <span className="status-pill bg-status-closed-bg text-status-closed">
+      <CheckCircle2 className="status-pill-icon" />
       Ended
     </span>
   );
@@ -106,6 +104,23 @@ function formatCountdown(targetTime: bigint | undefined, nowSec: number): string
   return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds
     .toString()
     .padStart(2, '0')}s`;
+}
+
+// Always shows seconds — for live ticking countdown displays.
+function formatCountdownLive(diff: number): string {
+  if (diff <= 0) return '00h 00m 00s';
+
+  const days = Math.floor(diff / 86400);
+  const hours = Math.floor((diff % 86400) / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  const seconds = diff % 60;
+
+  const hh = hours.toString().padStart(2, '0');
+  const mm = minutes.toString().padStart(2, '0');
+  const ss = seconds.toString().padStart(2, '0');
+
+  if (days > 0) return `${days}d ${hh}h ${mm}m ${ss}s`;
+  return `${hh}h ${mm}m ${ss}s`;
 }
 
 const NFTDetailPage: React.FC = () => {
@@ -433,19 +448,24 @@ const NFTDetailPage: React.FC = () => {
 
   const whitelistStartsIn = collection.whitelistEnabled
     ? whitelistStartSec > nowSec
-      ? 'Scheduled'
+      ? formatCountdown(collection.whitelistStart, nowSec)
       : publicStartSec > nowSec
-      ? 'Active'
+      ? 'Live'
       : 'Ended'
     : 'Disabled';
 
-  const publicStartsIn = publicStartSec > nowSec ? 'Scheduled' : collection.status === 'ended' ? 'Ended' : 'Active';
+  const publicStartsIn =
+    publicStartSec > nowSec
+      ? formatCountdown(collection.saleStart, nowSec)
+      : collection.status === 'ended'
+      ? 'Ended'
+      : 'Live';
 
   const saleEndsIn =
     collection.saleEnd === 0n
       ? 'No end date'
       : saleEndSec > nowSec
-      ? 'Active'
+      ? formatCountdown(collection.saleEnd, nowSec)
       : 'Ended';
 
   return (
@@ -465,12 +485,12 @@ const NFTDetailPage: React.FC = () => {
         </Link>
       </motion.div>
 
-      <motion.section variants={itemVariants} className="space-y-3">
+      <motion.section variants={itemVariants} className="page-hero-card space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="font-display text-display-lg text-ink">{collection.name}</h1>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-secondary/15 text-accent-secondary">
+              <h1 className="ds-h1">{collection.name}</h1>
+              <span className="pill pill-nft">
                 NFT
               </span>
             </div>
@@ -508,24 +528,39 @@ const NFTDetailPage: React.FC = () => {
         </motion.div>
 
         {/* Mint Progress — left col, mobile: 2nd */}
-        <motion.div variants={itemVariants} className="lg:col-span-2 order-2 glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="font-display text-display-sm text-ink">Mint Progress</h2>
+        <motion.div
+          variants={itemVariants}
+          className="lg:col-span-2 order-2 bg-canvas-alt border border-border rounded-3xl p-6 space-y-5 relative overflow-hidden"
+        >
+          <span
+            aria-hidden
+            className="absolute top-0 left-6 h-[3px] w-12 rounded-b-full"
+            style={{ background: 'rgb(var(--color-accent))' }}
+          />
+          <div>
+            <div className="eyebrow" style={{ color: 'rgb(var(--color-accent))' }}>
+              Supply
+            </div>
+            <h2 className="font-display font-bold text-[22px] text-ink leading-tight mt-1.5 tracking-tight">
+              Mint progress
+            </h2>
+          </div>
           <div className="space-y-3">
             <div className="flex justify-between text-body">
               <span className="text-ink-muted">Minted</span>
-              <span className="text-ink font-medium">
+              <span className="text-ink font-mono font-bold">
                 {collection.totalMinted.toString()} / {collection.maxSupply.toString()}
               </span>
             </div>
-            <div className="w-full h-4 bg-ink/5 rounded-full overflow-hidden">
+            <div className="w-full h-3 bg-ink/5 rounded-full overflow-hidden">
               <div
                 className="h-full bg-accent rounded-full transition-all duration-500"
                 style={{ width: `${mintProgress}%` }}
               />
             </div>
             <div className="flex justify-between text-body-sm text-ink-muted">
-              <span>{mintProgress}% minted</span>
-              <span>{collection.remaining.toString()} remaining</span>
+              <span className="font-mono">{mintProgress}% minted</span>
+              <span className="font-mono">{collection.remaining.toString()} remaining</span>
             </div>
           </div>
         </motion.div>
@@ -533,35 +568,62 @@ const NFTDetailPage: React.FC = () => {
         {/* Right column — mobile: 3rd (Mint NFT before Sale Overview) */}
         <div className="space-y-6 order-3 lg:col-start-3 lg:row-start-1 lg:row-span-3">
           {collection.status === 'live' && isConnected && (
-            <motion.div variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-4">
-              <h3 className="font-display text-display-sm text-ink">Mint NFT</h3>
-
-              <div className="rounded-2xl border border-border bg-canvas-alt p-4 space-y-1">
-                <p className="text-body-sm text-ink-muted">Active phase</p>
-                <p className="text-body font-medium text-ink">
-                  {collection.salePhase === 'whitelist' ? 'Whitelist mint' : 'Public mint'}
-                </p>
-                <p className="text-body-sm text-ink-muted">
-                  Current price: <span className="font-medium text-ink">{formatEther(unitPrice)} ETH</span>
-                </p>
+            <motion.div
+              variants={itemVariants}
+              className="bg-canvas-alt border border-border rounded-3xl p-6 space-y-5 relative overflow-hidden text-center"
+            >
+              <span
+                aria-hidden
+                className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-12 rounded-b-full"
+                style={{ background: 'rgb(var(--color-accent))' }}
+              />
+              <div>
+                <div className="eyebrow" style={{ color: 'rgb(var(--color-accent))' }}>
+                  Mint
+                </div>
+                <h3 className="font-display font-bold text-[22px] text-ink leading-tight mt-1.5 tracking-tight">
+                  Mint NFT
+                </h3>
               </div>
 
-              <PhaseCountdown
-                compact
-                label={mintCardCountdown.label}
-                targetTime={mintCardCountdown.targetTime}
-                nowSec={nowSec}
-                fallbackLabel={mintCardCountdown.fallbackLabel}
-                completedLabel={mintCardCountdown.completedLabel}
-                stoppedMessage={mintCardCountdown.stoppedMessage}
-              />
+              <div className="rounded-2xl border border-border bg-canvas/40 p-4 space-y-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                  Active phase
+                </div>
+                <div className="font-display font-bold text-[17px] text-ink leading-tight tracking-tight">
+                  {collection.salePhase === 'whitelist' ? 'Whitelist mint' : 'Public mint'}
+                </div>
+                <div className="text-body-sm text-ink-muted">
+                  Current price{' '}
+                  <span className="font-mono font-bold text-ink">{formatEther(unitPrice)} ETH</span>
+                </div>
+              </div>
+
+              <div className="launch-countdown justify-center">
+                <span className="launch-countdown-lbl">{mintCardCountdown.label}</span>
+                <span className="font-bold tabular-nums">
+                  {(() => {
+                    if (mintCardCountdown.targetTime !== undefined) {
+                      const secs = Number(mintCardCountdown.targetTime) - nowSec;
+                      if (secs > 0) return formatCountdownLive(secs);
+                      return mintCardCountdown.completedLabel ?? '—';
+                    }
+                    return (
+                      mintCardCountdown.stoppedMessage ??
+                      mintCardCountdown.fallbackLabel ??
+                      mintCardCountdown.completedLabel ??
+                      '—'
+                    );
+                  })()}
+                </span>
+              </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-body-sm text-ink-muted font-medium mb-1 block">
+                  <label className="text-body-sm text-ink-muted font-medium mb-2 block">
                     Quantity
                   </label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center gap-3">
                     <button
                       onClick={() => setMintQty((q) => Math.max(1, q - 1))}
                       disabled={mintQty <= 1}
@@ -592,9 +654,9 @@ const NFTDetailPage: React.FC = () => {
                 </div>
 
                 <div className="text-body-sm text-ink-muted space-y-1">
-                  <p>Price per NFT: {formatEther(unitPrice)} ETH</p>
-                  <p className="font-medium text-ink">Total: {formatEther(totalCost)} ETH</p>
-                  {collection.walletLimit > 0 && <p>Max per wallet: {collection.walletLimit}</p>}
+                  <p>Price per NFT: <span className="font-mono text-ink">{formatEther(unitPrice)} ETH</span></p>
+                  <p className="font-display font-bold text-[18px] text-ink tracking-tight">Total: {formatEther(totalCost)} ETH</p>
+                  {collection.walletLimit > 0 && <p>Max per wallet: <span className="font-mono">{collection.walletLimit}</span></p>}
                 </div>
 
                 {!userCanMintCurrentPhase ? (
@@ -686,57 +748,72 @@ const NFTDetailPage: React.FC = () => {
         </div>
 
         {/* Sale Overview — left col, mobile: 4th (after Mint NFT) */}
-        <motion.div variants={itemVariants} className="lg:col-span-2 order-4 glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="font-display text-display-sm text-ink">Sale Overview</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <motion.div
+          variants={itemVariants}
+          className="lg:col-span-2 order-4 bg-canvas-alt border border-border rounded-3xl p-6 space-y-5 relative overflow-hidden"
+        >
+          <span
+            aria-hidden
+            className="absolute top-0 left-6 h-[3px] w-12 rounded-b-full"
+            style={{ background: 'rgb(var(--color-accent))' }}
+          />
+          <div>
+            <div className="eyebrow" style={{ color: 'rgb(var(--color-accent))' }}>
+              Sale
+            </div>
+            <h2 className="font-display font-bold text-[22px] text-ink leading-tight mt-1.5 tracking-tight">
+              Sale overview
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
             {[
               {
                 label: 'Public Price',
                 value: `${formatEther(collection.mintPrice)} ETH`,
-                icon: Layers,
               },
               {
                 label: 'Whitelist Price',
                 value: collection.whitelistEnabled ? `${formatEther(collection.whitelistPrice)} ETH` : 'Disabled',
-                icon: Shield,
               },
               {
                 label: 'Whitelist Start',
                 value: whitelistStartsIn,
                 sub: collection.whitelistEnabled ? formatTimestamp(collection.whitelistStart) : undefined,
-                icon: Clock,
               },
               {
                 label: 'Public Start',
                 value: publicStartsIn,
                 sub: formatTimestamp(collection.saleStart),
-                icon: Clock,
               },
               {
                 label: 'Sale End',
                 value: saleEndsIn,
                 sub: formatTimestamp(collection.saleEnd),
-                icon: Clock,
               },
               {
                 label: 'Wallet Limit',
                 value: collection.walletLimit === 0 ? 'Unlimited' : collection.walletLimit.toString(),
-                icon: Users,
               },
-            ].map((item) => (
-              <div key={item.label} className="flex items-start gap-3 p-3 rounded-2xl bg-ink/[0.02]">
-                <div className="w-8 h-8 rounded-xl bg-accent-muted text-accent flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-body-sm text-ink-muted">{item.label}</p>
-                  <p className="text-body font-medium text-ink">{item.value}</p>
+            ].map((item) => {
+              const isDisabled = item.value === 'Disabled';
+              return (
+                <div key={item.label} className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                    {item.label}
+                  </div>
+                  <div
+                    className={`font-display font-bold mt-1.5 text-[17px] leading-tight tracking-tight ${
+                      isDisabled ? 'text-ink-faint' : 'text-ink'
+                    }`}
+                  >
+                    {item.value}
+                  </div>
                   {'sub' in item && item.sub ? (
-                    <p className="text-body-sm text-ink-faint">{item.sub}</p>
+                    <div className="font-mono text-[11px] text-ink-muted mt-1.5">{item.sub}</div>
                   ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {collection.salePhase === 'whitelist' && (

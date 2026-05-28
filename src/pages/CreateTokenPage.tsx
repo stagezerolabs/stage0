@@ -336,9 +336,10 @@ const CreateTokenPage: React.FC = () => {
       className="max-w-3xl mx-auto space-y-8"
     >
       {/* Header */}
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Create Token</h1>
-        <p className="text-body-lg text-ink-muted">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">ERC-20 factory</div>
+        <h1 className="ds-h1 mt-2">Create Token</h1>
+        <p className="text-body-lg text-ink-muted mt-3">
           Deploy your own ERC20 token on Stage0 with just a few clicks.
         </p>
       </motion.section>

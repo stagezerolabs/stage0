@@ -27,7 +27,10 @@ const MyNFTsPage: React.FC = () => {
   if (!isConnected) {
     return (
       <div className="space-y-6">
-        <h1 className="font-display text-display-lg text-ink">My NFTs</h1>
+        <section className="page-hero-card">
+          <div className="eyebrow">Collectibles</div>
+          <h1 className="ds-h1 mt-2">My NFTs</h1>
+        </section>
         <div className="glass-card rounded-3xl p-10 text-center space-y-4">
           <div className="w-14 h-14 rounded-full bg-canvas-alt border border-border mx-auto flex items-center justify-center">
             <Wallet className="w-6 h-6 text-ink-muted" />
@@ -43,9 +46,10 @@ const MyNFTsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <section className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">My NFTs</h1>
-        <p className="text-body text-ink-muted">
+      <section className="page-hero-card">
+        <div className="eyebrow">Collectibles</div>
+        <h1 className="ds-h1 mt-2">My NFTs</h1>
+        <p className="text-body text-ink-muted mt-3">
           View NFTs minted and currently held across launchpad collections.
         </p>
       </section>

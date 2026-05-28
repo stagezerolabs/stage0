@@ -225,18 +225,16 @@ const LockDetailPage: React.FC = () => {
         Back to Token Locker
       </Link>
 
-      <div className="glass-card rounded-3xl p-6 space-y-4">
+      <div className="page-hero-card space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <p className="text-body-sm text-ink-muted">Lock #{id}</p>
-            <h1 className="font-display text-display-lg text-ink">
+            <div className="eyebrow">Lock #{id}</div>
+            <h1 className="ds-h1 mt-2">
               {lock.name || `Token Lock #${id}`}
             </h1>
-            {lock.description && (
-              <p className="text-body text-ink-muted">{lock.description}</p>
-            )}
+            {lock.description && <p className="text-body text-ink-muted mt-3">{lock.description}</p>}
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+          <span className={`status-pill ${
             lock.withdrawn
               ? 'bg-ink/10 text-ink-muted'
               : unlockable

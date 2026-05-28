@@ -131,14 +131,15 @@ const Tools: React.FC = () => {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-12"
+      className="space-y-10"
     >
       {/* Header */}
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">Tools</div>
+        <h1 className="ds-h1 mt-2">
           Create & Manage
         </h1>
-        <p className="text-body-lg text-ink-muted max-w-2xl">
+        <p className="text-body-lg text-ink-muted max-w-2xl mt-3">
           NFT creation and Rise names are currently live. Additional launch tools are rolling out soon.
         </p>
       </motion.section>
@@ -148,7 +149,7 @@ const Tools: React.FC = () => {
         <motion.div variants={cardVariants} className="max-w-4xl mx-auto">
           <Link
             to={featuredTool.href}
-            className={`${featuredTool.bgColor} ${featuredTool.textColor} rounded-3xl border border-accent/40 p-8 md:p-10 text-left relative overflow-hidden group transition-all duration-500 backdrop-blur-md shadow-float hover:shadow-float-hover hover:-translate-y-2 hover:border-accent hover:ring-1 hover:ring-accent/40 block`}
+            className={`${featuredTool.bgColor} ${featuredTool.textColor} tool-surface-card border-accent/40 p-8 md:p-10 text-left group block`}
           >
             <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-accent/15 blur-2xl pointer-events-none" />
             <div className="absolute -left-10 -bottom-10 h-36 w-36 rounded-full bg-accent-secondary/10 blur-3xl pointer-events-none" />
@@ -182,7 +183,7 @@ const Tools: React.FC = () => {
                 <motion.div key={tool.id} variants={cardVariants}>
                   <Link
                     to={tool.href}
-                    className={`${tool.bgColor} ${tool.textColor} rounded-3xl border border-border p-6 md:p-8 text-left relative overflow-hidden group transition-all duration-500 backdrop-blur-md shadow-float hover:shadow-float-hover hover:-translate-y-2 hover:border-accent hover:ring-1 hover:ring-accent/30 block`}
+                    className={`${tool.bgColor} ${tool.textColor} tool-surface-card p-6 md:p-8 text-left group block`}
                   >
                     <div className={`${tool.iconBg} w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:bg-accent/20 group-hover:text-accent transition-colors`}>
                       <IconComponent className="w-6 h-6" />
@@ -205,7 +206,7 @@ const Tools: React.FC = () => {
               <motion.div key={tool.id} variants={cardVariants}>
                 <div
                   aria-disabled="true"
-                  className={`${tool.bgColor} ${tool.textColor} rounded-3xl border border-border p-6 md:p-8 text-left relative overflow-hidden backdrop-blur-md shadow-float opacity-60 grayscale select-none cursor-not-allowed`}
+                  className={`${tool.bgColor} ${tool.textColor} tool-surface-card p-6 md:p-8 text-left opacity-60 grayscale select-none cursor-not-allowed`}
                 >
                   <div className="absolute top-4 right-4 text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-1 rounded-full bg-ink/10 text-ink-muted">
                     Soon

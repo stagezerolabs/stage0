@@ -16,13 +16,22 @@ import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
 import { useIsAdmin } from '@/lib/utils/admin';
-import { ArrowRight, Globe, Image, Lock, Package, Plus, Settings, TrendingUp, Wallet, Wrench } from 'lucide-react';
+import {
+  ArrowRight,
+  Globe,
+  Image as ImageIcon,
+  Layers,
+  Lock,
+  Package,
+  Sparkles,
+  Wallet,
+} from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
 
-const COUNTDOWN_TICK_INTERVAL_MS = 10000;
+const COUNTDOWN_TICK_INTERVAL_MS = 1000;
 const DASHBOARD_QUERY_STALE_TIME = 15000;
 const DASHBOARD_QUERY_GC_TIME = 5 * 60 * 1000;
 
@@ -31,7 +40,7 @@ const ConnectWalletPlaceholder: React.FC<{ message: string }> = ({ message }) =>
     <div className="w-16 h-16 rounded-full bg-canvas flex items-center justify-center mb-4">
       <Wallet className="w-6 h-6 text-ink-muted" />
     </div>
-    <h3 className="font-display text-display-sm text-ink mb-2">Connect Your Wallet</h3>
+    <h3 className="font-display text-display-sm text-ink mb-2">Connect your wallet</h3>
     <p className="text-body text-ink-muted max-w-xs">{message}</p>
   </div>
 );
@@ -59,6 +68,11 @@ function formatLockAmount(amount: string): string {
   return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function shortenAddress(addr?: string): string {
+  if (!addr) return '—';
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
 interface DashboardLockItem {
   id: bigint;
   tokenSymbol: string;
@@ -72,7 +86,6 @@ const Dashboard: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { displayName: domainDisplayName } = useUserDomain(address);
   const { isAdmin } = useIsAdmin(address as Address | undefined);
-  const [nftTypeFilter, setNftTypeFilter] = useState<'all' | 'erc721' | 'erc721a'>('all');
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const safeAddress = (address ?? zeroAddress) as Address;
   const chainId = useChainId();
@@ -103,7 +116,6 @@ const Dashboard: React.FC = () => {
   const {
     holdings: myNftHoldings,
     totalOwned: totalOwnedNFTs,
-    totalMinted: totalMintedNFTs,
     isLoading: isNftHoldingsLoading,
   } = useUserNFTHoldings(address as Address | undefined, isConnected && Boolean(address));
   const { locks: rawLocks, isLoading: isLocksLoading } = useAllLocks();
@@ -259,637 +271,697 @@ const Dashboard: React.FC = () => {
     });
   }, [rawLocks]);
 
-  const filteredMyNFTDeployments = useMemo(() => {
-    if (nftTypeFilter === 'all') return myNFTDeployments;
-    if (nftTypeFilter === 'erc721a') return myNFTDeployments.filter((deployment) => deployment.is721A);
-    return myNFTDeployments.filter((deployment) => !deployment.is721A);
-  }, [myNFTDeployments, nftTypeFilter]);
-
   const balanceDisplay = balance
-    ? `${Number(balance.formatted).toLocaleString(undefined, {
-      maximumFractionDigits: 4,
-    })} ${balance.symbol ?? nativeToken}`
-    : `0 ${nativeToken}`;
+    ? `${Number(balance.formatted).toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+    : '0';
+  const balanceSymbol = balance?.symbol ?? nativeToken;
+
+  const totalAllocations = allocations.length + nftPurchaseAllocations.length + (hasStakedAllocation ? 1 : 0);
+  const unlockedLocks = myLocks.filter((lock) => !lock.withdrawn && Number(lock.unlockDate) <= nowSec).length;
+  const createdAssetsCount = createdTokenList.length + createdPresales.length + myNFTDeployments.length;
+
+  const creatorTiles = [
+    {
+      name: 'Launch a token',
+      desc: 'Deploy ERC-20s with mint, burn, tax options.',
+      to: isAdmin ? '/create/token' : '/tools',
+    },
+    {
+      name: 'Mint an NFT drop',
+      desc: 'ERC-721 or ERC-721A with whitelist + reveal.',
+      to: '/create/nft',
+    },
+    {
+      name: 'Lock liquidity',
+      desc: 'Timelock LP or tokens with verifiable proofs.',
+      to: isAdmin ? '/tools/token-locker' : '/tools',
+    },
+    {
+      name: 'Airdrop tool',
+      desc: 'Batch distribute tokens with merkle proofs.',
+      to: isAdmin ? '/tools/airdrop' : '/tools',
+    },
+  ];
 
   return (
-    <div className="space-y-12">
-      {/* Hero Section */}
-      <section className="space-y-2">
-        <h1 className="font-display text-display-md sm:text-display-lg text-ink">
-          {address ? (
-            <>
-              <span className="text-ink-muted">Welcome back, </span>
-              <br className="sm:hidden" />
-              <span className="text-accent-gradient font-mono text-body-lg sm:text-display-md">
-                {domainDisplayName ?? `${address.slice(0, 6)}...${address.slice(-4)}`}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-ink-muted">Hello, </span>
-              <span className="text-accent-gradient">Guest</span>
-            </>
-          )}
-        </h1>
-        {isConnected && isAdmin && !domainDisplayName ? (
-          <Link
-            to="/domains"
-            className="inline-flex items-center gap-2 text-body-sm text-ink-muted hover:text-ink transition-colors"
-          >
-            <Globe className="w-4 h-4" />
-            Mint a name for your dashboard
-          </Link>
-        ) : null}
+    <div className="space-y-10">
+      {/* Wallet hero */}
+      <section>
+        <div className="wallet-header">
+          <div>
+            <div className="wallet-greeting">
+              {isConnected ? 'Welcome back' : 'Hello, guest'}
+            </div>
+            <div className="wallet-addr">
+              {isConnected
+                ? (domainDisplayName ?? shortenAddress(address))
+                : 'Connect wallet to begin'}
+            </div>
+            <div className="wallet-portfolio">
+              <div className="wallet-portfolio-val">
+                {isConnected
+                  ? (isBalanceLoading ? '—' : balanceDisplay)
+                  : '0.00'}
+              </div>
+              <div className="font-mono text-ink-muted text-sm font-semibold">
+                {balanceSymbol}
+              </div>
+              {isConnected && hasStakedAllocation && (
+                <div className="wallet-portfolio-chg">
+                  {Number(formatUnits(stakedBalance, stakingDecimals)).toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  {stakingSymbol} staked
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="eyebrow">Native balance</span>
+              {isConnected && isAdmin && !domainDisplayName ? (
+                <Link
+                  to="/domains"
+                  className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-accent transition-colors"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  Mint a name for your dashboard
+                </Link>
+              ) : null}
+            </div>
+          </div>
+          <div className="wallet-actions">
+            <Link to="/presales" className="btn-primary btn-sm">
+              Discover launches <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Link>
+            <Link to="/tools" className="btn-secondary btn-sm">
+              Open tools
+            </Link>
+          </div>
+        </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-12 gap-y-12">
-        {/* === Left Column: Sidebar === */}
-        <div className="lg:col-span-1 space-y-12">
-          {/* Overview */}
-          <section className="space-y-6">
-            <h2 className="font-display text-display-md text-ink">Overview</h2>
-            {isConnected ? (
-              <div className="space-y-4">
-                <div className="stat-card p-5">
-                  <div className="flex items-start justify-between mb-4">
-                    <span className="text-label text-ink-faint uppercase">Native Balance</span>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-accent-muted text-accent">
-                      <TrendingUp className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <p className="font-display text-display-md text-ink">
-                    {isBalanceLoading ? 'Loading…' : balanceDisplay}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <ConnectWalletPlaceholder message="Connect your wallet to see your balance." />
-            )}
-          </section>
+      {/* Stat grid */}
+      <section className="stat-grid">
+        <StatTile
+          label="Created assets"
+          value={isConnected ? String(createdAssetsCount) : '0'}
+          meta={
+            isConnected
+              ? `${createdTokenList.length} tokens · ${myNFTDeployments.length} NFT drops`
+              : 'connect wallet'
+          }
+          icon={<Package className="w-4 h-4" />}
+          tint="rgb(var(--color-accent) / 0.14)"
+          tintSolid="rgb(var(--color-accent))"
+        />
+        <StatTile
+          label="Allocations"
+          value={isConnected ? String(totalAllocations) : '0'}
+          meta={totalAllocations > 0 ? 'live positions' : 'no positions yet'}
+          icon={<Layers className="w-4 h-4" />}
+          tint="rgb(var(--color-accent-secondary) / 0.14)"
+          tintSolid="rgb(var(--color-accent-secondary))"
+        />
+        <StatTile
+          label="NFTs owned"
+          value={isConnected ? totalOwnedNFTs.toString() : '0'}
+          meta={`${myNFTDeployments.length} collection${myNFTDeployments.length === 1 ? '' : 's'} created`}
+          icon={<ImageIcon className="w-4 h-4" />}
+          tint="rgb(var(--color-accent-violet) / 0.16)"
+          tintSolid="rgb(var(--color-accent-violet))"
+        />
+        <StatTile
+          label="Token locks"
+          value={isConnected ? String(myLocks.length) : '0'}
+          meta={unlockedLocks > 0 ? `${unlockedLocks} unlockable now` : 'all locked'}
+          icon={<Lock className="w-4 h-4" />}
+          tint="rgb(var(--color-accent-sky) / 0.16)"
+          tintSolid="rgb(var(--color-accent-sky))"
+        />
+      </section>
+
+      {/* Allocations */}
+      <section>
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">My positions</div>
+            <h2 className="ds-h2 mt-1.5">Allocations</h2>
+          </div>
         </div>
 
-        {/* === Right Column: Main Content === */}
-        <div className="lg:col-span-2 space-y-12">
-          {/* Allocations Table */}
-          <section className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-display-md text-ink">Your Allocations</h2>
+        {!isConnected ? (
+          <ConnectWalletPlaceholder message="Connect your wallet to view your launch allocations." />
+        ) : allocations.length === 0 &&
+          nftPurchaseAllocations.length === 0 &&
+          !hasStakedAllocation &&
+          !isPresalesLoading &&
+          !isContributionsLoading &&
+          !isNftHoldingsLoading ? (
+          <div className="alloc-table">
+            <div className="px-6 py-12 text-center text-ink-muted">
+              <Sparkles className="w-5 h-5 mx-auto mb-3 text-ink-faint" />
+              <p>No allocations yet — contribute to a launch to get started.</p>
+              <Link to="/presales" className="btn-secondary btn-sm mt-4 inline-flex">
+                Browse launchpad <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </Link>
             </div>
+          </div>
+        ) : (
+          <div className="alloc-table">
+            <div className="alloc-row head">
+              <div>Project</div>
+              <div>Contributed</div>
+              <div>Purchased / Held</div>
+              <div>Type</div>
+              <div>Status</div>
+              <div style={{ textAlign: 'right' }}>Action</div>
+            </div>
+            {allocations.map(({ presale, contribution, purchasedTokens }) => {
+              const paymentSymbol = presale.isPaymentETH
+                ? nativeToken
+                : presale.paymentTokenSymbol ?? 'TOKEN';
+              const saleSymbol = presale.saleTokenSymbol ?? 'TOKEN';
+              const contributionValue = formatUnits(contribution, presale.paymentTokenDecimals ?? 18);
+              const purchasedValue = formatUnits(purchasedTokens, presale.saleTokenDecimals ?? 18);
 
-            {isConnected ? (
-              allocations.length === 0 &&
-              nftPurchaseAllocations.length === 0 &&
-              !hasStakedAllocation &&
-              !isPresalesLoading &&
-              !isContributionsLoading &&
-              !isNftHoldingsLoading ? (
-                <div className="bg-canvas-alt rounded-3xl border border-border p-8 text-center">
-                  <p className="text-body text-ink-muted">No allocations yet.</p>
-                </div>
-              ) : (
-                <div className="bg-canvas-alt rounded-3xl border border-border overflow-hidden">
-                  {/* Table Header */}
-                  <div className="hidden md:grid grid-cols-12 gap-6 px-6 py-4 border-b border-border bg-canvas/40">
-                    <span className="text-label text-ink-faint uppercase col-span-4">Allocation</span>
-                    <span className="text-label text-ink-faint uppercase text-right col-span-3">Contributed / Minted</span>
-                    <span className="text-label text-ink-faint uppercase text-right col-span-3">Purchased / Held</span>
-                    <span className="text-label text-ink-faint uppercase text-right col-span-2">Status</span>
+              return (
+                <Link key={presale.address} to={`/presales/${presale.address}`} className="alloc-row">
+                  <div className="asset">
+                    <div className="asset-icon">
+                      {presale.logo ? (
+                        <img src={presale.logo} alt={saleSymbol} />
+                      ) : (
+                        saleSymbol.slice(0, 1)
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="asset-name">{presale.saleTokenName ?? saleSymbol}</div>
+                      <div className="asset-sym">${saleSymbol}</div>
+                    </div>
                   </div>
-                  {/* Table Body */}
-                  <div className="divide-y divide-border">
-                    {allocations.map(({ presale, contribution, purchasedTokens }) => {
-                      const paymentSymbol = presale.isPaymentETH
-                        ? nativeToken
-                        : presale.paymentTokenSymbol ?? 'TOKEN';
-                      const saleSymbol = presale.saleTokenSymbol ?? 'TOKEN';
-                      const contributionValue = formatUnits(contribution, presale.paymentTokenDecimals ?? 18);
-                      const purchasedValue = formatUnits(purchasedTokens, presale.saleTokenDecimals ?? 18);
-
-                      const statusVariant =
+                  <div className="alloc-cell-hide-mobile">
+                    <div className="num">
+                      {Number(contributionValue).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+                      {paymentSymbol}
+                    </div>
+                    <div className="num-sub">at presale</div>
+                  </div>
+                  <div className="alloc-cell-hide-mobile">
+                    <div className="num">
+                      {Number(purchasedValue).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
+                      {saleSymbol}
+                    </div>
+                    <div className="num-sub">
+                      {presale.status === 'live' ? 'pending' : 'available'}
+                    </div>
+                  </div>
+                  <div className="alloc-cell-hide-mobile">
+                    <span className="pill pill-token">Token</span>
+                  </div>
+                  <div className="alloc-cell-hide-mobile">
+                    <Badge
+                      variant={
                         presale.status === 'live'
                           ? 'live'
                           : presale.status === 'upcoming'
                             ? 'upcoming'
-                            : 'closed';
+                            : 'closed'
+                      }
+                    >
+                      {presale.status}
+                    </Badge>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span className="btn-secondary btn-sm inline-flex">View</span>
+                  </div>
+                </Link>
+              );
+            })}
 
-                      return (
-                        <Link
-                          key={presale.address}
-                          to={`/presales/${presale.address}`}
-                          className="grid grid-cols-1 md:grid-cols-12 gap-6 px-6 py-5 hover:bg-canvas/40 transition-colors duration-300 group items-center"
-                        >
-                          <div className="col-span-4 flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-canvas border border-border flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-mono text-ink-muted">{saleSymbol.slice(0, 3)}</span>
-                            </div>
-                            <div>
-                              <p className="text-body font-medium text-ink group-hover:text-accent transition-colors duration-300">
-                                {presale.saleTokenName ?? presale.saleTokenSymbol ?? 'Launch'}
-                              </p>
-                              <p className="text-body-sm text-ink-muted font-mono">{saleSymbol}</p>
-                            </div>
-                          </div>
-                          <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
-                            {Number(contributionValue).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
-                            {paymentSymbol}
-                          </p>
-                          <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
-                            {Number(purchasedValue).toLocaleString(undefined, { maximumFractionDigits: 4 })}{' '}
-                            {saleSymbol}
-                          </p>
-                          <div className="col-span-2 flex items-center justify-end">
-                            <Badge variant={statusVariant}>{presale.status}</Badge>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                    {nftPurchaseAllocations.map((holding) => {
-                      const statusVariant =
-                        holding.status === 'live'
-                          ? 'live'
-                          : holding.status === 'upcoming'
-                          ? 'upcoming'
-                          : 'closed';
-
-                      return (
-                        <Link
-                          key={`nft-${holding.address}`}
-                          to={`/nfts/${holding.address}`}
-                          className="grid grid-cols-1 md:grid-cols-12 gap-6 px-6 py-5 hover:bg-canvas/40 transition-colors duration-300 group items-center"
-                        >
-                          <div className="col-span-4 flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
-                              <FallbackImage
-                                src={holding.metadataImage}
-                                fallbackSrc={NFT_COLLECTION_IMAGES[holding.address.toLowerCase()]}
-                                alt={holding.name}
-                                className="w-full h-full object-cover"
-                                placeholder={<Image className="w-4 h-4 text-ink-muted" />}
-                              />
-                            </div>
-                            <div>
-                              <p className="text-body font-medium text-ink group-hover:text-accent transition-colors duration-300">
-                                {holding.name}
-                              </p>
-                              <p className="text-body-sm text-ink-muted font-mono">{holding.symbol}</p>
-                            </div>
-                          </div>
-                          <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
-                            {holding.mintedCount.toString()} NFT{holding.mintedCount === 1n ? '' : 's'}
-                          </p>
-                          <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
-                            {holding.ownedCount.toString()} Held
-                          </p>
-                          <div className="col-span-2 flex items-center justify-end">
-                            <Badge variant={statusVariant}>{holding.status}</Badge>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                    {hasStakedAllocation && !isStakingLoading && (
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 px-6 py-5 bg-canvas/30 items-center">
-                        <div className="col-span-4 flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-canvas border border-border flex items-center justify-center flex-shrink-0">
-                            <Wallet className="w-4 h-4 text-ink-muted" />
-                          </div>
-                          <div>
-                            <p className="text-body font-medium text-ink">Staked Tokens</p>
-                            <p className="text-body-sm text-ink-muted font-mono">{stakingSymbol}</p>
-                          </div>
-                        </div>
-                        <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
-                          {Number(formatUnits(stakedBalance, stakingDecimals)).toLocaleString(undefined, {
-                            maximumFractionDigits: 4,
-                          })}{' '}
-                          {stakingSymbol}
-                        </p>
-                        <p className="hidden md:block font-mono text-body text-ink text-right col-span-3">
-                          {pendingRewards > 0n
-                            ? `${Number(formatUnits(pendingRewards, stakingDecimals)).toLocaleString(undefined, {
-                              maximumFractionDigits: 4,
-                            })} ${stakingSymbol}`
-                            : '—'}
-                        </p>
-                        <div className="col-span-2 flex items-center justify-end">
-                          <Badge variant="live">staked</Badge>
-                        </div>
-                      </div>
-                    )}
+            {nftPurchaseAllocations.map((holding) => (
+              <Link key={`nft-${holding.address}`} to={`/nfts/${holding.address}`} className="alloc-row">
+                <div className="asset">
+                  <div className="asset-icon">
+                    <FallbackImage
+                      src={holding.metadataImage}
+                      fallbackSrc={NFT_COLLECTION_IMAGES[holding.address.toLowerCase()]}
+                      alt={holding.name}
+                      className="w-full h-full object-cover"
+                      placeholder={<ImageIcon className="w-4 h-4 text-ink-muted" />}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="asset-name">{holding.name}</div>
+                    <div className="asset-sym">${holding.symbol}</div>
                   </div>
                 </div>
-              )
-            ) : (
-              <ConnectWalletPlaceholder message="Connect your wallet to view your launch allocations." />
-            )}
-          </section>
-        </div>
-      </div>
-
-      {/* My Token Creations */}
-      <section className="space-y-6">
-        <h2 className="font-display text-display-md text-ink">My Token Creations</h2>
-        {isConnected ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-            {/* Created Tokens */}
-            <div className="bg-canvas-alt rounded-2xl border border-border p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center">
-                  <Package className="w-5 h-5 text-ink-muted" />
+                <div className="alloc-cell-hide-mobile">
+                  <div className="num">
+                    {holding.mintedCount.toString()} NFT{holding.mintedCount === 1n ? '' : 's'}
+                  </div>
+                  <div className="num-sub">minted</div>
                 </div>
-                <div>
-                  <h3 className="font-display text-body text-ink">Created Tokens</h3>
-                  <p className="text-body-sm text-ink-muted">
-                    {isTokensLoading ? 'Loading…' : `${createdTokenList.length} total`}
-                  </p>
+                <div className="alloc-cell-hide-mobile">
+                  <div className="num">{holding.ownedCount.toString()}</div>
+                  <div className="num-sub">held</div>
                 </div>
-              </div>
-
-              {isTokensLoading && createdTokenList.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">Loading tokens…</p>
-              ) : createdTokenList.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">You haven't created any tokens yet.</p>
-              ) : (
-                <div className="space-y-2 max-h-40 overflow-auto no-scrollbar">
-                  {createdTokenList.slice(0, 5).map((token) => (
-                    <Link
-                      key={token.address}
-                      to="/tokens"
-                      className="flex items-center justify-between rounded-xl bg-canvas/40 px-3 py-2 text-body-sm text-ink hover:bg-canvas transition-colors"
-                    >
-                      <span>{token.symbol}</span>
-                      <span className="font-mono text-ink-muted">
-                        {token.address.slice(0, 6)}…{token.address.slice(-4)}
-                      </span>
-                    </Link>
-                  ))}
+                <div className="alloc-cell-hide-mobile">
+                  <span className="pill pill-nft">NFT</span>
                 </div>
-              )}
-
-              {createdTokenList.length > 0 ? (
-                <Link to="/tokens" className="btn-secondary w-full">
-                  Manage Tokens
-                </Link>
-              ) : (
-                <Link to="/create/token" className="btn-secondary w-full">
-                  Create Token
-                </Link>
-              )}
-            </div>
-
-            {/* Created Launches */}
-            <div className="bg-canvas-alt rounded-2xl border border-border p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-ink-muted" />
-                </div>
-                <div>
-                  <h3 className="font-display text-body text-ink">Created Launches</h3>
-                  <p className="text-body-sm text-ink-muted">
-                    {isPresalesLoading ? 'Loading…' : `${createdPresales.length} total`}
-                  </p>
-                </div>
-              </div>
-
-              {isPresalesLoading && createdPresales.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">Loading launches…</p>
-              ) : createdPresales.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">
-                  Launch your next IDO or manage existing launches.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-40 overflow-auto no-scrollbar">
-                  {createdPresales.slice(0, 5).map((presale) => {
-                    const statusVariant =
-                      presale.status === 'live'
+                <div className="alloc-cell-hide-mobile">
+                  <Badge
+                    variant={
+                      holding.status === 'live'
                         ? 'live'
-                        : presale.status === 'upcoming'
+                        : holding.status === 'upcoming'
                           ? 'upcoming'
-                          : 'closed';
-                    return (
-                      <Link
-                        key={presale.address}
-                        to={`/presales/manage/${presale.address}`}
-                        className="flex items-center justify-between rounded-xl bg-canvas/40 px-3 py-2 text-body-sm text-ink hover:bg-canvas transition-colors"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Settings className="w-3.5 h-3.5 text-ink-muted" />
-                          {presale.saleTokenSymbol ?? 'Launch'}
-                        </span>
-                        <Badge variant={statusVariant}>{presale.status}</Badge>
-                      </Link>
-                    );
-                  })}
+                          : 'closed'
+                    }
+                  >
+                    {holding.status}
+                  </Badge>
                 </div>
-              )}
-
-              {createdPresales.length > 0 ? (
-                <Link to="/create/presale" className="btn-secondary w-full">
-                  Create Another Launch
-                </Link>
-              ) : (
-                <Link to="/create/presale" className="btn-secondary w-full">Create Launch</Link>
-              )}
-            </div>
-
-            {/* Token Locks */}
-            <div className="bg-canvas-alt rounded-2xl border border-border p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center">
-                  <Lock className="w-5 h-5 text-ink-muted" />
+                <div style={{ textAlign: 'right' }}>
+                  <span className="btn-secondary btn-sm inline-flex">View</span>
                 </div>
-                <div>
-                  <h3 className="font-display text-body text-ink">Token Locks</h3>
-                  <p className="text-body-sm text-ink-muted">
-                    {isLocksLoading ? 'Loading…' : `${myLocks.length} total`}
-                  </p>
+              </Link>
+            ))}
+
+            {hasStakedAllocation && !isStakingLoading && (
+              <div className="alloc-row" style={{ background: 'rgb(var(--color-canvas) / 0.3)' }}>
+                <div className="asset">
+                  <div className="asset-icon">
+                    <Wallet className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="asset-name">Staked tokens</div>
+                    <div className="asset-sym">${stakingSymbol}</div>
+                  </div>
+                </div>
+                <div className="alloc-cell-hide-mobile">
+                  <div className="num">
+                    {Number(formatUnits(stakedBalance, stakingDecimals)).toLocaleString(undefined, {
+                      maximumFractionDigits: 4,
+                    })}{' '}
+                    {stakingSymbol}
+                  </div>
+                  <div className="num-sub">staked</div>
+                </div>
+                <div className="alloc-cell-hide-mobile">
+                  <div className="num">
+                    {pendingRewards > 0n
+                      ? Number(formatUnits(pendingRewards, stakingDecimals)).toLocaleString(undefined, {
+                          maximumFractionDigits: 4,
+                        })
+                      : '—'}
+                  </div>
+                  <div className="num-sub">rewards</div>
+                </div>
+                <div className="alloc-cell-hide-mobile">
+                  <span className="pill pill-soon">Stake</span>
+                </div>
+                <div className="alloc-cell-hide-mobile">
+                  <Badge variant="live">staked</Badge>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span className="text-[11px] uppercase tracking-wider text-ink-faint">Auto-compounding</span>
                 </div>
               </div>
-
-              {isLocksLoading && myLocks.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">Loading your locks…</p>
-              ) : myLocks.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">No token locks yet. Create one from the locker tool.</p>
-              ) : (
-                <div className="space-y-2 max-h-40 overflow-auto no-scrollbar">
-                  {myLocks.slice(0, 5).map((lock) => {
-                    const secondsUntilUnlock = Number(lock.unlockDate) - nowSec;
-                    const isUnlockable = !lock.withdrawn && secondsUntilUnlock <= 0;
-                    const statusLabel = lock.withdrawn ? 'withdrawn' : isUnlockable ? 'unlockable' : 'locked';
-                    const timerLabel = lock.withdrawn
-                      ? 'Withdrawn'
-                      : isUnlockable
-                      ? 'Ready now'
-                      : `in ${formatCountdownFromSeconds(secondsUntilUnlock)}`;
-
-                    return (
-                      <Link
-                        key={lock.id.toString()}
-                        to={`/locks/${lock.id.toString()}`}
-                        className="flex items-center justify-between rounded-xl bg-canvas/40 px-3 py-2 text-body-sm text-ink hover:bg-canvas transition-colors"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium text-ink">
-                            {lock.name?.trim() ? lock.name : `Lock #${lock.id.toString()}`}
-                          </span>
-                          <span className="block truncate text-ink-muted">
-                            {formatLockAmount(lock.formattedAmount)} {lock.tokenSymbol}
-                          </span>
-                        </span>
-                        <span className="text-right">
-                          <span
-                            className={`block text-[11px] uppercase tracking-wide ${
-                              lock.withdrawn
-                                ? 'text-ink-faint'
-                                : isUnlockable
-                                ? 'text-status-live'
-                                : 'text-status-upcoming'
-                            }`}
-                          >
-                            {statusLabel}
-                          </span>
-                          <span className="block text-[11px] text-ink-faint whitespace-nowrap">
-                            {timerLabel}
-                          </span>
-                        </span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Link to="/tools/token-locker" className="btn-secondary w-full text-center">
-                  Create Lock
-                </Link>
-                <Link to="/tools/token-locker" className="btn-secondary w-full text-center">
-                  View All Locks
-                </Link>
-              </div>
-            </div>
-
+            )}
           </div>
-        ) : (
-          <ConnectWalletPlaceholder message="Connect your wallet to manage your created tokens, launches, and locks." />
         )}
       </section>
 
-      {/* My NFTs */}
+      {/* My creations + NFT holdings */}
       <section className="space-y-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="font-display text-display-md text-ink">My NFTs</h2>
-          <div className="flex items-center gap-2">
-            {[
-              { label: 'All', value: 'all' as const },
-              { label: 'ERC721', value: 'erc721' as const },
-              { label: 'ERC721A', value: 'erc721a' as const },
-            ].map((tag) => (
-              <button
-                key={tag.value}
-                onClick={() => setNftTypeFilter(tag.value)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${nftTypeFilter === tag.value
-                  ? 'bg-accent text-accent-foreground'
-                  : 'bg-ink/5 text-ink-muted hover:bg-ink/10'
-                  }`}
-              >
-                {tag.label}
-              </button>
-            ))}
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">Builder</div>
+            <h2 className="ds-h2 mt-1.5">My creations</h2>
           </div>
         </div>
-        {isConnected ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-            <div className="bg-canvas-alt rounded-2xl border border-border p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center">
-                  <Image className="w-5 h-5 text-ink-muted" />
-                </div>
-                <div>
-                  <h3 className="font-display text-body text-ink">Your Collections</h3>
-                  <p className="text-body-sm text-ink-muted">
-                    {isMyNFTDeploymentsLoading ? 'Loading…' : `${myNFTDeployments.length} deployed`}
-                  </p>
-                </div>
-              </div>
 
-              {isMyNFTDeploymentsLoading && myNFTDeployments.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">Loading NFT collections…</p>
-              ) : myNFTDeployments.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">
-                  No NFT collections yet. Launch your first collection.
-                </p>
-              ) : filteredMyNFTDeployments.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">
-                  No collections match this tag.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-auto no-scrollbar">
-                  {filteredMyNFTDeployments.slice(0, 8).map((collection) => {
+        {!isConnected ? (
+          <ConnectWalletPlaceholder message="Connect your wallet to manage your created tokens, launches, and locks." />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {/* Created Tokens */}
+            <CreationCard
+              eyebrow="ERC-20"
+              title="Created tokens"
+              count={isTokensLoading ? '…' : String(createdTokenList.length)}
+              accent="rgb(var(--color-accent))"
+              empty={
+                isTokensLoading && createdTokenList.length === 0
+                  ? 'Loading tokens…'
+                  : createdTokenList.length === 0
+                    ? "You haven't deployed a token yet."
+                    : null
+              }
+              cta={{
+                label: createdTokenList.length > 0 ? 'Manage tokens' : 'Create token',
+                to: createdTokenList.length > 0 ? '/tokens' : isAdmin ? '/create/token' : '/tools',
+              }}
+            >
+              {createdTokenList.slice(0, 5).map((token) => (
+                <Link
+                  key={token.address}
+                  to="/tokens"
+                  className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
+                >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span
+                      className="w-7 h-7 rounded-md flex items-center justify-center font-mono text-[11px] font-bold uppercase shrink-0"
+                      style={{
+                        background: 'rgb(var(--color-accent) / 0.12)',
+                        color: 'rgb(var(--color-accent))',
+                      }}
+                    >
+                      {token.symbol.slice(0, 2)}
+                    </span>
+                    <span className="font-medium text-[13px] text-ink truncate">{token.symbol}</span>
+                  </span>
+                  <span className="font-mono text-[11px] text-ink-faint shrink-0">
+                    {shortenAddress(token.address)}
+                  </span>
+                </Link>
+              ))}
+            </CreationCard>
+
+            {/* Created Launches */}
+            <CreationCard
+              eyebrow="Presales"
+              title="Created launches"
+              count={isPresalesLoading ? '…' : String(createdPresales.length)}
+              accent="rgb(var(--color-accent-secondary))"
+              empty={
+                isPresalesLoading && createdPresales.length === 0
+                  ? 'Loading launches…'
+                  : createdPresales.length === 0
+                    ? 'Launch your next presale or manage existing ones.'
+                    : null
+              }
+              cta={{
+                label: createdPresales.length > 0 ? 'Create another' : 'Create launch',
+                to: isAdmin ? '/create/presale' : '/tools',
+              }}
+            >
+              {createdPresales.slice(0, 5).map((presale) => {
+                const statusVariant =
+                  presale.status === 'live'
+                    ? 'live'
+                    : presale.status === 'upcoming'
+                      ? 'upcoming'
+                      : 'closed';
+                const symbol = presale.saleTokenSymbol ?? 'TKN';
+                return (
+                  <Link
+                    key={presale.address}
+                    to={`/presales/manage/${presale.address}`}
+                    className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
+                  >
+                    <span className="flex items-center gap-3 min-w-0">
+                      <span
+                        className="w-7 h-7 rounded-md flex items-center justify-center font-mono text-[11px] font-bold uppercase shrink-0"
+                        style={{
+                          background: 'rgb(var(--color-accent-secondary) / 0.14)',
+                          color: 'rgb(var(--color-accent-secondary))',
+                        }}
+                      >
+                        {symbol.slice(0, 2)}
+                      </span>
+                      <span className="font-medium text-[13px] text-ink truncate">{symbol}</span>
+                    </span>
+                    <Badge variant={statusVariant}>{presale.status}</Badge>
+                  </Link>
+                );
+              })}
+            </CreationCard>
+
+            {/* Token Locks */}
+            <CreationCard
+              eyebrow="Timelock"
+              title="Token locks"
+              count={isLocksLoading ? '…' : String(myLocks.length)}
+              accent="rgb(var(--color-accent-violet))"
+              empty={
+                isLocksLoading && myLocks.length === 0
+                  ? 'Loading locks…'
+                  : myLocks.length === 0
+                    ? 'No token locks yet.'
+                    : null
+              }
+              cta={{
+                label: myLocks.length > 0 ? 'Manage locks' : 'Create lock',
+                to: isAdmin ? '/tools/token-locker' : '/tools',
+              }}
+            >
+              {myLocks.slice(0, 5).map((lock) => {
+                const secondsUntilUnlock = Number(lock.unlockDate) - nowSec;
+                const isUnlockable = !lock.withdrawn && secondsUntilUnlock <= 0;
+                const timerLabel = lock.withdrawn
+                  ? 'Withdrawn'
+                  : isUnlockable
+                    ? 'Ready'
+                    : formatCountdownFromSeconds(secondsUntilUnlock);
+
+                return (
+                  <Link
+                    key={lock.id.toString()}
+                    to={`/locks/${lock.id.toString()}`}
+                    className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-[13px] text-ink">
+                        {lock.name?.trim() ? lock.name : `Lock #${lock.id.toString()}`}
+                      </span>
+                      <span className="block truncate font-mono text-[11px] text-ink-muted mt-0.5">
+                        {formatLockAmount(lock.formattedAmount)} {lock.tokenSymbol}
+                      </span>
+                    </span>
+                    <span
+                      className={`font-mono text-[11px] whitespace-nowrap uppercase tracking-wider shrink-0 ${
+                        lock.withdrawn
+                          ? 'text-ink-faint'
+                          : isUnlockable
+                            ? 'text-status-live'
+                            : 'text-status-upcoming'
+                      }`}
+                    >
+                      {timerLabel}
+                    </span>
+                  </Link>
+                );
+              })}
+            </CreationCard>
+          </div>
+        )}
+      </section>
+
+      {/* NFT collections section */}
+      <section>
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">Collectibles</div>
+            <h2 className="ds-h2 mt-1.5">NFT collections</h2>
+          </div>
+          <span className="font-mono text-[12px] text-ink-faint">
+            {isConnected ? `${totalOwnedNFTs.toString()} owned · ${myNFTDeployments.length} created` : ''}
+          </span>
+        </div>
+
+        {!isConnected ? (
+          <ConnectWalletPlaceholder message="Connect your wallet to see your NFT holdings." />
+        ) : isNftHoldingsLoading && isMyNFTDeploymentsLoading && myNftHoldings.length === 0 && myNFTDeployments.length === 0 ? (
+          <div className="bg-canvas-alt border border-border rounded-3xl p-12 text-center text-ink-muted">Loading…</div>
+        ) : myNftHoldings.length === 0 && myNFTDeployments.length === 0 ? (
+          <div className="bg-canvas-alt border border-border rounded-3xl p-12 text-center text-ink-muted">
+            <ImageIcon className="w-5 h-5 mx-auto mb-3 text-ink-faint" />
+            <p>No collections yet — mint or create your first drop.</p>
+            <Link to="/create/nft" className="btn-secondary btn-sm inline-flex mt-4">
+              Create NFT
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {myNftHoldings.length > 0 && (
+              <div className="holdings-grid">
+                {myNftHoldings.slice(0, 8).map((holding) => (
+                  <Link to={`/nfts/${holding.address}`} key={`held-${holding.address}`} className="holding-card">
+                    <div className="holding-img">
+                      <FallbackImage
+                        src={holding.metadataImage}
+                        fallbackSrc={NFT_COLLECTION_IMAGES[holding.address.toLowerCase()]}
+                        alt={holding.name}
+                        className="w-full h-full object-cover"
+                        placeholder={<span>{holding.name.slice(0, 1)}</span>}
+                      />
+                    </div>
+                    <div className="holding-info">
+                      <div className="holding-name">{holding.name}</div>
+                      <div className="holding-meta">
+                        {holding.ownedCount.toString()} held · {holding.symbol}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {myNFTDeployments.length > 0 && (
+              <div className="space-y-3">
+                <div className="eyebrow">Collections you've created</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {myNFTDeployments.slice(0, 6).map((collection) => {
                     const statusVariant =
                       collection.status === 'live'
                         ? 'live'
                         : collection.status === 'upcoming'
                           ? 'upcoming'
                           : 'closed';
-
                     return (
-                      <div
-                        key={collection.address}
-                        className="rounded-xl bg-canvas/40 px-3 py-3 space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden shrink-0">
-                              <FallbackImage
-                                src={collection.metadataImage}
-                                fallbackSrc={NFT_COLLECTION_IMAGES[collection.address.toLowerCase()]}
-                                alt={collection.name}
-                                className="w-full h-full object-cover"
-                                placeholder={<Image className="w-4 h-4 text-ink-muted" />}
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-body-sm font-medium text-ink truncate">
-                                {collection.name}
-                              </p>
-                              <p className="text-label text-ink-faint font-mono">
-                                {collection.symbol}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant={statusVariant}>
-                              {collection.status === 'live'
-                                ? collection.salePhase === 'whitelist'
-                                  ? 'whitelist live'
-                                  : 'public live'
-                                : collection.status}
-                            </Badge>
-                            <span className="inline-flex rounded-full bg-ink/10 px-2 py-1 text-xs font-medium text-ink-muted">
-                              {collection.is721A ? 'ERC721A' : 'ERC721'}
-                            </span>
-                          </div>
+                      <div key={collection.address} className="bg-canvas-alt border border-border rounded-2xl p-4 flex gap-4">
+                        <div className="w-16 h-16 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden shrink-0">
+                          <FallbackImage
+                            src={collection.metadataImage}
+                            fallbackSrc={NFT_COLLECTION_IMAGES[collection.address.toLowerCase()]}
+                            alt={collection.name}
+                            className="w-full h-full object-cover"
+                            placeholder={<ImageIcon className="w-5 h-5 text-ink-muted" />}
+                          />
                         </div>
-                        <p className="text-body-sm text-ink-muted">
-                          Minted{' '}
-                          <span className="font-mono text-ink">
-                            {collection.totalMinted.toLocaleString()}
-                          </span>{' '}
-                          /{' '}
-                          <span className="font-mono text-ink">
-                            {collection.maxSupply.toLocaleString()}
-                          </span>
-                        </p>
-                        <p className="text-body-sm text-ink-muted">
-                          Public {collection.mintPrice ? `${formatUnits(collection.mintPrice, 18)} ETH` : '0 ETH'}
-                          {collection.whitelistEnabled
-                            ? ` · WL ${formatUnits(collection.whitelistPrice, 18)} ETH`
-                            : ''}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Link to={`/nfts/manage/${collection.address}`} className="btn-secondary">
-                            Manage
-                          </Link>
-                          <a
-                            href={`${explorerUrl}/address/${collection.address}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn-secondary"
-                          >
-                            Explorer
-                          </a>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="font-medium text-ink truncate">{collection.name}</div>
+                              <div className="font-mono text-[11px] text-ink-muted">{collection.symbol}</div>
+                            </div>
+                            <Badge variant={statusVariant}>{collection.status}</Badge>
+                          </div>
+                          <p className="text-[12px] text-ink-muted">
+                            Minted{' '}
+                            <span className="font-mono text-ink">{collection.totalMinted.toLocaleString()}</span> /{' '}
+                            <span className="font-mono text-ink">{collection.maxSupply.toLocaleString()}</span>
+                          </p>
+                          <div className="flex gap-2">
+                            <Link to={`/nfts/manage/${collection.address}`} className="btn-secondary btn-sm">
+                              Manage
+                            </Link>
+                            <a
+                              href={`${explorerUrl}/address/${collection.address}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn-ghost btn-sm"
+                            >
+                              Explorer
+                            </a>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              )}
-
-              <Link to="/create/nft" className="btn-secondary w-full">
-                {myNFTDeployments.length > 0 ? 'Create Another NFT' : 'Create NFT'}
-              </Link>
-            </div>
-
-            <div className="bg-canvas-alt rounded-2xl border border-border p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-canvas flex items-center justify-center">
-                  <Wallet className="w-5 h-5 text-ink-muted" />
-                </div>
-                <div>
-                  <h3 className="font-display text-body text-ink">Owned NFTs</h3>
-                  <p className="text-body-sm text-ink-muted">
-                    {isNftHoldingsLoading ? 'Loading…' : `${totalOwnedNFTs.toString()} held · ${totalMintedNFTs.toString()} minted`}
-                  </p>
-                </div>
               </div>
-
-              {isNftHoldingsLoading && myNftHoldings.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">Loading your NFT holdings…</p>
-              ) : myNftHoldings.length === 0 ? (
-                <p className="text-body-sm text-ink-muted">
-                  No NFT holdings yet. Mint from the launchpad to build your collection.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-auto no-scrollbar">
-                  {myNftHoldings.slice(0, 8).map((holding) => (
-                    <Link
-                      key={`owned-${holding.address}`}
-                      to={`/nfts/${holding.address}`}
-                      className="flex items-center justify-between rounded-xl bg-canvas/40 px-3 py-2 text-body-sm text-ink hover:bg-canvas transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-canvas border border-border flex items-center justify-center overflow-hidden">
-                          <FallbackImage
-                            src={holding.metadataImage}
-                            fallbackSrc={NFT_COLLECTION_IMAGES[holding.address.toLowerCase()]}
-                            alt={holding.name}
-                            className="w-full h-full object-cover"
-                            placeholder={<Image className="w-3.5 h-3.5 text-ink-muted" />}
-                          />
-                        </span>
-                        <span>{holding.symbol}</span>
-                      </span>
-                      <span className="font-mono text-ink-muted">
-                        {holding.ownedCount.toString()} held
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-
-              <Link to="/my-nfts" className="btn-secondary w-full">
-                View My NFTs
-              </Link>
-            </div>
+            )}
           </div>
-        ) : (
-          <ConnectWalletPlaceholder message="Connect your wallet to manage your NFT collections." />
         )}
       </section>
 
-      {/* Creator Tools */}
-      <section className="space-y-6">
-        <div className="space-y-2">
-          <p className="text-label text-ink-faint uppercase tracking-wider">For Builders</p>
-          <h2 className="font-display text-display-md text-ink">Creator Tools</h2>
-          <p className="text-body text-ink-muted max-w-2xl">
-            Deploy tokens and NFTs, run airdrops, lock liquidity, and manage your onchain presence — all in one place.
-          </p>
-        </div>
-        <Link to="/tools" className="glass-card rounded-3xl p-6 group flex items-center justify-between w-full transition-colors duration-300 hover:border-accent/30">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-accent-muted text-accent flex items-center justify-center">
-              <Wrench className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="font-display text-display-sm text-ink">Open Creator Tools</p>
-              <p className="text-body-sm text-ink-muted">Tokens, NFTs, locks, airdrops, and more</p>
-            </div>
+      {/* Creator tools */}
+      <section>
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">Tools</div>
+            <h2 className="ds-h2 mt-1.5">Build on RISE</h2>
           </div>
-          <ArrowRight className="w-5 h-5 text-ink-muted group-hover:text-ink transition-colors duration-300" />
-        </Link>
+          <Link to="/tools" className="btn-ghost btn-sm inline-flex">
+            All tools <ArrowRight className="w-3.5 h-3.5 ml-1" />
+          </Link>
+        </div>
+        <div className="creator-grid">
+          {creatorTiles.map((t) => (
+            <Link key={t.name} to={t.to} className="creator-tile">
+              <div>
+                <div className="creator-name">{t.name}</div>
+                <div className="creator-desc">{t.desc}</div>
+              </div>
+              <div className="mt-auto flex items-center gap-1 text-accent text-[12px] font-semibold">
+                Start <ArrowRight className="w-3 h-3" />
+              </div>
+            </Link>
+          ))}
+        </div>
       </section>
     </div>
   );
 };
+
+type StatTileProps = {
+  label: string;
+  value: string;
+  meta: string;
+  icon: React.ReactNode;
+  tint: string;
+  tintSolid: string;
+};
+
+const StatTile: React.FC<StatTileProps> = ({ label, value, meta, icon, tint, tintSolid }) => (
+  <div className="stat-tile" style={{ ['--stat-tint' as unknown as string]: tint }}>
+    <div className="stat-tile-icon" style={{ background: tint, color: tintSolid }}>
+      {icon}
+    </div>
+    <div className="stat-tile-label">{label}</div>
+    <div className="stat-tile-value">{value}</div>
+    <div className="stat-tile-meta">{meta}</div>
+  </div>
+);
+
+type CreationCardProps = {
+  eyebrow: string;
+  title: string;
+  count: string;
+  accent: string;
+  empty: string | null;
+  cta: { label: string; to: string };
+  children?: React.ReactNode;
+};
+
+const CreationCard: React.FC<CreationCardProps> = ({ eyebrow, title, count, accent, empty, cta, children }) => (
+  <div className="relative bg-canvas-alt border border-border rounded-3xl p-5 flex flex-col gap-4 overflow-hidden">
+    <div
+      aria-hidden
+      className="absolute top-0 left-5 h-[3px] w-10 rounded-b-full"
+      style={{ background: accent }}
+    />
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div
+          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+          style={{ color: accent }}
+        >
+          {eyebrow}
+        </div>
+        <h3 className="font-display font-bold text-[20px] text-ink leading-tight mt-1.5 tracking-tight">
+          {title}
+        </h3>
+      </div>
+      <span
+        className="font-mono text-[12px] font-bold px-2.5 py-1 rounded-full shrink-0"
+        style={{ background: 'rgb(var(--color-ink) / 0.06)', color: 'rgb(var(--color-ink))' }}
+      >
+        {count}
+      </span>
+    </div>
+
+    {empty ? (
+      <p className="text-[13px] text-ink-muted leading-relaxed">{empty}</p>
+    ) : (
+      <div className="flex flex-col max-h-44 overflow-auto no-scrollbar">{children}</div>
+    )}
+
+    <Link to={cta.to} className="btn-secondary btn-sm w-full mt-auto">
+      {cta.label}
+    </Link>
+  </div>
+);
 
 export default Dashboard;

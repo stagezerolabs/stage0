@@ -415,9 +415,10 @@ const CreateNFTPage: React.FC = () => {
       animate="visible"
       className="max-w-6xl mx-auto space-y-8"
     >
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Create NFT Collection</h1>
-        <p className="text-body-lg text-ink-muted">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">NFT launch</div>
+        <h1 className="ds-h1 mt-2">Create NFT Collection</h1>
+        <p className="text-body-lg text-ink-muted max-w-3xl mt-3">
           Launch an ERC721 or ERC721A collection with separate whitelist and public mint phases.
         </p>
       </motion.section>

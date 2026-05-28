@@ -273,9 +273,24 @@ type FeaturedLaunch = {
   image?: string;
   fallbackImage?: string;
   link: string;
+  /** Larger values sort first: resolved metadata image, then configured fallback image. */
+  imagePriority: number;
   /** Normalized raised value in ETH for sorting */
   sortRaised: number;
 };
+
+function getLaunchImagePriority(image?: string, fallbackImage?: string): number {
+  if (image?.trim()) return 2;
+  if (fallbackImage?.trim()) return 1;
+  return 0;
+}
+
+function getLaunchStatusPriority(status: string): number {
+  if (status === 'live') return 3;
+  if (status === 'upcoming') return 2;
+  if (status === 'ended' || status === 'finalized') return 1;
+  return 0;
+}
 
 function tokenPresaleToFeatured(p: PresaleWithStatus): FeaturedLaunch {
   const paymentDecimals = p.paymentTokenDecimals ?? 18;
@@ -291,6 +306,7 @@ function tokenPresaleToFeatured(p: PresaleWithStatus): FeaturedLaunch {
     capDisplay: `${formatUnits(p.hardCap ?? 0n, paymentDecimals)} ${paymentSymbol}`,
     image: p.logo,
     link: `/presales/${p.address}`,
+    imagePriority: getLaunchImagePriority(p.logo),
     sortRaised: Number(formatUnits(p.totalRaised ?? 0n, paymentDecimals)),
   };
 }
@@ -299,6 +315,7 @@ function nftDeploymentToFeatured(d: NFTDeploymentWithMetadata): FeaturedLaunch {
   const mintedPercent = d.maxSupply > 0n
     ? Math.min(Number((d.totalMinted * 100n) / d.maxSupply), 100)
     : 0;
+  const fallbackImage = NFT_COLLECTION_IMAGES[d.address.toLowerCase()];
   return {
     type: 'nft',
     address: d.address,
@@ -309,8 +326,9 @@ function nftDeploymentToFeatured(d: NFTDeploymentWithMetadata): FeaturedLaunch {
     raisedDisplay: `${d.totalMinted.toString()} / ${d.maxSupply.toString()} minted`,
     capDisplay: `${formatUnits(d.mintPrice, 18)} ETH each`,
     image: d.metadataImage,
-    fallbackImage: NFT_COLLECTION_IMAGES[d.address.toLowerCase()],
+    fallbackImage,
     link: `/nfts/${d.address}`,
+    imagePriority: getLaunchImagePriority(d.metadataImage, fallbackImage),
     sortRaised: Number(formatUnits(d.mintPrice * d.totalMinted, 18)),
   };
 }
@@ -386,14 +404,21 @@ const HomePage: React.FC = () => {
   const upcomingPresales = presales.filter((p) => p.status === 'upcoming');
   const isFeaturedLoading = isPresalesLoading || isNFTLoading;
 
-  // Featured launches: merge token presales + NFT deployments, pinned first, sorted by highest raised
+  // Featured launches: merge token presales + NFT deployments, prioritizing usable images for the visible cards.
   const featuredLaunches = useMemo((): FeaturedLaunch[] => {
     const tokenItems = presales.map(tokenPresaleToFeatured);
     const nftItems = nftDeployments.map(nftDeploymentToFeatured);
     const all = [...tokenItems, ...nftItems];
 
-    // Sort by raised value descending
-    all.sort((a, b) => b.sortRaised - a.sortRaised);
+    all.sort((a, b) => {
+      const imageDelta = b.imagePriority - a.imagePriority;
+      if (imageDelta !== 0) return imageDelta;
+
+      const statusDelta = getLaunchStatusPriority(b.status) - getLaunchStatusPriority(a.status);
+      if (statusDelta !== 0) return statusDelta;
+
+      return b.sortRaised - a.sortRaised;
+    });
 
     // If there's a pinned launch, ensure it's first
     if (pinnedAddress) {
@@ -434,7 +459,6 @@ const HomePage: React.FC = () => {
       duration: 2200,
       icon: TrendingUp,
       iconBg: 'bg-blue-500/15 text-blue-500 ring-1 ring-blue-500/30',
-      ghost: 'E',
       cardClass: 'ambient-stat-card--orange',
       gaugeColor: 'rgb(255, 138, 0)',
       gaugeFill: 80,
@@ -448,7 +472,6 @@ const HomePage: React.FC = () => {
       duration: 1800,
       icon: Rocket,
       iconBg: 'bg-green-500/15 text-green-500 ring-1 ring-green-500/30',
-      ghost: '#',
       cardClass: 'ambient-stat-card--blue',
       gaugeColor: 'rgb(59, 130, 246)',
       gaugeFill: 60,
@@ -462,7 +485,6 @@ const HomePage: React.FC = () => {
       duration: 2400,
       icon: Users,
       iconBg: 'bg-purple-500/15 text-purple-500 ring-1 ring-purple-500/30',
-      ghost: '+',
       cardClass: 'ambient-stat-card--purple',
       gaugeColor: 'rgb(139, 124, 255)',
       gaugeFill: 90,
@@ -649,13 +671,6 @@ const HomePage: React.FC = () => {
                   }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20, duration: 0.7 }}
                 >
-                  <span
-                    className="absolute -top-12 -right-8 text-[10rem] font-bold select-none pointer-events-none"
-                    style={{ color: themeMode === 'light' ? 'rgba(28, 37, 50, 0.04)' : 'rgba(255, 255, 255, 0.05)' }}
-                    aria-hidden="true"
-                  >
-                    {stat.ghost}
-                  </span>
                   <div className="relative z-10">
                     <div className={`w-14 h-14 rounded-2xl ${stat.iconBg} mx-auto flex items-center justify-center mb-6`}>
                       <stat.icon className="w-7 h-7" />
@@ -761,13 +776,14 @@ const HomePage: React.FC = () => {
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
                                 {/* Status badge */}
-                                <span className={`absolute top-5 right-5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${isLive
+                                <span className={`status-pill absolute top-5 right-5 shadow-lg ${isLive
                                     ? 'bg-status-live-bg text-status-live border border-status-live/20'
                                     : isEnded
                                       ? 'bg-ink/10 text-ink-muted border border-ink/10'
                                       : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
                                   }`}>
-                                  {isLive ? 'Live Now' : isEnded ? 'Ended' : 'Upcoming'}
+                                  {isLive && <span className="status-pill-dot" />}
+                                  {isLive ? 'Live' : isEnded ? 'Ended' : 'Upcoming'}
                                 </span>
                                 {/* Launch type pill */}
                                 <span className={`absolute bottom-4 right-5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${item.type === 'nft'
@@ -812,13 +828,16 @@ const HomePage: React.FC = () => {
           </div>
         </motion.section>
 
-        {/* ─── How It Works — Connected Timeline ─── */}
+        {/* ─── How It Works ─── */}
         <motion.section
           ref={timelineContainerRef}
           variants={itemVariants}
-          className="space-y-16 py-10"
+          className="space-y-14 py-12 md:py-16"
         >
-          <div className="text-center space-y-4 max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl text-center space-y-4">
+            <div className="inline-flex items-center rounded-full border border-border/70 bg-canvas-alt/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+              Three steps
+            </div>
             <h2 className="font-display text-3xl md:text-5xl text-ink">How Stage0 Works</h2>
             <p className="text-lg text-ink-muted">
               Launching and participating in early-stage projects on RISE is simple. Stage0 provides the infrastructure for token launches, NFT drops, and distribution all in one place.
@@ -826,14 +845,13 @@ const HomePage: React.FC = () => {
           </div>
 
           <div className="relative max-w-6xl mx-auto">
-            {/* Scroll animated horizontal line (Desktop) */}
-            <div className="hidden md:block absolute top-[4.5rem] left-[16.67%] right-[16.67%] h-1 bg-ink/[0.06] rounded-full" />
+            <div className="hidden md:block absolute top-[4.5rem] left-[16.67%] right-[16.67%] h-px bg-border/80" />
             <motion.div
-              className="hidden md:block absolute top-[4.5rem] left-[16.67%] right-[16.67%] h-1 bg-gradient-to-r from-accent via-accent-secondary to-accent-tertiary rounded-full origin-left z-10 shadow-[0_0_15px_rgba(255,138,0,0.5)]"
+              className="hidden md:block absolute top-[4.5rem] left-[16.67%] right-[16.67%] h-[2px] origin-left rounded-full bg-accent/80"
               style={{ scaleX: lineProgress }}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative z-20">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-12 relative z-10">
               {[
                 {
                   step: 1,
@@ -862,23 +880,29 @@ const HomePage: React.FC = () => {
                   transition={{ duration: 0.7, delay: index * 0.2, ease: [0.16, 1, 0.3, 1] }}
                   className="flex flex-col items-center text-center space-y-6"
                 >
-                  <div className="relative w-36 h-36 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-canvas-alt rounded-full border border-border/70" />
-                    <div
-                      className="absolute inset-2 rounded-full bg-accent/10 border border-accent/20"
-                      style={{ willChange: 'transform' }}
-                    />
-                    <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-canvas to-canvas-alt shadow-inner flex items-center justify-center border border-border/50 text-accent">
-                      <item.icon className="w-8 h-8" />
+                  <motion.div
+                    className="relative w-32 h-32 flex items-center justify-center"
+                    animate={shouldDisableAnimations ? undefined : { y: [0, -5, 0] }}
+                    transition={{
+                      duration: 4.5,
+                      delay: index * 0.35,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                  >
+                    <div className="absolute inset-0 rounded-full border border-border bg-canvas-alt shadow-soft" />
+                    <div className="absolute inset-3 rounded-full border border-accent/25 bg-accent/[0.08]" />
+                    <div className="relative z-10 h-[4.5rem] w-[4.5rem] rounded-full border border-border/80 bg-canvas flex items-center justify-center text-accent shadow-inner">
+                      <item.icon className="w-7 h-7" />
                     </div>
-                    {/* Step badge */}
-                    <div className="absolute top-0 right-0 w-10 h-10 rounded-full bg-accent text-white font-bold text-lg flex items-center justify-center shadow-lg border-4 border-canvas">
+                    <div className="absolute -top-1 -right-1 w-9 h-9 rounded-full bg-ink text-canvas font-mono text-sm font-semibold flex items-center justify-center border-[3px] border-canvas">
                       {item.step}
                     </div>
-                  </div>
-                  <div>
-                    <h3 className="font-display text-2xl text-ink font-bold mb-3">{item.title}</h3>
-                    <p className="text-base text-ink-muted leading-relaxed max-w-xs">{item.description}</p>
+                    <div className="absolute inset-0 rounded-full border border-ink/5" />
+                  </motion.div>
+                  <div className="max-w-xs">
+                    <h3 className="font-display text-2xl text-ink mb-3">{item.title}</h3>
+                    <p className="text-base text-ink-muted leading-relaxed">{item.description}</p>
                   </div>
                 </motion.div>
               ))}

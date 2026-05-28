@@ -323,9 +323,10 @@ const CreatePresalePage: React.FC = () => {
       className="max-w-3xl mx-auto space-y-8"
     >
       {/* Header */}
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Create Launch</h1>
-        <p className="text-body-lg text-ink-muted">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">Token launch</div>
+        <h1 className="ds-h1 mt-2">Create Launch</h1>
+        <p className="text-body-lg text-ink-muted mt-3">
           Launch your token sale on Stage0. Configure your launch parameters below.
         </p>
       </motion.section>

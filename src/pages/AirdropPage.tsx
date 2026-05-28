@@ -360,9 +360,10 @@ const AirdropPage: React.FC = () => {
       className="max-w-3xl mx-auto space-y-8"
     >
       {/* Header */}
-      <motion.section variants={itemVariants} className="space-y-2">
-        <h1 className="font-display text-display-lg text-ink">Airdrop / Multi-Send</h1>
-        <p className="text-body-lg text-ink-muted">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">Distribution</div>
+        <h1 className="ds-h1 mt-2">Airdrop / Multi-Send</h1>
+        <p className="text-body-lg text-ink-muted mt-3">
           Send tokens to multiple addresses in a single transaction.
         </p>
       </motion.section>

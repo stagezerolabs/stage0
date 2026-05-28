@@ -163,10 +163,10 @@ const AdminDashboard: React.FC = () => {
       animate="visible"
       className="space-y-10"
     >
-      <motion.section variants={itemVariants} className="space-y-3">
-        <p className="text-label text-ink-faint uppercase tracking-wider">Admin</p>
-        <h1 className="font-display text-display-lg text-ink">Stage0 Admin</h1>
-        <p className="text-body text-ink-muted max-w-3xl">
+      <motion.section variants={itemVariants} className="page-hero-card">
+        <div className="eyebrow">Admin</div>
+        <h1 className="ds-h1 mt-2">Stage0 Admin</h1>
+        <p className="text-body text-ink-muted max-w-3xl mt-3">
           Manage launches, whitelisted creators, and NFT launchpad fee defaults from one place.
         </p>
       </motion.section>
@@ -205,7 +205,7 @@ const AdminDashboard: React.FC = () => {
       </motion.section>
 
       <motion.section variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Link to="/admin/presales" className="glass-card rounded-3xl p-6 group">
+        <Link to="/admin/presales" className="tool-surface-card p-6 group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-accent-muted text-accent flex items-center justify-center">
@@ -220,7 +220,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </Link>
 
-        <Link to="/admin/whitelist" className="glass-card rounded-3xl p-6 group">
+        <Link to="/admin/whitelist" className="tool-surface-card p-6 group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-ink/10 text-ink flex items-center justify-center">

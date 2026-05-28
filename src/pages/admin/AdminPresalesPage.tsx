@@ -11,8 +11,8 @@ import { useFeeRecipient } from '@/lib/utils/admin';
 
 const statusColors: Record<string, string> = {
   live: 'bg-status-live/15 text-status-live',
-  upcoming: 'bg-status-warning/15 text-status-warning',
-  finalized: 'bg-status-info/15 text-status-info',
+  upcoming: 'bg-status-upcoming-bg text-status-upcoming',
+  finalized: 'bg-status-closed-bg text-status-closed',
   cancelled: 'bg-status-error/15 text-status-error',
   ended: 'bg-ink/10 text-ink-muted',
 };
@@ -75,14 +75,14 @@ function PresaleCard({ presale, isFeeRecipient }: { presale: PresaleWithStatus; 
   const totalRaised = formatUnits(presale.totalRaised ?? 0n, paymentDecimals);
 
   return (
-    <div className="glass-card rounded-3xl p-6 space-y-4">
+    <div className="tool-surface-card p-6 space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h3 className="font-display text-display-sm text-ink">
               {presale.saleTokenSymbol ?? 'Token'} Launch
             </h3>
-            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[presale.status] ?? statusColors.ended}`}>
+            <span className={`status-pill ${statusColors[presale.status] ?? statusColors.ended}`}>
               {presale.status}
             </span>
           </div>
@@ -146,7 +146,7 @@ function PresaleCard({ presale, isFeeRecipient }: { presale: PresaleWithStatus; 
       </div>
 
       {showFeeForm && isFeeRecipient && (
-        <div className="glass-card rounded-2xl p-4 space-y-3 border border-border">
+        <div className="tool-surface-card rounded-2xl p-4 space-y-3">
           <p className="text-body-sm text-ink-muted">
             Update fees (basis points, 100 = 1%).
           </p>
@@ -205,15 +205,16 @@ const AdminPresalesPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-3">
+      <div className="page-hero-card">
         <Link to="/admin" className="inline-flex items-center gap-2 text-body-sm text-ink-muted hover:text-ink">
           <ArrowLeft className="w-4 h-4" />
           Back to Admin
         </Link>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mt-4">
           <div>
-            <h1 className="font-display text-display-lg text-ink">Admin Launches</h1>
-            <p className="text-body text-ink-muted">Monitor and update launch fee settings.</p>
+            <div className="eyebrow">Launch controls</div>
+            <h1 className="ds-h1 mt-2">Admin Launches</h1>
+            <p className="text-body text-ink-muted mt-3">Monitor and update launch fee settings.</p>
           </div>
           <button onClick={() => refetch()} className="btn-secondary inline-flex items-center gap-2">
             <RefreshCcw className="w-4 h-4" />

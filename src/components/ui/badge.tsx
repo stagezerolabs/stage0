@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-label uppercase tracking-wider font-medium backdrop-blur-sm transition-all duration-500',
+  'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] font-semibold font-sans leading-none backdrop-blur-sm transition-all duration-300',
   {
     variants: {
       variant: {
@@ -29,10 +29,8 @@ function Badge({ className, variant, pulse, children, ...props }: BadgeProps) {
   return (
     <div className={cn(badgeVariants({ variant }), className)} {...props}>
       {pulse && variant === 'live' && (
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-status-live animate-halo" />
-          <span className="absolute inline-flex h-full w-full rounded-full bg-status-live animate-halo" style={{ animationDelay: '0.6s' }} />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-status-live" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-status-live">
+          <span className="sr-only">Live</span>
         </span>
       )}
       {children}

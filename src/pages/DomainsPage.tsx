@@ -25,7 +25,6 @@ import {
   Search,
   Wallet,
   X,
-  CornerDownLeft,
   Sparkles,
   Trash2,
   ArrowRight,
@@ -393,8 +392,8 @@ const DomainsPage: React.FC = () => {
           {/* Search Inputs Container */}
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="relative w-full max-w-2xl mx-auto space-y-2">
-              <div className="relative bg-gradient-to-r from-accent via-accent-secondary to-[#78C8FF] p-[1.5px] rounded-2xl shadow-float hover:shadow-float-hover transition-all duration-300">
-                <div className="bg-canvas-alt rounded-[14px] flex items-center px-4 py-1.5">
+              <div className="relative bg-border hover:bg-accent p-[1.5px] rounded-2xl shadow-float hover:shadow-float-hover transition-all duration-300">
+                <div className="bg-canvas-alt rounded-[14px] flex items-center px-4 py-1.5 w-full">
                   <Search className="w-5 h-5 text-accent pointer-events-none mr-3 shrink-0" />
                   <input
                     id="domain-search"
@@ -516,7 +515,13 @@ const DomainsPage: React.FC = () => {
                           </span>
 
                           <div className="flex items-center gap-2 select-none">
-                            <span className="font-display text-lg md:text-xl font-bold text-ink">
+                            <span className="text-[11px] font-mono text-ink-muted">
+                              (~${usdValue} USD)
+                            </span>
+                            <div className="w-5 h-5 rounded-full bg-[#1e497b] border border-[#3b82f6] flex items-center justify-center font-bold text-[11px] text-white shrink-0 shadow-sm shadow-[#3b82f6]/20">
+                              $
+                            </div>
+                            <span className="font-display text-lg md:text-xl font-bold text-ink font-mono">
                               {formatEther(registerPrice)} ETH
                             </span>
                           </div>

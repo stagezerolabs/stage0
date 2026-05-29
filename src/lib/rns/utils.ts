@@ -26,8 +26,8 @@ export function validateDomainName(name: string): DomainValidationResult {
   if (!name) {
     return { valid: false, error: "Enter a name to search or mint." };
   }
-  if (name.length < 3) {
-    return { valid: false, error: "Names must be at least 3 characters." };
+  if (name.length < 6) {
+    return { valid: false, error: "Names must be at least 6 characters." };
   }
   if (name.length > 32) {
     return { valid: false, error: "Names must be 32 characters or fewer." };

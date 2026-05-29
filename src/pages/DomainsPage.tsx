@@ -10,6 +10,8 @@ import {
   validateDomainName
 } from '@/lib/domains/storage';
 import { RESERVED_NAMES } from '@/lib/rns/constants';
+import { cacheRnsLabel } from '@/lib/rns/label-cache';
+import { rnsNamehash } from '@/lib/rns/utils';
 import {
   useRnsExpiry,
   useRnsNameStatus,
@@ -215,6 +217,7 @@ const DomainsPage: React.FC = () => {
   useEffect(() => {
     if (!isRegisterSuccess || !address || !normalized) return;
     setHintLabel(normalized);
+    cacheRnsLabel(rnsNamehash(normalized), normalized);
     void refetchOwned();
     void refetchStatus();
     toast.success(`Registered ${formatDomainDisplay(normalized)}`);
@@ -297,6 +300,9 @@ const DomainsPage: React.FC = () => {
   const nowSec = Math.floor(Date.now() / 1000);
   const ownedExpirySec = Number(ownedExpiry);
   const isOwnedExpired = ownedExpirySec > 0 && ownedExpirySec < nowSec;
+  const TWO_MONTHS_SEC = 60 * 24 * 60 * 60; // 60 days
+  const isWithinRenewalWindow =
+    ownedExpirySec > 0 && ownedExpirySec - nowSec <= TWO_MONTHS_SEC;
 
   // Mock USD Conversion for aesthetics (optional, unused)
   // const usdValue = useMemo(() => {
@@ -368,16 +374,18 @@ const DomainsPage: React.FC = () => {
                 ) : null}
               </div>
               <div className="flex gap-3 w-full md:w-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={handleRenew}
-                  disabled={isRenewing || isRenewQuoteLoading}
-                  className="btn-primary py-2.5 px-6 disabled:opacity-60 text-body-sm flex-1 md:flex-initial"
-                >
-                  {isRenewing
-                    ? 'Renewing…'
-                    : `Renew (${formatEther(renewPrice)} ETH)`}
-                </button>
+                {isWithinRenewalWindow && (
+                  <button
+                    type="button"
+                    onClick={handleRenew}
+                    disabled={isRenewing || isRenewQuoteLoading}
+                    className="btn-primary py-2.5 px-6 disabled:opacity-60 text-body-sm flex-1 md:flex-initial"
+                  >
+                    {isRenewing
+                      ? 'Renewing…'
+                      : `Renew (${formatEther(renewPrice)} ETH)`}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleRelease}

@@ -231,9 +231,6 @@ export async function rnsGetFee(
   });
 }
 
-/** @deprecated Use `rnsGetFee` — kept as alias for older call sites. */
-export const rnsGetRentPrice = rnsGetFee;
-
 export async function rnsGetRegistrationQuote(
   client: PublicClient,
   chainId: number,
@@ -403,11 +400,3 @@ export async function rnsSetPrimaryAddr(
   return rnsSetAddr(walletClient, readClient, chainId, { name: label, addr });
 }
 
-/** @deprecated Use `rnsGetNode` */
-export async function rnsNodeForLabel(
-  client: PublicClient,
-  chainId: number,
-  label: string,
-): Promise<Hex> {
-  return rnsGetNode(client, chainId, label);
-}

@@ -2,6 +2,7 @@ import { DOMAIN_SUFFIX, formatDomainDisplay, normalizeRnsLabel } from "@/lib/rns
 import { useRnsOwner } from "@/lib/hooks/rns/useRnsRegistry";
 import { useRnsExpiry } from "@/lib/hooks/rns/useRnsRegistrar";
 import { useRnsSubgraphDomainsForOwner } from "@/lib/hooks/rns/useRnsSubgraph";
+import { getCachedRnsLabel } from "@/lib/rns/label-cache";
 import { useCallback, useMemo } from "react";
 import type { Address } from "viem";
 
@@ -23,19 +24,28 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     refetch: refetchSubgraph,
   } = useRnsSubgraphDomainsForOwner(typedAddress, { enabled: Boolean(address) });
 
-  const subgraphLabel = subgraphDomains?.[0]?.label ?? null;
+  // Treat empty string from subgraph as null — Rise Testnet calldata isn't
+  // available so the indexer may leave label="" even for registered domains.
+  const subgraphLabel = subgraphDomains?.[0]?.label || null;
+
+  // Cache fallback: look up the label via the node hash that was stored at
+  // registration time in localStorage.
+  const firstNode = subgraphDomains?.[0]?.node;
+  const cachedLabel = !subgraphLabel && firstNode
+    ? (getCachedRnsLabel(firstNode) || null)
+    : null;
 
   // Fallback: onchain ownership check for hintLabel while subgraph indexes
   const hintNormalized = hintLabel ? normalizeRnsLabel(hintLabel) : "";
   const { owner: hintOwner, isLoading: isHintLoading } = useRnsOwner(
     hintNormalized,
-    { enabled: Boolean(address && hintNormalized && !subgraphLabel) },
+    { enabled: Boolean(address && hintNormalized && !subgraphLabel && !cachedLabel) },
   );
   const isHintOwner = Boolean(
     address && hintOwner && hintOwner.toLowerCase() === address.toLowerCase(),
   );
 
-  const label = subgraphLabel ?? (isHintOwner ? hintNormalized : null);
+  const label = subgraphLabel ?? cachedLabel ?? (isHintOwner ? hintNormalized : null);
 
   const { expiry, isLoading: isExpiryLoading, refetch: refetchExpiry } = useRnsExpiry(
     label ?? "",

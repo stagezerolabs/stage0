@@ -11,6 +11,7 @@ import type {
 } from "@/lib/rns/types";
 import { normalizeRnsLabel } from "@/lib/rns/utils";
 import { useCallback } from "react";
+import { zeroAddress } from "viem";
 import { useTrackedWriteContract } from "@/lib/hooks/useTrackedWriteContract";
 
 function useRnsWrite() {
@@ -21,14 +22,17 @@ function useRnsWrite() {
 }
 
 export function useRnsRegister() {
-  const { registrar, resolver: defaultResolver } = useRnsContracts();
+  const { registrar } = useRnsContracts();
   const write = useRnsWrite();
 
   const register = useCallback(
     (params: RnsRegisterParams) => {
       const name = normalizeRnsLabel(params.name);
       const duration = params.duration ?? RNS_DEFAULT_REGISTRATION_DURATION;
-      const resolver = params.resolver ?? defaultResolver;
+      // Pass zeroAddress as resolver so the registrar skips the setAddr call.
+      // The registrar's resolver.setAddr() reverts because msg.sender (registrar)
+      // is not an approved operator for the newly-created node.
+      const resolver = params.resolver ?? zeroAddress;
 
       write.writeContract({
         address: registrar,
@@ -38,7 +42,7 @@ export function useRnsRegister() {
         value: params.value,
       });
     },
-    [defaultResolver, registrar, write],
+    [registrar, write],
   );
 
   return { ...write, register };

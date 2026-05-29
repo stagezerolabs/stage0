@@ -15,6 +15,7 @@ import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import { useRnsSubgraphDomainsForOwner } from '@/lib/hooks/rns/useRnsSubgraph';
 import { getCachedRnsLabel, seedCacheFromCandidates } from '@/lib/rns/label-cache';
+import { getPrimaryLabel, setPrimaryLabel } from '@/lib/rns/primary-label';
 import { rnsNamehash } from '@/lib/rns/utils';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
@@ -27,9 +28,10 @@ import {
   Lock,
   Package,
   Sparkles,
+  Star,
   Wallet,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
@@ -94,6 +96,21 @@ const Dashboard: React.FC = () => {
   );
   const { isAdmin } = useIsAdmin(address as Address | undefined);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+
+  // Which label the user has chosen as their primary identity.
+  // Initialise from localStorage; updates trigger a re-render via state.
+  const [primaryLabel, setPrimaryLabelState] = useState<string | null>(() =>
+    address ? getPrimaryLabel(address) : null,
+  );
+
+  const handleSetPrimary = useCallback(
+    (label: string) => {
+      if (!address) return;
+      setPrimaryLabel(address, label);
+      setPrimaryLabelState(label);
+    },
+    [address],
+  );
   const safeAddress = (address ?? zeroAddress) as Address;
   const chainId = useChainId();
   const nativeToken = getNativeTokenLabel(chainId);
@@ -452,27 +469,29 @@ const Dashboard: React.FC = () => {
         ) : (
           <div className="bg-canvas-alt border border-border rounded-3xl overflow-hidden">
             {ownedDomains.map((domain, i) => {
-              // Subgraph may return empty label when calldata decoding fails on
-              // the node — fall back to the localStorage cache written at
-              // registration time.
               const label = domain.label || getCachedRnsLabel(domain.node) || '';
+              // Determine if this domain is the active primary. If none is stored,
+              // the first domain is the implicit primary.
+              const effectivePrimary = primaryLabel ?? (ownedDomains[0].label || getCachedRnsLabel(ownedDomains[0].node) || '');
+              const isPrimary = label !== '' && label === effectivePrimary;
               const expiryDate = domain.expiry
                 ? new Date(Number(domain.expiry) * 1000).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
                 : '—';
               const isLastItem = i === ownedDomains.length - 1;
               return (
-                <Link
+                <div
                   key={domain.node}
-                  to={`/domains?q=${label}`}
-                  className={`flex items-center justify-between gap-4 px-6 py-4 hover:bg-canvas transition-colors ${
-                    !isLastItem ? 'border-b border-border/50' : ''
-                  }`}
+                  className={`flex items-center justify-between gap-4 px-6 py-4 ${!isLastItem ? 'border-b border-border/50' : ''
+                    }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <Link
+                    to={`/domains?q=${label}`}
+                    className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+                  >
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                       style={{ background: 'rgb(var(--color-accent) / 0.12)' }}
@@ -480,15 +499,36 @@ const Dashboard: React.FC = () => {
                       <Globe className="w-4 h-4" style={{ color: 'rgb(var(--color-accent))' }} />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-medium text-[14px] text-ink truncate">
-                        {label || <span className="text-ink-muted font-mono text-[12px]">{domain.node.slice(0, 10)}…</span>}
-                        {label && <span className="text-ink-muted">.rise</span>}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-[14px] text-ink truncate">
+                          {label || <span className="text-ink-muted font-mono text-[12px]">{domain.node.slice(0, 10)}…</span>}
+                          {label && <span className="text-ink-muted">.rise</span>}
+                        </span>
+                        {isPrimary && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
+                            style={{ background: 'rgb(var(--color-accent) / 0.12)', color: 'rgb(var(--color-accent))' }}>
+                            <Star className="w-2.5 h-2.5" />
+                            main
+                          </span>
+                        )}
                       </div>
                       <div className="font-mono text-[11px] text-ink-muted">Expires {expiryDate}</div>
                     </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-ink-faint shrink-0" />
-                </Link>
+                  </Link>
+                  {!isPrimary && label && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimary(label)}
+                      className="text-[11px] font-medium text-ink-muted hover:text-accent transition-colors shrink-0 flex items-center gap-1"
+                      title={`Set ${label}.rise as primary identity`}
+                    >
+                      <Star className="w-3 h-3" />
+                    </button>
+                  )}
+                  {isPrimary && (
+                    <ArrowRight className="w-4 h-4 text-ink-faint shrink-0 pointer-events-none" />
+                  )}
+                </div>
               );
             })}
             {ownedDomains.length > 0 && (
@@ -679,8 +719,8 @@ const Dashboard: React.FC = () => {
                   <div className="num">
                     {pendingRewards > 0n
                       ? Number(formatUnits(pendingRewards, stakingDecimals)).toLocaleString(undefined, {
-                          maximumFractionDigits: 4,
-                        })
+                        maximumFractionDigits: 4,
+                      })
                       : '—'}
                   </div>
                   <div className="num-sub">rewards</div>
@@ -848,13 +888,12 @@ const Dashboard: React.FC = () => {
                       </span>
                     </span>
                     <span
-                      className={`font-mono text-[11px] whitespace-nowrap uppercase tracking-wider shrink-0 ${
-                        lock.withdrawn
-                          ? 'text-ink-faint'
-                          : isUnlockable
-                            ? 'text-status-live'
-                            : 'text-status-upcoming'
-                      }`}
+                      className={`font-mono text-[11px] whitespace-nowrap uppercase tracking-wider shrink-0 ${lock.withdrawn
+                        ? 'text-ink-faint'
+                        : isUnlockable
+                          ? 'text-status-live'
+                          : 'text-status-upcoming'
+                        }`}
                     >
                       {timerLabel}
                     </span>

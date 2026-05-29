@@ -323,7 +323,7 @@ const DomainsPage: React.FC = () => {
           Names
         </h1>
         <p className="text-body-lg text-ink-muted max-w-2xl">
-          Your identity on RISE — powered by RNS.
+          Your custom username on the RISE network.
         </p>
       </motion.section>
 
@@ -344,63 +344,12 @@ const DomainsPage: React.FC = () => {
           </p>
         </motion.div>
       ) : (
-        <div className="space-y-8">
-          {/* Currently Owned Name Section (For Management) */}
-          {ownedLabel ? (
-            <motion.div
-              variants={itemVariants}
-              className="glass-card rounded-3xl p-6 md:p-8 border border-border flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
-            >
-              <div className="space-y-2">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase border border-accent/40 bg-accent/10 text-accent">
-                  Your active name
-                </span>
-                <h3 className="font-mono text-display-sm text-ink">{ownedDisplayName}</h3>
-                {ownedExpirySec > 0 ? (
-                  <p className="text-body-sm text-ink-muted">
-                    {isOwnedExpired ? (
-                      <span className="text-status-error font-semibold">Expired — renew to keep this identity.</span>
-                    ) : (
-                      <>
-                        Expires{' '}
-                        <span className="font-mono text-ink">
-                          {new Date(ownedExpirySec * 1000).toLocaleDateString(undefined, {
-                            dateStyle: 'medium',
-                          })}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex gap-3 w-full md:w-auto shrink-0">
-                {isWithinRenewalWindow && (
-                  <button
-                    type="button"
-                    onClick={handleRenew}
-                    disabled={isRenewing || isRenewQuoteLoading}
-                    className="btn-primary py-2.5 px-6 disabled:opacity-60 text-body-sm flex-1 md:flex-initial"
-                  >
-                    {isRenewing
-                      ? 'Renewing…'
-                      : `Renew (${formatEther(renewPrice)} ETH)`}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleRelease}
-                  disabled={isReleasing}
-                  className="btn-secondary py-2.5 px-6 disabled:opacity-60 text-body-sm flex-1 md:flex-initial"
-                >
-                  {isReleasing ? 'Releasing…' : 'Release'}
-                </button>
-              </div>
-            </motion.div>
-          ) : null}
-
-          {/* Search Inputs Container */}
-          <motion.div variants={itemVariants} className="space-y-6">
-            <div className="relative w-full max-w-2xl mx-auto space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* LEFT COLUMN: Search & Register */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Search Input Card */}
+            <div className="glass-card rounded-3xl p-6 border border-border space-y-4">
+              <h3 className="font-display text-lg font-bold text-ink">Find a name</h3>
               <div className="relative bg-border hover:bg-accent p-[1.5px] rounded-2xl shadow-float hover:shadow-float-hover transition-all duration-300">
                 <div className="bg-canvas-alt rounded-[14px] flex items-center px-4 py-1.5 w-full">
                   <Search className="w-5 h-5 text-accent pointer-events-none mr-3 shrink-0" />
@@ -436,8 +385,8 @@ const DomainsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Results Panel */}
             <AnimatePresence mode="wait">
-              {/* Search History & Recommendations (Only shown when not showing search results) */}
               {!submittedQuery ? (
                 <motion.div
                   key="history-panel"
@@ -445,10 +394,10 @@ const DomainsPage: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.3 }}
-                  className="w-full max-w-2xl mx-auto space-y-6"
+                  className="space-y-6"
                 >
                   {searchHistory.length > 0 ? (
-                    <div className="glass-card rounded-2xl p-5 border border-border space-y-4">
+                    <div className="glass-card rounded-3xl p-6 border border-border space-y-4">
                       <div className="flex justify-between items-center text-xs font-mono">
                         <span className="text-ink-muted font-semibold tracking-wider uppercase">Search History</span>
                         <button
@@ -476,8 +425,7 @@ const DomainsPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    // Suggested searches if history is empty to make it look rich
-                    <div className="glass-card rounded-2xl p-5 border border-border space-y-3">
+                    <div className="glass-card rounded-3xl p-6 border border-border space-y-4">
                       <p className="text-xs font-mono text-ink-muted font-semibold tracking-wider uppercase">
                         Recommended Keywords
                       </p>
@@ -496,19 +444,18 @@ const DomainsPage: React.FC = () => {
                   )}
                 </motion.div>
               ) : (
-                /* Exact Result Cards */
                 <motion.div
                   key="result-panel"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.3 }}
-                  className="w-full max-w-2xl mx-auto space-y-4"
+                  className="space-y-4"
                 >
-                  <h3 className="font-display text-lg font-bold text-ink mb-2">Exact Result</h3>
+                  <h3 className="font-display text-sm font-semibold tracking-wider uppercase text-ink-muted">Search Result</h3>
 
                   {isStatusLoading ? (
-                    <div className="glass-card rounded-2xl p-10 border border-border text-center text-ink-muted">
+                    <div className="glass-card rounded-3xl p-12 border border-border text-center text-ink-muted">
                       <div className="h-5 w-5 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                       Checking availability…
                     </div>
@@ -657,7 +604,108 @@ const DomainsPage: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </div>
+
+          {/* RIGHT COLUMN: Your Active Identity & Details */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* Identity Manager */}
+            {ownedLabel ? (
+              <motion.div
+                variants={itemVariants}
+                className="glass-card rounded-3xl border border-accent/20 p-6 md:p-8 flex flex-col justify-between gap-6 relative overflow-hidden"
+              >
+                {/* Accent glow behind name badge */}
+                <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-accent/5 blur-2xl pointer-events-none" />
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold tracking-wider uppercase border border-accent/40 bg-accent/10 text-accent">
+                      main
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h3 className="font-mono text-display-sm text-ink break-all">{ownedDisplayName}</h3>
+                    {ownedExpirySec > 0 ? (
+                      <p className="text-body-sm text-ink-muted">
+                        {isOwnedExpired ? (
+                          <span className="text-status-error font-semibold flex items-center gap-1">
+                            <AlertTriangle className="w-4 h-4 shrink-0" /> Expired — renew to keep this identity.
+                          </span>
+                        ) : (
+                          <>
+                            Expires{' '}
+                            <span className="font-mono text-ink font-semibold">
+                              {new Date(ownedExpirySec * 1000).toLocaleDateString(undefined, {
+                                dateStyle: 'medium',
+                              })}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 w-full mt-2 shrink-0">
+                  {isWithinRenewalWindow && (
+                    <button
+                      type="button"
+                      onClick={handleRenew}
+                      disabled={isRenewing || isRenewQuoteLoading}
+                      className="btn-primary py-2.5 px-6 disabled:opacity-60 text-body-sm flex-1 font-semibold"
+                    >
+                      {isRenewing
+                        ? 'Renewing…'
+                        : `Renew (${formatEther(renewPrice)} ETH)`}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRelease}
+                    disabled={isReleasing}
+                    className="btn-secondary py-2.5 px-6 disabled:opacity-60 text-body-sm flex-1 font-semibold"
+                  >
+                    {isReleasing ? 'Releasing…' : 'Release'}
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                variants={itemVariants}
+                className="glass-card rounded-3xl border border-border p-6 md:p-8 flex flex-col justify-between gap-6"
+              >
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-canvas-alt border border-border flex items-center justify-center">
+                    <Search className="w-5 h-5 text-ink-faint" />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-display text-lg font-bold text-ink">Get your name</h4>
+                    <p className="text-body-sm text-ink-muted leading-relaxed">
+                      You don't have a <span className="font-mono text-accent">.rise</span> name yet! Find a clean one on the left to claim your identity.
+                    </p>
+                  </div>
+                  <div className="border-t border-border/60 pt-4 space-y-3">
+                    <h5 className="text-xs font-mono text-ink-muted tracking-wider uppercase font-semibold">Why get one?</h5>
+                    <ul className="space-y-2.5 text-body-xs text-ink-muted">
+                      <li className="flex items-start gap-2">
+                        <span className="text-accent shrink-0">✦</span>
+                        <span>Ditch long, complex addresses. Use a readable name instead.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-accent shrink-0">✦</span>
+                        <span>One username for all dApps built on the RISE chain.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-accent shrink-0">✦</span>
+                        <span>Add your social profiles, website links, or a custom avatar.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
         </div>
       )}
 
@@ -756,8 +804,6 @@ const DomainsPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-
-
     </motion.div>
   );
 };

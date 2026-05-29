@@ -150,11 +150,45 @@ const AICopilot: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
 
+  // Update greeting when domain loads in
+  useEffect(() => {
+    setMessages([{ role: 'bot', text: greeting, time: nowTime() }]);
+  }, [greeting]);
+
   useEffect(() => {
     if (chatOpen && bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
   }, [chatOpen, messages, typing]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const footer = document.querySelector('footer');
+      if (!footer) {
+        setBottomOffset(24);
+        return;
+      }
+
+      const footerRect = footer.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+
+      if (footerRect.top < viewportHeight) {
+        const visibleFooterHeight = viewportHeight - footerRect.top;
+        setBottomOffset(visibleFooterHeight + 24);
+      } else {
+        setBottomOffset(24);
+      }
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, []);
 
   const openChat = () => {
     setChatOpen(true);
@@ -223,7 +257,7 @@ const AICopilot: React.FC = () => {
   };
 
   return (
-    <div className="ai-bubble-wrap">
+    <div className="ai-bubble-wrap" style={{ bottom: `${bottomOffset}px` }}>
       {chatOpen && (
         <div className="ai-chat" role="dialog" aria-label="Senna assistant">
           <div className="ai-chat-header">

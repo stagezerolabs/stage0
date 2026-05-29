@@ -13,6 +13,10 @@ import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
+import { useRnsSubgraphDomainsForOwner } from '@/lib/hooks/rns/useRnsSubgraph';
+import { getCachedRnsLabel, seedCacheFromCandidates } from '@/lib/rns/label-cache';
+import { getPrimaryLabel, setPrimaryLabel } from '@/lib/rns/primary-label';
+import { rnsNamehash } from '@/lib/rns/utils';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
 import { useIsAdmin } from '@/lib/utils/admin';
@@ -24,9 +28,10 @@ import {
   Lock,
   Package,
   Sparkles,
+  Star,
   Wallet,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
@@ -85,8 +90,27 @@ interface DashboardLockItem {
 const Dashboard: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { displayName: domainDisplayName } = useUserDomain(address);
+  const { data: ownedDomains, isLoading: isDomainsLoading } = useRnsSubgraphDomainsForOwner(
+    address as Address | undefined,
+    { enabled: isConnected && Boolean(address) },
+  );
   const { isAdmin } = useIsAdmin(address as Address | undefined);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+
+  // Which label the user has chosen as their primary identity.
+  // Initialise from localStorage; updates trigger a re-render via state.
+  const [primaryLabel, setPrimaryLabelState] = useState<string | null>(() =>
+    address ? getPrimaryLabel(address) : null,
+  );
+
+  const handleSetPrimary = useCallback(
+    (label: string) => {
+      if (!address) return;
+      setPrimaryLabel(address, label);
+      setPrimaryLabelState(label);
+    },
+    [address],
+  );
   const safeAddress = (address ?? zeroAddress) as Address;
   const chainId = useChainId();
   const nativeToken = getNativeTokenLabel(chainId);
@@ -126,6 +150,23 @@ const Dashboard: React.FC = () => {
     }, COUNTDOWN_TICK_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Seed the label cache from search history for domains registered before the
+  // cache was introduced (subgraph returns empty labels on Rise Testnet).
+  useEffect(() => {
+    if (!ownedDomains?.length) return;
+    const emptyNodes = ownedDomains.filter((d) => !d.label).map((d) => d.node);
+    if (!emptyNodes.length) return;
+    try {
+      const raw = localStorage.getItem('rns_search_history');
+      const history: string[] = raw ? JSON.parse(raw) : [];
+      if (history.length) {
+        seedCacheFromCandidates(emptyNodes, history, rnsNamehash);
+      }
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [ownedDomains]);
 
   const { data: stakingTokenData } = useReadContracts({
     contracts: [
@@ -337,7 +378,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="eyebrow">Native balance</span>
-              {isConnected && isAdmin && !domainDisplayName ? (
+              {isConnected && !domainDisplayName ? (
                 <Link
                   to="/domains"
                   className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-accent transition-colors"
@@ -397,6 +438,114 @@ const Dashboard: React.FC = () => {
           tint="rgb(var(--color-accent-sky) / 0.16)"
           tintSolid="rgb(var(--color-accent-sky))"
         />
+      </section>
+
+      {/* My Names */}
+      <section>
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">Identity</div>
+            <h2 className="ds-h2 mt-1.5">My Names</h2>
+          </div>
+          <Link to="/domains" className="btn-ghost btn-sm inline-flex">
+            Manage names <ArrowRight className="w-3.5 h-3.5 ml-1" />
+          </Link>
+        </div>
+
+        {!isConnected ? (
+          <ConnectWalletPlaceholder message="Connect your wallet to see your .rise names." />
+        ) : isDomainsLoading ? (
+          <div className="bg-canvas-alt border border-border rounded-3xl p-8 text-center text-ink-muted text-sm">
+            Loading names…
+          </div>
+        ) : !ownedDomains || ownedDomains.length === 0 ? (
+          <div className="bg-canvas-alt border border-border rounded-3xl p-10 text-center">
+            <Globe className="w-5 h-5 mx-auto mb-3 text-ink-faint" />
+            <p className="text-ink-muted text-sm mb-4">You don't own any .rise names yet.</p>
+            <Link to="/domains" className="btn-secondary btn-sm inline-flex">
+              Register a name <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-canvas-alt border border-border rounded-3xl overflow-hidden">
+            {ownedDomains.map((domain, i) => {
+              const label = domain.label || getCachedRnsLabel(domain.node) || '';
+              // Determine if this domain is the active primary. If none is stored,
+              // the first domain is the implicit primary.
+              const effectivePrimary = primaryLabel ?? (ownedDomains[0].label || getCachedRnsLabel(ownedDomains[0].node) || '');
+              const isPrimary = label !== '' && label === effectivePrimary;
+              const expiryDate = domain.expiry
+                ? new Date(Number(domain.expiry) * 1000).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+                : '—';
+              const isLastItem = i === ownedDomains.length - 1;
+              return (
+                <div
+                  key={domain.node}
+                  className={`flex items-center justify-between gap-4 px-6 py-4 ${!isLastItem ? 'border-b border-border/50' : ''
+                    }`}
+                >
+                  <Link
+                    to={`/domains?q=${label}`}
+                    className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: 'rgb(var(--color-accent) / 0.12)' }}
+                    >
+                      <Globe className="w-4 h-4" style={{ color: 'rgb(var(--color-accent))' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-[14px] text-ink truncate">
+                          {label || <span className="text-ink-muted font-mono text-[12px]">{domain.node.slice(0, 10)}…</span>}
+                          {label && <span className="text-ink-muted">.rise</span>}
+                        </span>
+                        {isPrimary && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
+                            style={{ background: 'rgb(var(--color-accent) / 0.12)', color: 'rgb(var(--color-accent))' }}>
+                            <Star className="w-2.5 h-2.5" />
+                            main
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-mono text-[11px] text-ink-muted">Expires {expiryDate}</div>
+                    </div>
+                  </Link>
+                  {!isPrimary && label && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimary(label)}
+                      className="text-[11px] font-medium text-ink-muted hover:text-accent transition-colors shrink-0 flex items-center gap-1"
+                      title={`Set ${label}.rise as primary identity`}
+                    >
+                      <Star className="w-3 h-3" />
+                    </button>
+                  )}
+                  {isPrimary && (
+                    <ArrowRight className="w-4 h-4 text-ink-faint shrink-0 pointer-events-none" />
+                  )}
+                </div>
+              );
+            })}
+            {ownedDomains.length > 0 && (
+              <div className="px-6 py-3 border-t border-border/50 flex items-center justify-between">
+                <span className="text-[12px] text-ink-muted">
+                  {ownedDomains.length} name{ownedDomains.length !== 1 ? 's' : ''} registered
+                </span>
+                <Link
+                  to="/domains"
+                  className="text-[12px] font-medium text-accent hover:text-accent/80 transition-colors"
+                >
+                  Register another →
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Allocations */}
@@ -570,8 +719,8 @@ const Dashboard: React.FC = () => {
                   <div className="num">
                     {pendingRewards > 0n
                       ? Number(formatUnits(pendingRewards, stakingDecimals)).toLocaleString(undefined, {
-                          maximumFractionDigits: 4,
-                        })
+                        maximumFractionDigits: 4,
+                      })
                       : '—'}
                   </div>
                   <div className="num-sub">rewards</div>
@@ -739,13 +888,12 @@ const Dashboard: React.FC = () => {
                       </span>
                     </span>
                     <span
-                      className={`font-mono text-[11px] whitespace-nowrap uppercase tracking-wider shrink-0 ${
-                        lock.withdrawn
-                          ? 'text-ink-faint'
-                          : isUnlockable
-                            ? 'text-status-live'
-                            : 'text-status-upcoming'
-                      }`}
+                      className={`font-mono text-[11px] whitespace-nowrap uppercase tracking-wider shrink-0 ${lock.withdrawn
+                        ? 'text-ink-faint'
+                        : isUnlockable
+                          ? 'text-status-live'
+                          : 'text-status-upcoming'
+                        }`}
                     >
                       {timerLabel}
                     </span>

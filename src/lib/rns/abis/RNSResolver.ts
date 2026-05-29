@@ -1,0 +1,1 @@
+export { RNSResolver } from "@/config";

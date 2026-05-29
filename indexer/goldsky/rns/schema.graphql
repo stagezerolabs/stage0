@@ -1,0 +1,22 @@
+type RnsDomain @entity(immutable: false) {
+  id: ID!                  # event.params.node.toHexString()
+  label: String!           # normalised label, e.g. "alice"
+  fqdn: String!            # fully-qualified, e.g. "alice.rise"
+  owner: Bytes!            # current registry owner
+  resolver: Bytes          # resolver contract address (null until set)
+  resolvedAddress: Bytes   # addr(node) result (null until resolver is set)
+  registrant: Bytes!       # address that called register()
+  expiry: BigInt!          # unix timestamp from Registrar
+  registeredAt: BigInt!    # block.timestamp of NameRegistered event
+  renewedAt: BigInt        # block.timestamp of last NameRenewed event
+  releasedAt: BigInt       # block.timestamp of NameReleased event (null if active)
+  createdAtBlock: BigInt!
+  updatedAtBlock: BigInt!
+}
+
+# Lightweight reverse-lookup — one record per address that has addr() set.
+# Populated from AddrChanged events on the resolver.
+type RnsReverseRecord @entity(immutable: false) {
+  id: ID!          # lowercase hex address (0x...)
+  domain: RnsDomain!
+}

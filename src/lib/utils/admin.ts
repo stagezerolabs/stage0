@@ -137,39 +137,3 @@ export function useIsFeeRecipient(address: Address | undefined, target: FactoryT
     feeRecipient,
   };
 }
-
-/**
- * Legacy function for backward compatibility - now always returns false.
- * Use useIsAdmin hook instead for proper on-chain verification.
- * @deprecated Use useIsAdmin hook instead
- */
-export function isAdmin(_address: string | undefined): boolean {
-  console.warn('isAdmin() is deprecated. Use useIsAdmin() hook for on-chain verification.');
-  return false;
-}
-
-/**
- * Legacy function - deprecated.
- * @deprecated Use useIsAdmin hook instead
- */
-export function useIsAdminLegacy(_address: string | undefined): boolean {
-  return isAdmin(_address);
-}
-
-/**
- * Legacy function - deprecated.
- * @deprecated Admin check now happens on-chain
- */
-export function requireAdmin(_address: string | undefined): void {
-  console.warn('requireAdmin() is deprecated. Use on-chain admin verification instead.');
-  throw new Error('Unauthorized: Admin access requires on-chain verification');
-}
-
-/**
- * Legacy function - deprecated.
- * @deprecated Admin addresses are now determined by factoryOwner on-chain
- */
-export function getAdminAddresses(): string[] {
-  console.warn('getAdminAddresses() is deprecated. Use useFactoryOwner() hook instead.');
-  return [];
-}

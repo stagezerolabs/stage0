@@ -1,0 +1,1 @@
+export { RNSRegistry } from "@/config";

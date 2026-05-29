@@ -1,6 +1,6 @@
 import { LaunchpadPresaleContract, NFTFactory, PresaleFactory } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
-import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useTrackedWriteContract } from '@/lib/hooks/useTrackedWriteContract';
 import type { Abi, Address } from 'viem';
 
 type FactoryTarget = 'presale' | 'nft';
@@ -22,18 +22,8 @@ function useFactoryWriteConfig(target: FactoryTarget) {
 }
 
 function useContractWriteState() {
-  const {
-    writeContract,
-    data: hash,
-    isPending,
-    isError,
-    error,
-    reset,
-  } = useWriteContract();
-
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const { writeContract, hash, isPending, isConfirming, isSuccess, error, reset, isBusy } =
+    useTrackedWriteContract();
 
   return {
     writeContract,
@@ -41,10 +31,10 @@ function useContractWriteState() {
     isPending,
     isConfirming,
     isSuccess,
-    isError,
+    isError: !!error,
     error,
     reset,
-    isBusy: isPending || isConfirming,
+    isBusy,
   };
 }
 

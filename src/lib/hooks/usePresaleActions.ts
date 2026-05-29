@@ -2,7 +2,8 @@ import { LaunchpadPresaleContract } from '@/config';
 import { useLaunchpadPresaleStore } from '@/lib/store/launchpad-presale-store';
 import { useCallback } from 'react';
 import { type Address } from 'viem';
-import { useAccount, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount } from 'wagmi';
+import { useTrackedWriteContract } from '@/lib/hooks/useTrackedWriteContract';
 
 export interface ContributeParams {
   presaleAddress: Address;
@@ -15,19 +16,8 @@ export function usePresaleContribute() {
   const { address: userAddress } = useAccount();
   const { invalidatePresale, invalidateUserPresaleData } = useLaunchpadPresaleStore();
 
-  const {
-    data: hash,
-    writeContract,
-    isPending: isWritePending,
-    error: writeError,
-    reset,
-  } = useWriteContract();
-
-  const {
-    isLoading: isConfirming,
-    isSuccess,
-    error: confirmError,
-  } = useWaitForTransactionReceipt({ hash });
+  const { hash, writeContract, isPending: isWritePending, isConfirming, isSuccess, error, reset } =
+    useTrackedWriteContract();
 
   const contribute = useCallback(
     async ({ presaleAddress, amount, isPaymentETH }: ContributeParams) => {
@@ -70,7 +60,7 @@ export function usePresaleContribute() {
     isPending: isWritePending,
     isConfirming,
     isSuccess,
-    error: writeError || confirmError,
+    error,
     reset,
     invalidateOnSuccess,
   };
@@ -80,19 +70,8 @@ export function usePresaleClaimTokens() {
   const { address: userAddress } = useAccount();
   const { invalidatePresale, invalidateUserPresaleData } = useLaunchpadPresaleStore();
 
-  const {
-    data: hash,
-    writeContract,
-    isPending: isWritePending,
-    error: writeError,
-    reset,
-  } = useWriteContract();
-
-  const {
-    isLoading: isConfirming,
-    isSuccess,
-    error: confirmError,
-  } = useWaitForTransactionReceipt({ hash });
+  const { hash, writeContract, isPending: isWritePending, isConfirming, isSuccess, error, reset } =
+    useTrackedWriteContract();
 
   const claimTokens = useCallback(
     (presaleAddress: Address) => {
@@ -121,7 +100,7 @@ export function usePresaleClaimTokens() {
     isPending: isWritePending,
     isConfirming,
     isSuccess,
-    error: writeError || confirmError,
+    error,
     reset,
     invalidateOnSuccess,
   };
@@ -131,19 +110,8 @@ export function usePresaleClaimRefund() {
   const { address: userAddress } = useAccount();
   const { invalidatePresale, invalidateUserPresaleData } = useLaunchpadPresaleStore();
 
-  const {
-    data: hash,
-    writeContract,
-    isPending: isWritePending,
-    error: writeError,
-    reset,
-  } = useWriteContract();
-
-  const {
-    isLoading: isConfirming,
-    isSuccess,
-    error: confirmError,
-  } = useWaitForTransactionReceipt({ hash });
+  const { hash, writeContract, isPending: isWritePending, isConfirming, isSuccess, error, reset } =
+    useTrackedWriteContract();
 
   const claimRefund = useCallback(
     (presaleAddress: Address) => {
@@ -172,7 +140,7 @@ export function usePresaleClaimRefund() {
     isPending: isWritePending,
     isConfirming,
     isSuccess,
-    error: writeError || confirmError,
+    error,
     reset,
     invalidateOnSuccess,
   };
@@ -182,19 +150,8 @@ export function usePresaleClaimRefund() {
 export function usePresaleOwnerActions() {
   const { invalidatePresale } = useLaunchpadPresaleStore();
 
-  const {
-    data: hash,
-    writeContract,
-    isPending: isWritePending,
-    error: writeError,
-    reset,
-  } = useWriteContract();
-
-  const {
-    isLoading: isConfirming,
-    isSuccess,
-    error: confirmError,
-  } = useWaitForTransactionReceipt({ hash });
+  const { hash, writeContract, isPending: isWritePending, isConfirming, isSuccess, error, reset } =
+    useTrackedWriteContract();
 
   const depositSaleTokens = useCallback(
     (presaleAddress: Address, amount: bigint) => {
@@ -285,7 +242,7 @@ export function usePresaleOwnerActions() {
     isPending: isWritePending,
     isConfirming,
     isSuccess,
-    error: writeError || confirmError,
+    error,
     reset,
     invalidateOnSuccess,
   };

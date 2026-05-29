@@ -1,3 +1,4 @@
+import { onchainLog } from "@/lib/utils/onchain-logger";
 import { useMemo } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { erc20Abi } from "@/config";
@@ -41,6 +42,8 @@ export function usePresaleApproval({
   const approve = async () => {
     if (!paymentToken.address) return;
 
+    onchainLog.submit(paymentToken.address, "approve", [presaleAddress, maxUint256]);
+
     try {
       const hash = await approveAsync({
         address: paymentToken.address,
@@ -49,12 +52,12 @@ export function usePresaleApproval({
         args: [presaleAddress, maxUint256],
       });
 
-      // After approval, refetch allowance
       if (hash) {
+        onchainLog.hash(hash, "approve");
         refetch();
       }
     } catch (error) {
-      console.error("Approval failed", error);
+      onchainLog.error("approve", error);
     }
   };
 

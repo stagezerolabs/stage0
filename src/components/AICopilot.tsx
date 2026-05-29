@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useAccount } from 'wagmi';
+import { useUserDomain } from '@/lib/hooks/useUserDomain';
 
 type CopilotCard = {
   title: string;
@@ -20,22 +22,41 @@ const nowTime = (): string => {
 };
 
 const SUGGESTIONS = [
+  'What is my .rise name?',
   'Show my allocations',
   'What launches today?',
-  'Help me claim',
   'Tier requirements?',
 ];
 
-const INITIAL_MESSAGES: CopilotMessage[] = [
-  {
-    role: 'bot',
-    text: "I'm Senna. I can help you track positions, find launches, or understand creator tools.",
-    time: nowTime(),
-  },
-];
 
-const replyFor = (text: string): CopilotMessage => {
+const replyFor = (text: string, rnsDomain: string | null): CopilotMessage => {
   const t = text.toLowerCase();
+  if (t.includes('domain') || t.includes('name') || t.includes('.rise') || t.includes('rns')) {
+    if (rnsDomain) {
+      return {
+        role: 'bot',
+        text: `Your active name is ${rnsDomain}. You can renew it, check its expiry, or release it from the Names page.`,
+        card: {
+          title: 'Manage your name',
+          sub: `${rnsDomain} · Rise Name Service`,
+          value: 'Go →',
+          icon: '◈',
+        },
+        time: nowTime(),
+      };
+    }
+    return {
+      role: 'bot',
+      text: "You don't have a .rise name yet. Head to the Names page to search and register one — it becomes your onchain identity on Rise.",
+      card: {
+        title: 'Get a .rise name',
+        sub: 'Search and register your identity',
+        value: 'Go →',
+        icon: '◈',
+      },
+      time: nowTime(),
+    };
+  }
   if (t.includes('claim') || t.includes('alloc')) {
     return {
       role: 'bot',
@@ -79,23 +100,68 @@ const replyFor = (text: string): CopilotMessage => {
   }
   return {
     role: 'bot',
-    text: 'I can help with allocations, launches, NFTs, tier requirements, and creator tools. What would you like to do?',
+    text: 'I can help with allocations, launches, NFTs, tier requirements, domains, and creator tools. What would you like to do?',
     time: nowTime(),
   };
 };
 
 const AICopilot: React.FC = () => {
+  const { address } = useAccount();
+  const { displayName: rnsDomain } = useUserDomain(address);
+
+  const greeting = useMemo(() => {
+    if (rnsDomain) return `Hey ${rnsDomain} — I'm Senna. I can help you track positions, find launches, or manage your name.`;
+    return "I'm Senna. I can help you track positions, find launches, or understand creator tools.";
+  }, [rnsDomain]);
+
   const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState<CopilotMessage[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<CopilotMessage[]>(() => [
+    { role: 'bot', text: greeting, time: nowTime() },
+  ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
+  const [bottomOffset, setBottomOffset] = useState(24);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+
+  // Update greeting when domain loads in
+  useEffect(() => {
+    setMessages([{ role: 'bot', text: greeting, time: nowTime() }]);
+  }, [greeting]);
 
   useEffect(() => {
     if (chatOpen && bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
   }, [chatOpen, messages, typing]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const footer = document.querySelector('footer');
+      if (!footer) {
+        setBottomOffset(24);
+        return;
+      }
+
+      const footerRect = footer.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+
+      if (footerRect.top < viewportHeight) {
+        const visibleFooterHeight = viewportHeight - footerRect.top;
+        setBottomOffset(visibleFooterHeight + 24);
+      } else {
+        setBottomOffset(24);
+      }
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, []);
 
   const openChat = () => {
     setChatOpen(true);
@@ -109,12 +175,12 @@ const AICopilot: React.FC = () => {
     setTyping(true);
     window.setTimeout(() => {
       setTyping(false);
-      setMessages((m) => [...m, replyFor(msg)]);
+      setMessages((m) => [...m, replyFor(msg, rnsDomain ?? null)]);
     }, 1100);
   };
 
   return (
-    <div className="ai-bubble-wrap">
+    <div className="ai-bubble-wrap" style={{ bottom: `${bottomOffset}px` }}>
       {chatOpen && (
         <div className="ai-chat" role="dialog" aria-label="Senna assistant">
           <div className="ai-chat-header">
@@ -128,7 +194,7 @@ const AICopilot: React.FC = () => {
                 type="button"
                 className="ai-chat-icon-btn"
                 title="New chat"
-                onClick={() => setMessages([{ role: 'bot', text: 'Fresh start. What should we look at?', time: nowTime() }])}
+                onClick={() => setMessages([{ role: 'bot', text: greeting, time: nowTime() }])}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 12a9 9 0 1 0 9-9" />

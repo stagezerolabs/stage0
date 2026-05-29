@@ -25,7 +25,6 @@ import {
   Search,
   Wallet,
   X,
-  Sparkles,
   Trash2,
   ArrowRight,
   History
@@ -299,11 +298,11 @@ const DomainsPage: React.FC = () => {
   const ownedExpirySec = Number(ownedExpiry);
   const isOwnedExpired = ownedExpirySec > 0 && ownedExpirySec < nowSec;
 
-  // Mock USD Conversion for aesthetics
-  const usdValue = useMemo(() => {
-    if (!registerPrice) return '0.00';
-    return (Number(formatEther(registerPrice)) * 3000).toFixed(2);
-  }, [registerPrice]);
+  // Mock USD Conversion for aesthetics (optional, unused)
+  // const usdValue = useMemo(() => {
+  //   if (!registerPrice) return '0.00';
+  //   return (Number(formatEther(registerPrice)) * 3000).toFixed(2);
+  // }, [registerPrice]);
 
   return (
     <motion.div

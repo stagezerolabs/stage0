@@ -6,6 +6,7 @@ import { useAccount, useConnect, useConnectors } from 'wagmi';
 import { AlertTriangle, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
 import { RISE_CONNECTOR_ID } from '@/config';
 import { useIsAdmin } from '@/lib/utils/admin';
+import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import type { Address } from 'viem';
 
 type HeaderProps = {
@@ -29,6 +30,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const openConnectModalRef = useRef<(() => void) | null>(null);
   const { isConnected, address } = useAccount();
   const { isAdmin: isOwner } = useIsAdmin(address as Address | undefined);
+  const { displayName: rnsDomain } = useUserDomain(address);
   const { connect, isPending: isRiseConnectPending } = useConnect();
   const availableConnectors = useConnectors();
   const riseConnector = availableConnectors.find((connector) => connector.id === RISE_CONNECTOR_ID);
@@ -269,7 +271,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                             className="btn-primary"
                           >
                             <span className="font-mono text-body-sm">
-                              {account.displayName}
+                              {rnsDomain ?? account.displayName}
                             </span>
                           </button>
                         </div>

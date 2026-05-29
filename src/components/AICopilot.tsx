@@ -148,12 +148,8 @@ const AICopilot: React.FC = () => {
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [bottomOffset, setBottomOffset] = useState(24);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-
-  // Update greeting when domain loads in
-  useEffect(() => {
-    setMessages([{ role: 'bot', text: greeting, time: nowTime() }]);
-  }, [greeting]);
 
   useEffect(() => {
     if (chatOpen && bodyRef.current) {

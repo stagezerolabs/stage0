@@ -87,6 +87,7 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     owner: owner ?? null,
     expiry: expiry ?? 0n,
     isLoading: isSubgraphLoading || isHintLoading || isExpiryLoading,
+    allDomains: resolvedDomains,
     refetch,
   };
 }

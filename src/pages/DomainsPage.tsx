@@ -21,6 +21,7 @@ import {
   useRnsRelease,
   useRnsRenew,
 } from '@/lib/hooks/rns';
+import { setPrimaryLabel } from '@/lib/rns/primary-label';
 import {
   AlertTriangle,
   ExternalLink,
@@ -29,7 +30,8 @@ import {
   X,
   Trash2,
   ArrowRight,
-  History
+  History,
+  Star,
 } from 'lucide-react';
 
 const itemVariants = {
@@ -64,6 +66,7 @@ const DomainsPage: React.FC = () => {
     refetch: refetchOwned,
     expiry: ownedExpiry,
     isLoading: isOwnedLoading,
+    allDomains: ownedDomains,
   } = useRnsOwnedLabel(address, hintLabel ?? undefined);
 
   // Search Queries
@@ -119,6 +122,12 @@ const DomainsPage: React.FC = () => {
     if (isReserved) return true;
     return onChainIsTaken;
   }, [isReserved, onChainIsTaken]);
+
+  // True when the searched name is owned by the connected wallet (but isn't their primary)
+  const isOwnedByMe = useMemo(() => {
+    if (!normalized || !address || !isTaken) return false;
+    return ownedDomains.some((d) => d.label === normalized);
+  }, [normalized, address, isTaken, ownedDomains]);
 
   const {
     price: registerPrice = 0n,
@@ -292,6 +301,13 @@ const DomainsPage: React.FC = () => {
     if (!ownedLabel) return;
     if (!window.confirm(`Release ${ownedDisplayName}? This cannot be undone.`)) return;
     release({ name: ownedLabel });
+  };
+
+  const handleSetPrimary = (label: string) => {
+    if (!address) return;
+    setPrimaryLabel(address, label);
+    void refetchOwned();
+    toast.success(`${formatDomainDisplay(label)} set as your primary name.`);
   };
 
   const userBalance = balanceData?.value ?? 0n;
@@ -533,6 +549,43 @@ const DomainsPage: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                    ) : isOwnedByMe ? (
+                      /* YOU OWN THIS CARD */
+                      <div className="relative overflow-hidden glass-card rounded-3xl p-6 md:p-8 border border-accent/20 hover:border-accent/40 shadow-float flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div className="space-y-1 w-full max-w-md">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold tracking-wider uppercase border border-accent/40 bg-accent/10 text-accent shadow-sm mb-1.5">
+                            You own this
+                          </span>
+                          <div className="font-display text-2xl font-bold text-ink flex items-baseline">
+                            <span>{normalized}</span>
+                            <span className="text-ink-faint">.rise</span>
+                          </div>
+                          {searchExpiry > 0n ? (
+                            <p className="text-body-xs text-ink-muted mt-1">
+                              Expires{' '}
+                              <span className="font-mono text-ink font-semibold">
+                                {new Date(Number(searchExpiry) * 1000).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                              </span>
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 w-full md:w-auto mt-4 md:mt-0 justify-end">
+                          {normalized !== ownedLabel ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSetPrimary(normalized)}
+                              className="btn-primary py-2.5 px-6 font-semibold text-body-sm flex items-center gap-2"
+                            >
+                              <Star className="w-4 h-4" />
+                              Set as Primary
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-accent/40 bg-accent/10 text-accent text-[11px] font-semibold">
+                              <Star className="w-3.5 h-3.5" /> Primary
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     ) : (
                       /* REGISTERED CARD */
                       <div className="relative overflow-hidden glass-card rounded-3xl p-6 md:p-8 border border-status-error/20 hover:border-status-error/40 shadow-float flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -608,7 +661,7 @@ const DomainsPage: React.FC = () => {
 
           {/* RIGHT COLUMN: Your Active Identity & Details */}
           <div className="lg:col-span-5 space-y-6">
-            {/* Identity Manager */}
+            {/* Primary Identity Manager */}
             {ownedLabel ? (
               <motion.div
                 variants={itemVariants}
@@ -619,9 +672,14 @@ const DomainsPage: React.FC = () => {
 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold tracking-wider uppercase border border-accent/40 bg-accent/10 text-accent">
-                      main
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold tracking-wider uppercase border border-accent/40 bg-accent/10 text-accent">
+                      <Star className="w-3 h-3" /> primary
                     </span>
+                    {ownedDomains.length > 1 && (
+                      <span className="text-[10px] font-mono text-ink-faint">
+                        {ownedDomains.length} names
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -702,6 +760,59 @@ const DomainsPage: React.FC = () => {
                       </li>
                     </ul>
                   </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* All Owned Names List (shown when user has more than 1) */}
+            {ownedDomains.length > 1 && (
+              <motion.div
+                variants={itemVariants}
+                className="glass-card rounded-3xl border border-border p-5 space-y-3"
+              >
+                <p className="text-xs font-mono text-ink-muted font-semibold tracking-wider uppercase">
+                  All your names
+                </p>
+                <div className="space-y-1">
+                  {ownedDomains.map((d) => {
+                    const isPrimary = d.label === ownedLabel;
+                    const expirySec = Number(d.expiry);
+                    return (
+                      <div
+                        key={d.node}
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${
+                          isPrimary
+                            ? 'border-accent/30 bg-accent/5'
+                            : 'border-transparent hover:border-border/40 hover:bg-canvas/40'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <span className="font-mono text-body-sm text-ink truncate block">
+                            {d.label || '…'}<span className="text-ink-faint">.rise</span>
+                          </span>
+                          {expirySec > 0 && (
+                            <span className="text-[10px] text-ink-faint font-mono">
+                              exp {new Date(expirySec * 1000).toLocaleDateString(undefined, { dateStyle: 'short' })}
+                            </span>
+                          )}
+                        </div>
+                        {isPrimary ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase border border-accent/40 bg-accent/10 text-accent shrink-0 ml-2">
+                            <Star className="w-2.5 h-2.5" /> primary
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => d.label && handleSetPrimary(d.label)}
+                            disabled={!d.label}
+                            className="shrink-0 ml-2 text-[10px] font-semibold text-ink-muted hover:text-accent disabled:opacity-40 transition-colors px-2 py-1 rounded-lg hover:bg-canvas/60"
+                          >
+                            Set primary
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </motion.div>
             )}

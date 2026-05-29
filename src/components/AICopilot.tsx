@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount } from 'wagmi';
-import { useUserDomain } from '@/lib/hooks/useUserDomain';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAccount, useChainId } from 'wagmi';
 
 type CopilotCard = {
   title: string;
   sub: string;
   value: string;
   icon: React.ReactNode;
+  route?: string;
 };
 
 type CopilotMessage = {
@@ -16,111 +17,137 @@ type CopilotMessage = {
   card?: CopilotCard;
 };
 
+type SennaRole = 'user' | 'assistant';
+
+type SennaActionDraft = {
+  actionType: string;
+  targetRoute: string;
+  summary: string;
+  warnings?: string[];
+};
+
+type SennaChatResponse = {
+  blocked?: boolean;
+  sessionId?: string;
+  answer?: string;
+  actionDraft?: SennaActionDraft | null;
+};
+
 const nowTime = (): string => {
   const d = new Date();
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 };
 
 const SUGGESTIONS = [
-  'What is my .rise name?',
-  'Show my allocations',
-  'What launches today?',
-  'Tier requirements?',
+  'What launches are live?',
+  'Help me create an NFT',
+  'How do I lock tokens?',
+  'RISE testnet setup',
 ];
 
+const INTRO_MESSAGES = [
+  "Hey, Senna here. What's the move?",
+  "Hi, I'm Senna. What's up?",
+  "Hey. Launchpad, NFTs, tokens, or chaos?",
+  "Hi, Senna here. Fire away.",
+];
 
-const replyFor = (text: string, rnsDomain: string | null): CopilotMessage => {
-  const t = text.toLowerCase();
-  if (t.includes('domain') || t.includes('name') || t.includes('.rise') || t.includes('rns')) {
-    if (rnsDomain) {
-      return {
-        role: 'bot',
-        text: `Your active name is ${rnsDomain}. You can renew it, check its expiry, or release it from the Names page.`,
-        card: {
-          title: 'Manage your name',
-          sub: `${rnsDomain} · Rise Name Service`,
-          value: 'Go →',
-          icon: '◈',
-        },
-        time: nowTime(),
-      };
-    }
-    return {
-      role: 'bot',
-      text: "You don't have a .rise name yet. Head to the Names page to search and register one — it becomes your onchain identity on Rise.",
-      card: {
-        title: 'Get a .rise name',
-        sub: 'Search and register your identity',
-        value: 'Go →',
-        icon: '◈',
-      },
-      time: nowTime(),
-    };
+const RESET_MESSAGES = [
+  "Clean slate. What's next?",
+  "Fresh lap. What are we sorting?",
+  "New chat. Fire away.",
+];
+
+const SENNA_API_URL =
+  (import.meta.env.VITE_SENNA_CHAT_API_URL as string | undefined)?.replace(/\/$/, '') ||
+  'http://localhost:8788';
+
+const randomItem = (items: string[]) => items[Math.floor(Math.random() * items.length)];
+
+const makeBotMessage = (text: string): CopilotMessage => ({
+  role: 'bot',
+  text,
+  time: nowTime(),
+});
+
+const toApiMessages = (messages: CopilotMessage[], nextUserMessage: string) => {
+  const mapped = messages.slice(-24).map((message) => ({
+    role: (message.role === 'bot' ? 'assistant' : 'user') as SennaRole,
+    content: message.text,
+  }));
+
+  mapped.push({ role: 'user', content: nextUserMessage });
+  return mapped;
+};
+
+const buildChatPayload = (input: {
+  sessionId: string | null;
+  address?: string;
+  chainId?: number;
+  messages: Array<{ role: SennaRole; content: string }>;
+}) => {
+  const payload: {
+    sessionId?: string;
+    mode: 'fast';
+    walletAddress?: string;
+    evmAddress?: string;
+    chainId?: number;
+    messages: Array<{ role: SennaRole; content: string }>;
+  } = {
+    mode: 'fast',
+    messages: input.messages,
+  };
+
+  if (input.sessionId) payload.sessionId = input.sessionId;
+  if (input.address) {
+    payload.walletAddress = input.address;
+    payload.evmAddress = input.address;
   }
-  if (t.includes('claim') || t.includes('alloc')) {
-    return {
-      role: 'bot',
-      text: 'Your allocations are tracked on the Dashboard. Open it to see what is claimable right now.',
-      card: {
-        title: 'Open Dashboard',
-        sub: 'See claimable balances and vesting timers',
-        value: 'View',
-        icon: '◆',
-      },
-      time: nowTime(),
-    };
+  if (input.chainId) payload.chainId = input.chainId;
+
+  return payload;
+};
+
+const readApiError = async (response: Response) => {
+  let detail = '';
+
+  try {
+    const data = await response.json();
+    detail = data?.detail || data?.error || '';
+  } catch {
+    detail = await response.text().catch(() => '');
   }
-  if (t.includes('launch') || t.includes('today') || t.includes('upcoming') || t.includes('presale')) {
-    return {
-      role: 'bot',
-      text: 'The Launchpad shows everything live, upcoming, and recently ended — token sales and NFT mints. Want me to open it?',
-      time: nowTime(),
-    };
+
+  if (response.status === 429) {
+    return 'Senna is rate-limiting this chat for a moment. Give it a few seconds and try again.';
   }
-  if (t.includes('tier') || t.includes('stake') || t.includes('rise')) {
-    return {
-      role: 'bot',
-      text: 'Tier levels are based on staked STAGE. Connect your wallet, then head to the Dashboard to see your current tier and what each unlocks.',
-      time: nowTime(),
-    };
-  }
-  if (t.includes('nft') || t.includes('mint')) {
-    return {
-      role: 'bot',
-      text: 'You can browse open NFT mints on the Launchpad, manage your own drops from the Dashboard, or view your collection under My NFTs.',
-      time: nowTime(),
-    };
-  }
-  if (t.includes('token') && (t.includes('create') || t.includes('launch') || t.includes('deploy'))) {
-    return {
-      role: 'bot',
-      text: 'You can deploy a new token from the Tools section. After that, configure a presale and lock liquidity for credibility.',
-      time: nowTime(),
-    };
-  }
+
+  return detail
+    ? `Senna API returned ${response.status}: ${detail}`
+    : `Senna API returned ${response.status}.`;
+};
+
+const cardForAction = (actionDraft?: SennaActionDraft | null): CopilotCard | undefined => {
+  if (!actionDraft?.targetRoute) return undefined;
+
   return {
-    role: 'bot',
-    text: 'I can help with allocations, launches, NFTs, tier requirements, domains, and creator tools. What would you like to do?',
-    time: nowTime(),
+    title: actionDraft.summary || 'Open in Stage0',
+    sub: actionDraft.targetRoute,
+    value: 'Open',
+    icon: 'S0',
+    route: actionDraft.targetRoute,
   };
 };
 
 const AICopilot: React.FC = () => {
+  const navigate = useNavigate();
   const { address } = useAccount();
-  const { displayName: rnsDomain } = useUserDomain(address);
-
-  const greeting = useMemo(() => {
-    if (rnsDomain) return `Hey ${rnsDomain} — I'm Senna. I can help you track positions, find launches, or manage your name.`;
-    return "I'm Senna. I can help you track positions, find launches, or understand creator tools.";
-  }, [rnsDomain]);
-
+  const chainId = useChainId();
   const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState<CopilotMessage[]>(() => [
-    { role: 'bot', text: greeting, time: nowTime() },
-  ]);
+  const [messages, setMessages] = useState<CopilotMessage[]>(() => [makeBotMessage(randomItem(INTRO_MESSAGES))]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
-  const [bottomOffset, setBottomOffset] = useState(24);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
 
   // Update greeting when domain loads in
@@ -167,16 +194,66 @@ const AICopilot: React.FC = () => {
     setChatOpen(true);
   };
 
-  const send = (text?: string) => {
+  const startNewChat = () => {
+    setSessionId(null);
+    setMessages([makeBotMessage(randomItem(RESET_MESSAGES))]);
+  };
+
+  const send = async (text?: string) => {
     const msg = (text ?? input).trim();
-    if (!msg) return;
+    if (!msg || typing) return;
+    const nextMessages = [...messages, { role: 'user' as const, text: msg, time: nowTime() }];
     setMessages((m) => [...m, { role: 'user', text: msg, time: nowTime() }]);
     setInput('');
     setTyping(true);
-    window.setTimeout(() => {
+
+    try {
+      const response = await fetch(`${SENNA_API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(buildChatPayload({
+          sessionId,
+          chainId,
+          address,
+          messages: toApiMessages(messages, msg),
+        })),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+
+      const data = (await response.json()) as SennaChatResponse;
+      if (data.sessionId) setSessionId(data.sessionId);
+
+      setMessages([
+        ...nextMessages,
+        {
+          role: 'bot',
+          text: data.answer || 'Senna did not return an answer.',
+          time: nowTime(),
+          card: cardForAction(data.actionDraft),
+        },
+      ]);
+    } catch (error) {
+      const fallbackText =
+        error instanceof TypeError
+          ? `I cannot connect to Senna at ${SENNA_API_URL}. Confirm the local API is running, then try again.`
+          : error instanceof Error
+            ? error.message
+            : `I cannot connect to Senna at ${SENNA_API_URL}. Confirm the local API is running, then try again.`;
+
+      setMessages([
+        ...nextMessages,
+        {
+          role: 'bot',
+          text: fallbackText,
+          time: nowTime(),
+        },
+      ]);
+    } finally {
       setTyping(false);
-      setMessages((m) => [...m, replyFor(msg, rnsDomain ?? null)]);
-    }, 1100);
+    }
   };
 
   return (
@@ -194,7 +271,7 @@ const AICopilot: React.FC = () => {
                 type="button"
                 className="ai-chat-icon-btn"
                 title="New chat"
-                onClick={() => setMessages([{ role: 'bot', text: greeting, time: nowTime() }])}
+                onClick={startNewChat}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 12a9 9 0 1 0 9-9" />
@@ -222,7 +299,16 @@ const AICopilot: React.FC = () => {
                   <div style={{ minWidth: 0 }}>
                     <div className="ai-msg-bubble">{m.text}</div>
                     {m.card && (
-                      <div className="ai-msg-card">
+                      <button
+                        type="button"
+                        className="ai-msg-card"
+                        onClick={() => {
+                          if (m.card?.route) {
+                            setChatOpen(false);
+                            navigate(m.card.route);
+                          }
+                        }}
+                      >
                         <div className="ai-msg-card-head">
                           <div className="ai-msg-card-icon">{m.card.icon}</div>
                           <div style={{ minWidth: 0 }}>
@@ -231,7 +317,7 @@ const AICopilot: React.FC = () => {
                           </div>
                           <div className="ai-msg-card-value">{m.card.value}</div>
                         </div>
-                      </div>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -270,22 +356,10 @@ const AICopilot: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') send();
                 }}
+                disabled={typing}
               />
-              <div className="ai-input-tools">
-                <button type="button" className="ai-input-tool" title="Attach" aria-label="Attach">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 17.93 8.8l-8.58 8.57a2 2 0 1 1-2.83-2.83l8.49-8.48" />
-                  </svg>
-                </button>
-                <button type="button" className="ai-input-tool" title="Voice" aria-label="Voice">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4" />
-                  </svg>
-                </button>
-              </div>
             </div>
-            <button type="button" className="ai-send" onClick={() => send()} disabled={!input.trim()} aria-label="Send message">
+            <button type="button" className="ai-send" onClick={() => send()} disabled={!input.trim() || typing} aria-label="Send message">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 2 11 13" />
                 <path d="M22 2l-7 20-4-9-9-4 20-7z" />

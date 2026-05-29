@@ -63,7 +63,8 @@
 
 [[redirects]]
   from = "/*"
-  to = "/:splat"
+  to = "/index.html"
+  status = 200
 
   [redirects.rate_limit]
     # Broad fallback protection for the entire site.
@@ -71,11 +72,6 @@
     window_limit = 120
     window_size = 60
     aggregate_by = ["ip", "domain"]
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
 
 [[headers]]
   for = "/*"

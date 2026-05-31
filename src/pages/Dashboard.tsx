@@ -5,7 +5,6 @@ import {
   NFT_COLLECTION_IMAGES,
   StakingContract,
   erc20Abi,
-  getExplorerUrl,
   getNativeTokenLabel,
   getStakingContractAddress,
 } from '@/config';
@@ -115,7 +114,6 @@ const Dashboard: React.FC = () => {
   const chainId = useChainId();
   const nativeToken = getNativeTokenLabel(chainId);
   const stakingAddress = getStakingContractAddress(chainId);
-  const explorerUrl = getExplorerUrl(chainId);
 
   const { data: balance, isLoading: isBalanceLoading } = useBalance({
     address: safeAddress,
@@ -132,7 +130,6 @@ const Dashboard: React.FC = () => {
   const { tokens: createdTokens, isLoading: isTokensLoading } = useUserTokens();
   const {
     deployments: myNFTDeployments,
-    isLoading: isMyNFTDeploymentsLoading,
   } = useNFTDeployments({
     creator: address as Address | undefined,
     enabled: isConnected && Boolean(address),
@@ -378,25 +375,16 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="eyebrow">Native balance</span>
-              {isConnected && !domainDisplayName ? (
-                <Link
-                  to="/domains"
-                  className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-accent transition-colors"
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  Mint a name for your dashboard
-                </Link>
-              ) : null}
             </div>
           </div>
-          <div className="wallet-actions">
-            <Link to="/presales" className="btn-primary btn-sm">
-              Discover launches <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Link>
-            <Link to="/tools" className="btn-secondary btn-sm">
-              Open tools
-            </Link>
-          </div>
+          {isConnected && isAdmin && !domainDisplayName ? (
+            <aside className="wallet-name-card" aria-label="Dashboard name">
+              <Link to="/domains" className="wallet-name-link">
+                <Globe className="w-3.5 h-3.5" />
+                Mint a name for your dashboard
+              </Link>
+            </aside>
+          ) : null}
         </div>
       </section>
 
@@ -567,8 +555,7 @@ const Dashboard: React.FC = () => {
           !isNftHoldingsLoading ? (
           <div className="alloc-table">
             <div className="px-6 py-12 text-center text-ink-muted">
-              <Sparkles className="w-5 h-5 mx-auto mb-3 text-ink-faint" />
-              <p>No allocations yet — contribute to a launch to get started.</p>
+              <p>No allocations yet.</p>
               <Link to="/presales" className="btn-secondary btn-sm mt-4 inline-flex">
                 Browse launchpad <ArrowRight className="w-3.5 h-3.5 ml-1" />
               </Link>
@@ -901,115 +888,6 @@ const Dashboard: React.FC = () => {
                 );
               })}
             </CreationCard>
-          </div>
-        )}
-      </section>
-
-      {/* NFT collections section */}
-      <section>
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Collectibles</div>
-            <h2 className="ds-h2 mt-1.5">NFT collections</h2>
-          </div>
-          <span className="font-mono text-[12px] text-ink-faint">
-            {isConnected ? `${totalOwnedNFTs.toString()} owned · ${myNFTDeployments.length} created` : ''}
-          </span>
-        </div>
-
-        {!isConnected ? (
-          <ConnectWalletPlaceholder message="Connect your wallet to see your NFT holdings." />
-        ) : isNftHoldingsLoading && isMyNFTDeploymentsLoading && myNftHoldings.length === 0 && myNFTDeployments.length === 0 ? (
-          <div className="bg-canvas-alt border border-border rounded-3xl p-12 text-center text-ink-muted">Loading…</div>
-        ) : myNftHoldings.length === 0 && myNFTDeployments.length === 0 ? (
-          <div className="bg-canvas-alt border border-border rounded-3xl p-12 text-center text-ink-muted">
-            <ImageIcon className="w-5 h-5 mx-auto mb-3 text-ink-faint" />
-            <p>No collections yet — mint or create your first drop.</p>
-            <Link to="/create/nft" className="btn-secondary btn-sm inline-flex mt-4">
-              Create NFT
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {myNftHoldings.length > 0 && (
-              <div className="holdings-grid">
-                {myNftHoldings.slice(0, 8).map((holding) => (
-                  <Link to={`/nfts/${holding.address}`} key={`held-${holding.address}`} className="holding-card">
-                    <div className="holding-img">
-                      <FallbackImage
-                        src={holding.metadataImage}
-                        fallbackSrc={NFT_COLLECTION_IMAGES[holding.address.toLowerCase()]}
-                        alt={holding.name}
-                        className="w-full h-full object-cover"
-                        placeholder={<span>{holding.name.slice(0, 1)}</span>}
-                      />
-                    </div>
-                    <div className="holding-info">
-                      <div className="holding-name">{holding.name}</div>
-                      <div className="holding-meta">
-                        {holding.ownedCount.toString()} held · {holding.symbol}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-
-            {myNFTDeployments.length > 0 && (
-              <div className="space-y-3">
-                <div className="eyebrow">Collections you've created</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {myNFTDeployments.slice(0, 6).map((collection) => {
-                    const statusVariant =
-                      collection.status === 'live'
-                        ? 'live'
-                        : collection.status === 'upcoming'
-                          ? 'upcoming'
-                          : 'closed';
-                    return (
-                      <div key={collection.address} className="bg-canvas-alt border border-border rounded-2xl p-4 flex gap-4">
-                        <div className="w-16 h-16 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden shrink-0">
-                          <FallbackImage
-                            src={collection.metadataImage}
-                            fallbackSrc={NFT_COLLECTION_IMAGES[collection.address.toLowerCase()]}
-                            alt={collection.name}
-                            className="w-full h-full object-cover"
-                            placeholder={<ImageIcon className="w-5 h-5 text-ink-muted" />}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="font-medium text-ink truncate">{collection.name}</div>
-                              <div className="font-mono text-[11px] text-ink-muted">{collection.symbol}</div>
-                            </div>
-                            <Badge variant={statusVariant}>{collection.status}</Badge>
-                          </div>
-                          <p className="text-[12px] text-ink-muted">
-                            Minted{' '}
-                            <span className="font-mono text-ink">{collection.totalMinted.toLocaleString()}</span> /{' '}
-                            <span className="font-mono text-ink">{collection.maxSupply.toLocaleString()}</span>
-                          </p>
-                          <div className="flex gap-2">
-                            <Link to={`/nfts/manage/${collection.address}`} className="btn-secondary btn-sm">
-                              Manage
-                            </Link>
-                            <a
-                              href={`${explorerUrl}/address/${collection.address}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="btn-ghost btn-sm"
-                            >
-                              Explorer
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </section>

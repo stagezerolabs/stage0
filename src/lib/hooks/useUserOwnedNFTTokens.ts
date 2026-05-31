@@ -19,6 +19,20 @@ type OwnerReadResult = {
   result?: unknown;
 };
 
+type OwnedTokenTarget = {
+  collectionAddress: Address;
+  collectionName: string;
+  collectionSymbol: string;
+  collectionOwner: Address;
+  tokenId: bigint;
+  collectionStatus: 'live' | 'upcoming' | 'ended';
+  is721A: boolean;
+};
+
+type UseUserOwnedNFTTokensOptions = {
+  metadataLimit?: number;
+};
+
 function readResult<T>(entry: unknown): T | undefined {
   if (!entry || typeof entry !== 'object') return undefined;
   const result = entry as OwnerReadResult;
@@ -50,6 +64,14 @@ function looksLikeImageUrl(value: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg)$/i.test(value);
 }
 
+function compareTokenTargets(a: OwnedTokenTarget, b: OwnedTokenTarget): number {
+  const collectionA = a.collectionAddress.toLowerCase();
+  const collectionB = b.collectionAddress.toLowerCase();
+
+  if (collectionA !== collectionB) return collectionA < collectionB ? -1 : 1;
+  return Number(b.tokenId - a.tokenId);
+}
+
 export type OwnedNFTToken = {
   collectionAddress: Address;
   collectionName: string;
@@ -64,8 +86,16 @@ export type OwnedNFTToken = {
   is721A: boolean;
 };
 
-export function useUserOwnedNFTTokens(userAddress?: Address, enabled = true) {
+export function useUserOwnedNFTTokens(
+  userAddress?: Address,
+  enabled = true,
+  options: UseUserOwnedNFTTokensOptions = {}
+) {
   const canRead = Boolean(enabled && userAddress);
+  const metadataLimit =
+    typeof options.metadataLimit === 'number' && Number.isFinite(options.metadataLimit)
+      ? Math.max(0, Math.floor(options.metadataLimit))
+      : undefined;
 
   const { holdings, totalOwned, isLoading: isHoldingsLoading } = useUserNFTHoldings(userAddress, canRead);
 
@@ -75,15 +105,7 @@ export function useUserOwnedNFTTokens(userAddress?: Address, enabled = true) {
   );
 
   const ownerScanTargets = useMemo(() => {
-    const targets: Array<{
-      collectionAddress: Address;
-      collectionName: string;
-      collectionSymbol: string;
-      collectionOwner: Address;
-      tokenId: bigint;
-      collectionStatus: 'live' | 'upcoming' | 'ended';
-      is721A: boolean;
-    }> = [];
+    const targets: OwnedTokenTarget[] = [];
 
     for (const holding of holdingsWithBalance) {
       const mintedCount = Number(holding.totalMinted);
@@ -134,15 +156,25 @@ export function useUserOwnedNFTTokens(userAddress?: Address, enabled = true) {
     });
   }, [userAddress, ownerScanTargets, ownerResults]);
 
+  const sortedOwnedTargets = useMemo(
+    () => [...ownedTargets].sort(compareTokenTargets),
+    [ownedTargets]
+  );
+
+  const metadataTargets = useMemo(
+    () => sortedOwnedTargets.slice(0, metadataLimit ?? sortedOwnedTargets.length),
+    [metadataLimit, sortedOwnedTargets]
+  );
+
   const tokenUriQueries = useMemo(
     () =>
-      ownedTargets.map((target) => ({
+      metadataTargets.map((target) => ({
         abi: NFTCollectionContract,
         address: target.collectionAddress,
         functionName: 'tokenURI',
         args: [target.tokenId],
       })),
-    [ownedTargets]
+    [metadataTargets]
   );
 
   const { data: tokenUriResults, isLoading: isTokenUriLoading } = useReadContracts({
@@ -155,11 +187,11 @@ export function useUserOwnedNFTTokens(userAddress?: Address, enabled = true) {
   });
 
   const tokenRows = useMemo(() => {
-    return ownedTargets.map((target, idx) => {
-      const tokenURI = readResult<string>(tokenUriResults?.[idx]);
+    return sortedOwnedTargets.map((target, idx) => {
+      const tokenURI = idx < metadataTargets.length ? readResult<string>(tokenUriResults?.[idx]) : undefined;
       return { ...target, tokenURI };
     });
-  }, [ownedTargets, tokenUriResults]);
+  }, [metadataTargets.length, sortedOwnedTargets, tokenUriResults]);
 
   const [metadataByToken, setMetadataByToken] = useState<Record<string, TokenMetadata>>({});
 
@@ -227,30 +259,23 @@ export function useUserOwnedNFTTokens(userAddress?: Address, enabled = true) {
   }, [tokenRows, metadataByToken]);
 
   const tokens = useMemo((): OwnedNFTToken[] => {
-    return tokenRows
-      .map((row) => {
-        const key = `${row.collectionAddress.toLowerCase()}:${row.tokenId.toString()}`;
-        const metadata = metadataByToken[key];
-        return {
-          collectionAddress: row.collectionAddress,
-          collectionName: row.collectionName,
-          collectionSymbol: row.collectionSymbol,
-          collectionOwner: row.collectionOwner,
-          tokenId: row.tokenId,
-          tokenURI: row.tokenURI,
-          image: metadata?.image,
-          metadataName: metadata?.name,
-          metadataDescription: metadata?.description,
-          collectionStatus: row.collectionStatus,
-          is721A: row.is721A,
-        };
-      })
-      .sort((a, b) => {
-        if (a.collectionAddress.toLowerCase() !== b.collectionAddress.toLowerCase()) {
-          return a.collectionAddress.toLowerCase() < b.collectionAddress.toLowerCase() ? -1 : 1;
-        }
-        return Number(b.tokenId - a.tokenId);
-      });
+    return tokenRows.map((row) => {
+      const key = `${row.collectionAddress.toLowerCase()}:${row.tokenId.toString()}`;
+      const metadata = metadataByToken[key];
+      return {
+        collectionAddress: row.collectionAddress,
+        collectionName: row.collectionName,
+        collectionSymbol: row.collectionSymbol,
+        collectionOwner: row.collectionOwner,
+        tokenId: row.tokenId,
+        tokenURI: row.tokenURI,
+        image: metadata?.image,
+        metadataName: metadata?.name,
+        metadataDescription: metadata?.description,
+        collectionStatus: row.collectionStatus,
+        is721A: row.is721A,
+      };
+    });
   }, [tokenRows, metadataByToken]);
 
   const truncatedCollections = useMemo(

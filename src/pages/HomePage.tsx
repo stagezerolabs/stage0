@@ -760,9 +760,9 @@ const HomePage: React.FC = () => {
                             </button>
                           )}
                           <Link to={item.link}>
-                            <div className="group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-border transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
+                            <div className="featured-launch-card-surface group relative overflow-hidden rounded-[2.5rem] bg-canvas-alt border border-border transition-all duration-500 hover:border-accent/40 flex flex-col h-full bg-gradient-to-br from-canvas-alt to-canvas">
                               {/* Card Image Header */}
-                              <div className="relative h-48 w-full overflow-hidden">
+                              <div className="featured-launch-card-media relative h-48 w-full overflow-hidden">
                                 <FallbackImage
                                   src={item.image}
                                   fallbackSrc={item.fallbackImage}
@@ -776,11 +776,11 @@ const HomePage: React.FC = () => {
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
                                 {/* Status badge */}
-                                <span className={`status-pill absolute top-5 right-5 shadow-lg ${isLive
-                                    ? 'bg-status-live-bg text-status-live border border-status-live/20'
+                                <span className={`status-pill featured-launch-status-pill absolute top-5 right-5 ${isLive
+                                    ? 'featured-launch-status-pill-live'
                                     : isEnded
-                                      ? 'bg-ink/10 text-ink-muted border border-ink/10'
-                                      : 'bg-status-upcoming-bg text-status-upcoming border border-status-upcoming/20'
+                                      ? 'featured-launch-status-pill-ended'
+                                      : 'featured-launch-status-pill-upcoming'
                                   }`}>
                                   {isLive && <span className="status-pill-dot" />}
                                   {isLive ? 'Live' : isEnded ? 'Ended' : 'Upcoming'}
@@ -1014,10 +1014,11 @@ const PresaleCard: React.FC<{
         rotateX: reducedMotion ? 0 : springX,
         rotateY: reducedMotion ? 0 : springY,
         transformPerspective: 1000,
+        transformStyle: 'preserve-3d',
       }}
       onMouseMove={reducedMotion ? undefined : handleMouseMove}
       onMouseLeave={reducedMotion ? undefined : handleMouseLeave}
-      className="h-full"
+      className="featured-launch-card-shell h-full"
     >
       {children}
     </motion.div>

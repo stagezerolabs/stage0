@@ -56,6 +56,14 @@ const RESET_MESSAGES = [
   "Clean slate. What's next?",
   "Fresh lap. What are we sorting?",
   "New chat. Fire away.",
+  "Pit stop done. What's the next move?",
+  "Reset complete. Send the next Stage0 thing.",
+  "Back on track. What are we checking?",
+  "New run. Launchpad, NFT, token, or something spicy?",
+  "Fresh line. Where to?",
+  "All clear. What do you need?",
+  "Clean board. What's up?",
+  "New chat loaded. Let's go.",
 ];
 
 const SENNA_API_URL =
@@ -88,13 +96,13 @@ const buildChatPayload = (input: {
 }) => {
   const payload: {
     sessionId?: string;
-    mode: 'fast';
+    mode: 'auto';
     walletAddress?: string;
     evmAddress?: string;
     chainId?: number;
     messages: Array<{ role: SennaRole; content: string }>;
   } = {
-    mode: 'fast',
+    mode: 'auto',
     messages: input.messages,
   };
 
@@ -138,6 +146,23 @@ const cardForAction = (actionDraft?: SennaActionDraft | null): CopilotCard | und
     route: actionDraft.targetRoute,
   };
 };
+
+const SennaGlyph: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M12 2a3 3 0 0 1 3 3v1h1a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4h-1l-3 3-3-3H8a4 4 0 0 1-4-4v-3a4 4 0 0 1 4-4h1V5a3 3 0 0 1 3-3z" />
+    <circle cx="9.5" cy="11" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="14.5" cy="11" r="1.1" fill="currentColor" stroke="none" />
+  </svg>
+);
 
 const AICopilot: React.FC = () => {
   const navigate = useNavigate();
@@ -257,7 +282,9 @@ const AICopilot: React.FC = () => {
       {chatOpen && (
         <div className="ai-chat" role="dialog" aria-label="Senna assistant">
           <div className="ai-chat-header">
-            <div className="ai-chat-avatar">S</div>
+            <div className="ai-chat-avatar">
+              <SennaGlyph className="h-5 w-5" />
+            </div>
             <div>
               <div className="ai-chat-name">Senna</div>
               <div className="ai-chat-status">Online · Stage0 assistant</div>
@@ -291,7 +318,11 @@ const AICopilot: React.FC = () => {
             {messages.map((m, i) => (
               <div key={i} className={`ai-msg ${m.role}`}>
                 <div className="ai-msg-row">
-                  {m.role === 'bot' && <div className="ai-msg-mini-avatar">S</div>}
+                  {m.role === 'bot' && (
+                    <div className="ai-msg-mini-avatar">
+                      <SennaGlyph className="h-4 w-4" />
+                    </div>
+                  )}
                   <div style={{ minWidth: 0 }}>
                     <div className="ai-msg-bubble">{m.text}</div>
                     {m.card && (
@@ -323,7 +354,9 @@ const AICopilot: React.FC = () => {
             {typing && (
               <div className="ai-msg bot">
                 <div className="ai-msg-row">
-                  <div className="ai-msg-mini-avatar">S</div>
+                  <div className="ai-msg-mini-avatar">
+                    <SennaGlyph className="h-4 w-4" />
+                  </div>
                   <div className="ai-typing">
                     <span />
                     <span />
@@ -376,11 +409,7 @@ const AICopilot: React.FC = () => {
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
         ) : (
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a3 3 0 0 1 3 3v1h1a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4h-1l-3 3-3-3H8a4 4 0 0 1-4-4v-3a4 4 0 0 1 4-4h1V5a3 3 0 0 1 3-3z" />
-            <circle cx="9.5" cy="11" r="1.1" fill="currentColor" stroke="none" />
-            <circle cx="14.5" cy="11" r="1.1" fill="currentColor" stroke="none" />
-          </svg>
+          <SennaGlyph className="h-[26px] w-[26px]" />
         )}
       </button>
     </div>

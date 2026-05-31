@@ -22,9 +22,11 @@ const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) =
 
       {/* Subtle gradient accent at top */}
       <div
-        className="fixed top-0 left-0 right-0 h-[520px] pointer-events-none opacity-50"
+        className="fixed left-0 right-0 pointer-events-none opacity-50"
         style={{
           background: 'var(--layout-top-glow)',
+          top: themeMode === 'dark' ? 72 : 0,
+          height: themeMode === 'dark' ? 448 : 520,
           zIndex: 1,
         }}
       />

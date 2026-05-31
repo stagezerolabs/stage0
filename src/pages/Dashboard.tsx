@@ -26,7 +26,6 @@ import {
   Layers,
   Lock,
   Package,
-  Sparkles,
   Star,
   Wallet,
 } from 'lucide-react';

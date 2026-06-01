@@ -19,7 +19,11 @@ import {
 import { toast } from 'sonner';
 import { useBlockchainStore } from '@/lib/store/blockchain-store';
 import FallbackImage from '@/components/ui/fallback-image';
-import { contractUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
+import {
+  formatStage0ImageFileSize,
+  getStage0ImageValidationError,
+  uploadTokenImage,
+} from '@/lib/api/media';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -101,8 +105,14 @@ const CreateTokenPage: React.FC = () => {
   const [symbol, setSymbol] = useState('');
   const [decimals, setDecimals] = useState('18');
   const [initialSupply, setInitialSupply] = useState('');
-  const [tokenImageURI, setTokenImageURI] = useState('');
+  const [tokenDescription, setTokenDescription] = useState('');
+  const [tokenWebsiteUrl, setTokenWebsiteUrl] = useState('');
+  const [tokenXUrl, setTokenXUrl] = useState('');
+  const [tokenTelegramUrl, setTokenTelegramUrl] = useState('');
+  const [tokenDiscordUrl, setTokenDiscordUrl] = useState('');
+  const [tokenImageFile, setTokenImageFile] = useState<File | null>(null);
   const [tokenImagePreview, setTokenImagePreview] = useState('');
+  const [tokenImageMeta, setTokenImageMeta] = useState('');
   const [recipient, setRecipient] = useState('');
   const [taxWallet, setTaxWallet] = useState('');
   const [taxBps, setTaxBps] = useState('');
@@ -111,6 +121,7 @@ const CreateTokenPage: React.FC = () => {
   const lastToastHash = useRef<string | null>(null);
   const lastErrorMessage = useRef<string | null>(null);
   const hasHandledSuccess = useRef(false);
+  const uploadedTokenImageKeyRef = useRef<string | null>(null);
 
   const { getUserTokens, setUserTokens } = useBlockchainStore();
 
@@ -262,6 +273,60 @@ const CreateTokenPage: React.FC = () => {
     }
   }, [isSuccess, createdTokenAddress, userAddress, getUserTokens, setUserTokens]);
 
+  useEffect(() => {
+    if (!createdTokenAddress) return;
+
+    const profile = {
+      description: tokenDescription.trim(),
+      websiteUrl: tokenWebsiteUrl.trim(),
+      xUrl: tokenXUrl.trim(),
+      telegramUrl: tokenTelegramUrl.trim(),
+      discordUrl: tokenDiscordUrl.trim(),
+    };
+    const hasProfileInfo = Object.values(profile).some(Boolean);
+    if (!tokenImageFile && !hasProfileInfo) return;
+
+    const uploadKey = [
+      chainId,
+      createdTokenAddress.toLowerCase(),
+      tokenImageFile?.name ?? '',
+      tokenImageFile?.size ?? 0,
+      tokenImageFile?.lastModified ?? 0,
+      profile.description,
+      profile.websiteUrl,
+      profile.xUrl,
+      profile.telegramUrl,
+      profile.discordUrl,
+    ].join(':');
+
+    if (uploadedTokenImageKeyRef.current === uploadKey) return;
+    uploadedTokenImageKeyRef.current = uploadKey;
+
+    uploadTokenImage({
+      chainId,
+      address: createdTokenAddress as Address,
+      file: tokenImageFile,
+      profile,
+    })
+      .then(() => {
+        toast.success('Token profile saved for Stage0.');
+      })
+      .catch((error) => {
+        uploadedTokenImageKeyRef.current = null;
+        const message = error instanceof Error ? error.message : 'Token created, but profile upload failed.';
+        toast.error(message);
+      });
+  }, [
+    chainId,
+    createdTokenAddress,
+    tokenDescription,
+    tokenDiscordUrl,
+    tokenImageFile,
+    tokenTelegramUrl,
+    tokenWebsiteUrl,
+    tokenXUrl,
+  ]);
+
   const handleSubmit = () => {
     if (!name || !symbol || !initialSupply || !recipient) return;
 
@@ -314,19 +379,19 @@ const CreateTokenPage: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Select an image file for the token preview.');
+    const validationError = getStage0ImageValidationError(file, 'token image');
+    if (validationError) {
+      toast.error(validationError);
       event.target.value = '';
       return;
     }
 
+    setTokenImageFile(file);
+    setTokenImageMeta(`${file.name} · ${formatStage0ImageFileSize(file.size)}`);
     setTokenImagePreview(URL.createObjectURL(file));
   };
 
-  const normalizedTokenImagePreviewUri = normalizeContractURI(tokenImageURI.trim());
-  const tokenImagePreviewSrc =
-    tokenImagePreview ||
-    (normalizedTokenImagePreviewUri ? contractUriToHttp(normalizedTokenImagePreviewUri) : '');
+  const tokenImagePreviewSrc = tokenImagePreview;
 
   return (
     <motion.div
@@ -423,47 +488,98 @@ const CreateTokenPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-body-sm text-ink-muted font-medium">Token Image URI</label>
-            <input
-              type="text"
-              value={tokenImageURI}
-              onChange={(e) => setTokenImageURI(e.target.value)}
-              placeholder="CID, ipfs://..., or https://..."
-              className="input-field w-full"
-            />
-            <p className="text-xs text-ink-faint">
-              Optional for now. ERC20 deployments do not store this onchain yet, so this is staged for the later metadata/database hookup.
+        <div className="rounded-3xl border border-border bg-canvas-alt/55 p-5 space-y-4">
+          <div className="space-y-1">
+            <h3 className="font-display text-xl font-semibold text-ink">Token Info</h3>
+            <p className="text-body-sm text-ink-muted">
+              App-level profile details for Stage0 surfaces. ERC20 contract data still comes from the deployed token.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_9rem] gap-4">
-            <label className="rounded-2xl border border-dashed border-border bg-canvas-alt p-4 cursor-pointer hover:border-accent/40 transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleTokenImageFileChange}
-                className="sr-only"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-body-sm text-ink-muted font-medium">Description</label>
+              <textarea
+                value={tokenDescription}
+                onChange={(e) => setTokenDescription(e.target.value)}
+                placeholder="A short intro for the token profile."
+                className="input-field min-h-24 w-full resize-y"
+                maxLength={1200}
               />
-              <span className="flex items-start gap-3">
-                <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
-                  <Upload className="w-5 h-5" />
-                </span>
-                <span className="space-y-1">
-                  <span className="block text-body-sm font-medium text-ink">Upload token image</span>
-                  <span className="block text-xs text-ink-faint">
-                    Preview-only until you wire storage. Paste the uploaded CID or URL above when available.
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">Website</label>
+              <input
+                type="url"
+                value={tokenWebsiteUrl}
+                onChange={(e) => setTokenWebsiteUrl(e.target.value)}
+                placeholder="https://example.xyz"
+                className="input-field w-full"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">X / Twitter</label>
+              <input
+                type="url"
+                value={tokenXUrl}
+                onChange={(e) => setTokenXUrl(e.target.value)}
+                placeholder="https://x.com/stage0_"
+                className="input-field w-full"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">Telegram</label>
+              <input
+                type="url"
+                value={tokenTelegramUrl}
+                onChange={(e) => setTokenTelegramUrl(e.target.value)}
+                placeholder="https://t.me/project"
+                className="input-field w-full"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">Discord</label>
+              <input
+                type="url"
+                value={tokenDiscordUrl}
+                onChange={(e) => setTokenDiscordUrl(e.target.value)}
+                placeholder="https://discord.gg/project"
+                className="input-field w-full"
+              />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label className="text-body-sm text-ink-muted font-medium">Token Profile Image</label>
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_9rem] gap-4">
+              <label className="rounded-2xl border border-dashed border-border bg-canvas p-4 cursor-pointer hover:border-accent/40 transition-colors">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleTokenImageFileChange}
+                  className="sr-only"
+                />
+                <span className="flex items-start gap-3">
+                  <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                    <Upload className="w-5 h-5" />
+                  </span>
+                  <span className="space-y-1">
+                    <span className="block text-body-sm font-medium text-ink">Upload token image</span>
+                    <span className="block text-xs text-ink-faint">
+                      PNG, JPG, or WebP up to 2MB. Stage0 saves this profile block after deployment.
+                    </span>
+                    {tokenImageMeta ? (
+                      <span className="block text-xs text-ink-muted break-all">{tokenImageMeta}</span>
+                    ) : null}
                   </span>
                 </span>
-              </span>
-            </label>
-            <div className="h-36 rounded-2xl border border-border bg-canvas-alt overflow-hidden flex items-center justify-center">
-              <FallbackImage
-                src={tokenImagePreviewSrc}
-                alt="Token image preview"
-                className="w-full h-full object-cover"
-                placeholder={<ImageIcon className="w-8 h-8 text-ink-faint" />}
-              />
+              </label>
+              <div className="h-36 rounded-2xl border border-border bg-canvas overflow-hidden flex items-center justify-center">
+                <FallbackImage
+                  src={tokenImagePreviewSrc}
+                  alt="Token image preview"
+                  className="w-full h-full object-cover"
+                  placeholder={<ImageIcon className="w-8 h-8 text-ink-faint" />}
+                />
+              </div>
             </div>
           </div>
         </div>

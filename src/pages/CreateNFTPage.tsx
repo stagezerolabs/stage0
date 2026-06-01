@@ -20,6 +20,11 @@ import { format, isSameDay, setHours, setMinutes, startOfDay } from 'date-fns';
 import { toast } from 'sonner';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import { normalizeBaseURI } from '@/lib/utils/ipfs';
+import {
+  formatStage0ImageFileSize,
+  getStage0ImageValidationError,
+  uploadCollectionImage,
+} from '@/lib/api/media';
 import FallbackImage from '@/components/ui/fallback-image';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -52,8 +57,6 @@ type NFTMode = 'erc721' | 'erc721a';
 type ValidationResult = { valid: true } | { valid: false; message: string };
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
-const COLLECTION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
-const COLLECTION_IMAGE_ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const TIME_STEP_MINUTES = 15;
 
 function parseDateTimeInput(value: string): number | null {
@@ -78,11 +81,6 @@ function dateToLocalDateTimeValue(date: Date | null): string {
 function formatPreviewDate(value: string): string {
   const ts = parseDateTimeInput(value);
   return ts ? new Date(ts * 1000).toLocaleString() : 'Not set';
-}
-
-function formatFileSize(size: number): string {
-  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function roundDateToTimeStep(date: Date): Date {
@@ -230,6 +228,12 @@ const CreateNFTPage: React.FC = () => {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [baseURI, setBaseURI] = useState('');
+  const [collectionDescription, setCollectionDescription] = useState('');
+  const [collectionWebsiteUrl, setCollectionWebsiteUrl] = useState('');
+  const [collectionXUrl, setCollectionXUrl] = useState('');
+  const [collectionTelegramUrl, setCollectionTelegramUrl] = useState('');
+  const [collectionDiscordUrl, setCollectionDiscordUrl] = useState('');
+  const [collectionImageFile, setCollectionImageFile] = useState<File | null>(null);
   const [collectionImagePreview, setCollectionImagePreview] = useState('');
   const [collectionImageMeta, setCollectionImageMeta] = useState<string>('');
   const [collectionImageName, setCollectionImageName] = useState('');
@@ -246,6 +250,7 @@ const CreateNFTPage: React.FC = () => {
   const [createdCollectionAddress, setCreatedCollectionAddress] = useState<string | null>(null);
   const [showPostDeployPopup, setShowPostDeployPopup] = useState(false);
   const collectionImageInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadedCollectionImageKeyRef = useRef<string | null>(null);
 
   const {
     data: hash,
@@ -296,6 +301,60 @@ const CreateNFTPage: React.FC = () => {
       toast.success('NFT collection deployed successfully. Review the launch checklist next.');
     }
   }, [isSuccess, receipt, nftFactory, createdCollectionAddress]);
+
+  useEffect(() => {
+    if (!createdCollectionAddress) return;
+
+    const profile = {
+      description: collectionDescription.trim(),
+      websiteUrl: collectionWebsiteUrl.trim(),
+      xUrl: collectionXUrl.trim(),
+      telegramUrl: collectionTelegramUrl.trim(),
+      discordUrl: collectionDiscordUrl.trim(),
+    };
+    const hasProfileInfo = Object.values(profile).some(Boolean);
+    if (!collectionImageFile && !hasProfileInfo) return;
+
+    const uploadKey = [
+      chainId,
+      createdCollectionAddress.toLowerCase(),
+      collectionImageFile?.name ?? '',
+      collectionImageFile?.size ?? 0,
+      collectionImageFile?.lastModified ?? 0,
+      profile.description,
+      profile.websiteUrl,
+      profile.xUrl,
+      profile.telegramUrl,
+      profile.discordUrl,
+    ].join(':');
+
+    if (uploadedCollectionImageKeyRef.current === uploadKey) return;
+    uploadedCollectionImageKeyRef.current = uploadKey;
+
+    uploadCollectionImage({
+      chainId,
+      address: createdCollectionAddress as Address,
+      file: collectionImageFile,
+      profile,
+    })
+      .then(() => {
+        toast.success('Collection profile saved for Stage0.');
+      })
+      .catch((error) => {
+        uploadedCollectionImageKeyRef.current = null;
+        const message = error instanceof Error ? error.message : 'Collection deployed, but profile upload failed.';
+        toast.error(message);
+      });
+  }, [
+    chainId,
+    collectionDescription,
+    collectionDiscordUrl,
+    collectionImageFile,
+    collectionTelegramUrl,
+    collectionWebsiteUrl,
+    collectionXUrl,
+    createdCollectionAddress,
+  ]);
 
   useEffect(() => {
     if (!whitelistEnabled || whitelistStart || !saleStart) return;
@@ -465,18 +524,14 @@ const CreateNFTPage: React.FC = () => {
   const setCollectionImageFromFile = async (file: File | undefined | null) => {
     if (!file) return;
 
-    if (!COLLECTION_IMAGE_ACCEPTED_TYPES.has(file.type)) {
-      toast.error('Use a PNG, JPG, or WebP image for the collection image.');
-      return;
-    }
-
-    if (file.size > COLLECTION_IMAGE_MAX_BYTES) {
-      toast.error('Collection image must be 5MB or smaller.');
+    const validationError = getStage0ImageValidationError(file, 'collection image');
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
     const dimensions = await getImageDimensions(file);
-    const detailParts = [formatFileSize(file.size)];
+    const detailParts = [formatStage0ImageFileSize(file.size)];
     if (dimensions) {
       detailParts.push(`${dimensions.width}×${dimensions.height}`);
       if (dimensions.width !== dimensions.height) {
@@ -486,6 +541,7 @@ const CreateNFTPage: React.FC = () => {
       }
     }
 
+    setCollectionImageFile(file);
     setCollectionImageName(file.name);
     setCollectionImageMeta(detailParts.join(' · '));
     setCollectionImagePreview(URL.createObjectURL(file));
@@ -680,12 +736,73 @@ const CreateNFTPage: React.FC = () => {
                   className="input-field w-full"
                 />
               </div>
+            </div>
+          </motion.section>
+
+          <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-5">
+            <div className="space-y-1">
+              <h2 className="font-display text-display-sm text-ink">Collection Info</h2>
+              <p className="text-body-sm text-ink-muted">
+                App-level profile details for Stage0 cards and discovery. NFT token metadata still comes from your Base URI onchain.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-body-sm text-ink-muted font-medium">Description</label>
+                <textarea
+                  value={collectionDescription}
+                  onChange={(e) => setCollectionDescription(e.target.value)}
+                  placeholder="A short intro for your collection profile."
+                  className="input-field min-h-28 w-full resize-y"
+                  maxLength={1200}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-body-sm text-ink-muted font-medium">Website</label>
+                <input
+                  type="url"
+                  value={collectionWebsiteUrl}
+                  onChange={(e) => setCollectionWebsiteUrl(e.target.value)}
+                  placeholder="https://example.xyz"
+                  className="input-field w-full"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-body-sm text-ink-muted font-medium">X / Twitter</label>
+                <input
+                  type="url"
+                  value={collectionXUrl}
+                  onChange={(e) => setCollectionXUrl(e.target.value)}
+                  placeholder="https://x.com/stage0_"
+                  className="input-field w-full"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-body-sm text-ink-muted font-medium">Telegram</label>
+                <input
+                  type="url"
+                  value={collectionTelegramUrl}
+                  onChange={(e) => setCollectionTelegramUrl(e.target.value)}
+                  placeholder="https://t.me/project"
+                  className="input-field w-full"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-body-sm text-ink-muted font-medium">Discord</label>
+                <input
+                  type="url"
+                  value={collectionDiscordUrl}
+                  onChange={(e) => setCollectionDiscordUrl(e.target.value)}
+                  placeholder="https://discord.gg/project"
+                  className="input-field w-full"
+                />
+              </div>
               <div className="space-y-3 md:col-span-2">
                 <div className="space-y-1.5">
-                  <label className="text-body-sm text-ink-muted font-medium">Collection Image</label>
+                  <label className="text-body-sm text-ink-muted font-medium">Collection Profile Image</label>
                   <p className="text-xs text-ink-faint">
-                    Upload a square image. WebP is best for future database storage because it keeps files smaller; PNG is best
-                    for flat artwork and logos. Keep it under 5MB.
+                    Upload a square app profile image. WebP keeps files smaller; PNG is best for flat artwork and logos.
+                    Keep it at 2MB or less.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_11rem] gap-4">
@@ -720,10 +837,10 @@ const CreateNFTPage: React.FC = () => {
                           >
                             browse files
                           </button>{' '}
-                          · PNG, JPG, WebP up to 5MB. Square (1:1) recommended.
+                          · PNG, JPG, WebP up to 2MB. Square (1:1) recommended.
                         </div>
                         <div className="text-[11px] text-ink-faint">
-                          This currently stays local as a preview until the upload API is wired.
+                          Stage0 saves this profile block after the collection contract is deployed.
                         </div>
                         {collectionImageName ? (
                           <div className="text-xs text-ink-muted break-all">

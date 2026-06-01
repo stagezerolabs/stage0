@@ -2,11 +2,13 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAccount, useChainId, useReadContracts } from 'wagmi';
-import { Copy, ExternalLink, Package, Plus, Trash2, X } from 'lucide-react';
+import { Copy, ExternalLink, Image as ImageIcon, Package, Plus, Trash2, X } from 'lucide-react';
 import { erc20Abi, getExplorerUrl } from '@/config';
 import { formatUnits, isAddress, type Address } from 'viem';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
+import { useOffchainTokenImages } from '@/lib/hooks/useOffchainProjectImages';
 import { useBlockchainStore } from '@/lib/store/blockchain-store';
+import FallbackImage from '@/components/ui/fallback-image';
 import { toast } from 'sonner';
 
 const containerVariants = {
@@ -37,6 +39,7 @@ const TokensPage: React.FC = () => {
   const chainId = useChainId();
   const explorerUrl = getExplorerUrl(chainId);
   const { tokens: allTokens, factoryTokens, isLoading } = useUserTokens();
+  const { data: tokenImages = {} } = useOffchainTokenImages(chainId, allTokens, allTokens.length > 0);
   const { addImportedToken, removeImportedToken } = useBlockchainStore();
 
   const [showImportModal, setShowImportModal] = useState(false);
@@ -87,9 +90,10 @@ const TokensPage: React.FC = () => {
         totalSupply,
         balance,
         isFactory,
+        imageUrl: tokenImages[token.toLowerCase()]?.imageUrl,
       };
     });
-  }, [allTokens, tokenMetaResults, factorySet]);
+  }, [allTokens, tokenMetaResults, factorySet, tokenImages]);
 
   const handleCopy = (value: string) => {
     navigator.clipboard.writeText(value);
@@ -223,6 +227,14 @@ const TokensPage: React.FC = () => {
               <div key={token.address} className="glass-card rounded-3xl p-6 space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl overflow-hidden bg-canvas-alt border border-border flex items-center justify-center shrink-0">
+                      <FallbackImage
+                        src={token.imageUrl}
+                        alt={`${token.symbol} token image`}
+                        className="w-full h-full object-cover"
+                        placeholder={<ImageIcon className="w-5 h-5 text-ink-faint" />}
+                      />
+                    </div>
                     <div>
                       <p className="font-display text-display-sm text-ink">{token.symbol}</p>
                       <p className="text-body-sm text-ink-muted">{token.name}</p>

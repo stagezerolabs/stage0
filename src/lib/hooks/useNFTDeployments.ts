@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { usePublicClient } from 'wagmi';
+import { useChainId, usePublicClient } from 'wagmi';
 import { getAddress, type Address } from 'viem';
 import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
+import { useOffchainCollectionImages } from '@/lib/hooks/useOffchainProjectImages';
 import {
   normalizeContractURI,
 } from '@/lib/utils/ipfs';
@@ -214,6 +215,7 @@ function getMetadataCacheKey(deployment: NFTDeploymentWithMetadata): string {
 export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
   const { creator, enabled = true } = options;
   const { nftFactoryLens } = useChainContracts();
+  const chainId = useChainId();
   const publicClient = usePublicClient();
   const [metadataByKey, setMetadataByKey] = useState<Record<string, NFTContractMetadata | null>>(() =>
     Object.fromEntries(deploymentMetadataCache.entries())
@@ -290,6 +292,17 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       .map(toDeployment);
   }, [chainRaw]);
 
+  const deploymentAddresses = useMemo(
+    () => rawDeployments.map((deployment) => deployment.address),
+    [rawDeployments],
+  );
+
+  const { data: offchainCollectionImages = {} } = useOffchainCollectionImages(
+    chainId,
+    deploymentAddresses,
+    canRead,
+  );
+
   useEffect(() => {
     const pending = rawDeployments.filter((deployment) => {
       const key = getMetadataCacheKey(deployment);
@@ -346,13 +359,14 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
     return rawDeployments.map((deployment) => {
       const metadataKey = getMetadataCacheKey(deployment);
       const metadata = metadataByKey[metadataKey] ?? deploymentMetadataCache.get(metadataKey);
+      const offchainImage = offchainCollectionImages[deployment.address.toLowerCase()];
       return {
         ...deployment,
-        metadataImage: metadata?.image,
+        metadataImage: offchainImage?.imageUrl ?? metadata?.image,
         metadataDescription: metadata?.description,
       };
     });
-  }, [rawDeployments, metadataByKey]);
+  }, [rawDeployments, metadataByKey, offchainCollectionImages]);
 
   return {
     deployments,

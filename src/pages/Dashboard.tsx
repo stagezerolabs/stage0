@@ -10,6 +10,7 @@ import {
 } from '@/config';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
+import { useOffchainTokenImages } from '@/lib/hooks/useOffchainProjectImages';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import { useRnsSubgraphDomainsForOwner } from '@/lib/hooks/rns/useRnsSubgraph';
@@ -127,6 +128,7 @@ const Dashboard: React.FC = () => {
 
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
   const { tokens: createdTokens, isLoading: isTokensLoading } = useUserTokens();
+  const { data: tokenImages = {} } = useOffchainTokenImages(chainId, createdTokens, createdTokens.length > 0);
   const {
     deployments: myNFTDeployments,
   } = useNFTDeployments({
@@ -291,9 +293,10 @@ const Dashboard: React.FC = () => {
         address: token,
         symbol: symbol ?? 'TOKEN',
         name: name ?? 'Token',
+        imageUrl: tokenImages[token.toLowerCase()]?.imageUrl,
       };
     });
-  }, [createdTokens, tokenMetaResults]);
+  }, [createdTokens, tokenMetaResults, tokenImages]);
 
   const createdPresales = useMemo(() => {
     if (!address) return [];
@@ -733,14 +736,17 @@ const Dashboard: React.FC = () => {
                   className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
                 >
                   <span className="flex items-center gap-3 min-w-0">
-                    <span
-                      className="w-7 h-7 rounded-md flex items-center justify-center font-mono text-[11px] font-bold uppercase shrink-0"
-                      style={{
-                        background: 'rgb(var(--color-accent) / 0.12)',
-                        color: 'rgb(var(--color-accent))',
-                      }}
-                    >
-                      {token.symbol.slice(0, 2)}
+                    <span className="w-7 h-7 rounded-md overflow-hidden bg-accent/10 flex items-center justify-center shrink-0">
+                      <FallbackImage
+                        src={token.imageUrl}
+                        alt={`${token.symbol} token image`}
+                        className="w-full h-full object-cover"
+                        placeholder={
+                          <span className="font-mono text-[11px] font-bold uppercase text-accent">
+                            {token.symbol.slice(0, 2)}
+                          </span>
+                        }
+                      />
                     </span>
                     <span className="font-medium text-[13px] text-ink truncate">{token.symbol}</span>
                   </span>

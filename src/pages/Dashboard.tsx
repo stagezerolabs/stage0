@@ -317,29 +317,6 @@ const Dashboard: React.FC = () => {
   const unlockedLocks = myLocks.filter((lock) => !lock.withdrawn && Number(lock.unlockDate) <= nowSec).length;
   const createdAssetsCount = createdTokenList.length + createdPresales.length + myNFTDeployments.length;
 
-  const creatorTiles = [
-    {
-      name: 'Launch a token',
-      desc: 'Deploy ERC-20s with mint, burn, tax options.',
-      to: isAdmin ? '/create/token' : '/tools',
-    },
-    {
-      name: 'Mint an NFT drop',
-      desc: 'ERC-721 or ERC-721A with whitelist + reveal.',
-      to: '/create/nft',
-    },
-    {
-      name: 'Lock liquidity',
-      desc: 'Timelock LP or tokens with verifiable proofs.',
-      to: isAdmin ? '/tools/token-locker' : '/tools',
-    },
-    {
-      name: 'Airdrop tool',
-      desc: 'Batch distribute tokens with merkle proofs.',
-      to: isAdmin ? '/tools/airdrop' : '/tools',
-    },
-  ];
-
   return (
     <div className="space-y-10">
       {/* Wallet hero */}
@@ -376,14 +353,6 @@ const Dashboard: React.FC = () => {
               <span className="eyebrow">Native balance</span>
             </div>
           </div>
-          {isConnected && isAdmin && !domainDisplayName ? (
-            <aside className="wallet-name-card" aria-label="Dashboard name">
-              <Link to="/domains" className="wallet-name-link">
-                <Globe className="w-3.5 h-3.5" />
-                Mint a name for your dashboard
-              </Link>
-            </aside>
-          ) : null}
         </div>
       </section>
 
@@ -889,32 +858,6 @@ const Dashboard: React.FC = () => {
             </CreationCard>
           </div>
         )}
-      </section>
-
-      {/* Creator tools */}
-      <section>
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Tools</div>
-            <h2 className="ds-h2 mt-1.5">Build on RISE</h2>
-          </div>
-          <Link to="/tools" className="btn-ghost btn-sm inline-flex">
-            All tools <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Link>
-        </div>
-        <div className="creator-grid">
-          {creatorTiles.map((t) => (
-            <Link key={t.name} to={t.to} className="creator-tile">
-              <div>
-                <div className="creator-name">{t.name}</div>
-                <div className="creator-desc">{t.desc}</div>
-              </div>
-              <div className="mt-auto flex items-center gap-1 text-accent text-[12px] font-semibold">
-                Start <ArrowRight className="w-3 h-3" />
-              </div>
-            </Link>
-          ))}
-        </div>
       </section>
     </div>
   );

@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@radix-ui/react-popover": "^1.1.15",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
@@ -23,6 +24,7 @@
     "motion": "^12.35.1",
     "postprocessing": "^6.38.3",
     "react": "^19.2.0",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.11.0",
     "rise-wallet": "^0.3.5",

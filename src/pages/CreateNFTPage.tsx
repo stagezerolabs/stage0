@@ -1,22 +1,28 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAccount, useChainId, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { decodeEventLog, isAddress, parseEther, type Address } from 'viem';
 import { NFTFactory, getContractAddresses, getExplorerUrl } from '@/config';
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
+  ChevronDown,
+  Clock3,
   ExternalLink,
   Image,
   Layers,
   Loader2,
   Upload,
 } from 'lucide-react';
+import { format, isSameDay, setHours, setMinutes, startOfDay } from 'date-fns';
 import { toast } from 'sonner';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
-import { contractUriToHttp, normalizeBaseURI, normalizeContractURI } from '@/lib/utils/ipfs';
+import { normalizeBaseURI } from '@/lib/utils/ipfs';
 import FallbackImage from '@/components/ui/fallback-image';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -46,6 +52,9 @@ type NFTMode = 'erc721' | 'erc721a';
 type ValidationResult = { valid: true } | { valid: false; message: string };
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
+const COLLECTION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const COLLECTION_IMAGE_ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const TIME_STEP_MINUTES = 15;
 
 function parseDateTimeInput(value: string): number | null {
   if (!value.trim()) return null;
@@ -54,10 +63,162 @@ function parseDateTimeInput(value: string): number | null {
   return Math.floor(parsed / 1000);
 }
 
+function dateTimeValueToDate(value: string): Date | null {
+  if (!value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function dateToLocalDateTimeValue(date: Date | null): string {
+  if (!date) return '';
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
 function formatPreviewDate(value: string): string {
   const ts = parseDateTimeInput(value);
   return ts ? new Date(ts * 1000).toLocaleString() : 'Not set';
 }
+
+function formatFileSize(size: number): string {
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function roundDateToTimeStep(date: Date): Date {
+  const rounded = new Date(date);
+  rounded.setSeconds(0, 0);
+  const minutes = rounded.getMinutes();
+  const remainder = minutes % TIME_STEP_MINUTES;
+  if (remainder !== 0) {
+    rounded.setMinutes(minutes + (TIME_STEP_MINUTES - remainder));
+  }
+  return rounded;
+}
+
+function combineDateAndTime(baseDate: Date, timeValue: string): Date {
+  const [hoursString = '0', minutesString = '0'] = timeValue.split(':');
+  return setMinutes(setHours(new Date(baseDate), Number(hoursString)), Number(minutesString));
+}
+
+function clampToMinDate(date: Date, minDate?: Date | null): Date {
+  if (!minDate) return date;
+  return date.getTime() < minDate.getTime() ? new Date(minDate) : date;
+}
+
+async function getImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => reject(new Error('Failed to read image dimensions.'));
+      img.src = objectUrl;
+    });
+    return dimensions;
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+type DateTimePickerFieldProps = {
+  label: string;
+  value: string;
+  onChange: (nextValue: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+  minDate?: Date | null;
+};
+
+const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({
+  label,
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+  minDate,
+}) => {
+  const timeInputId = React.useId();
+  const selectedDate = dateTimeValueToDate(value);
+  const minCalendarDate = minDate ? startOfDay(minDate) : undefined;
+  const timeValue = selectedDate ? format(selectedDate, 'HH:mm') : '';
+  const timeMin = selectedDate && minDate && isSameDay(selectedDate, minDate) ? format(minDate, 'HH:mm') : undefined;
+
+  const handleDateSelect = (nextDate: Date | undefined) => {
+    if (!nextDate) {
+      onChange('');
+      return;
+    }
+
+    const baseDate = selectedDate ?? roundDateToTimeStep(minDate ?? new Date());
+    const merged = setMinutes(setHours(new Date(nextDate), baseDate.getHours()), baseDate.getMinutes());
+    onChange(dateToLocalDateTimeValue(clampToMinDate(merged, minDate)));
+  };
+
+  const handleTimeChange = (nextTime: string) => {
+    if (!nextTime) return;
+    const baseDate = selectedDate ?? minDate ?? roundDateToTimeStep(new Date());
+    onChange(dateToLocalDateTimeValue(clampToMinDate(combineDateAndTime(baseDate, nextTime), minDate)));
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-body-sm text-ink-muted font-medium">{label}</label>
+      <Popover>
+        <PopoverTrigger asChild disabled={disabled}>
+          <button
+            type="button"
+            className="create-nft-date-trigger disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
+              <span className={`create-nft-date-trigger-text ${selectedDate ? 'text-ink' : 'text-ink-faint'}`}>
+                {selectedDate ? format(selectedDate, 'MMM d, yyyy · h:mm a') : placeholder}
+              </span>
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="center"
+          sideOffset={10}
+          collisionPadding={16}
+          className="create-nft-datetime-popover"
+        >
+          <Calendar
+            mode="single"
+            selected={selectedDate ?? undefined}
+            onSelect={handleDateSelect}
+            disabled={minCalendarDate ? { before: minCalendarDate } : undefined}
+          />
+          <div className="create-nft-time-panel">
+            <div className="create-nft-time-row">
+              <label htmlFor={timeInputId} className="create-nft-time-label">
+                <Clock3 className="h-3.5 w-3.5" />
+                <span>Time</span>
+              </label>
+              <input
+                id={timeInputId}
+                type="time"
+                step={TIME_STEP_MINUTES * 60}
+                value={timeValue}
+                min={timeMin}
+                disabled={disabled || !selectedDate}
+                onChange={(event) => handleTimeChange(event.target.value)}
+                className="create-nft-time-input disabled:cursor-not-allowed disabled:opacity-55"
+              />
+            </div>
+            {!selectedDate ? (
+              <p className="mt-2 text-center text-[11px] text-ink-faint">Pick a date first, then set the time.</p>
+            ) : null}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
 
 const CreateNFTPage: React.FC = () => {
   const { isConnected } = useAccount();
@@ -69,8 +230,10 @@ const CreateNFTPage: React.FC = () => {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [baseURI, setBaseURI] = useState('');
-  const [collectionImageURI, setCollectionImageURI] = useState('');
   const [collectionImagePreview, setCollectionImagePreview] = useState('');
+  const [collectionImageMeta, setCollectionImageMeta] = useState<string>('');
+  const [collectionImageName, setCollectionImageName] = useState('');
+  const [collectionImageDragActive, setCollectionImageDragActive] = useState(false);
   const [maxSupply, setMaxSupply] = useState('');
   const [walletLimit, setWalletLimit] = useState('');
   const [payoutWallet, setPayoutWallet] = useState('');
@@ -82,6 +245,7 @@ const CreateNFTPage: React.FC = () => {
   const [whitelistPrice, setWhitelistPrice] = useState('');
   const [createdCollectionAddress, setCreatedCollectionAddress] = useState<string | null>(null);
   const [showPostDeployPopup, setShowPostDeployPopup] = useState(false);
+  const collectionImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     data: hash,
@@ -142,9 +306,7 @@ const CreateNFTPage: React.FC = () => {
     const suggested = new Date(saleStartMs - 60 * 60 * 1000);
     if (!Number.isFinite(suggested.getTime()) || suggested.getTime() <= 0) return;
 
-    const tzOffsetMs = suggested.getTimezoneOffset() * 60_000;
-    const local = new Date(suggested.getTime() - tzOffsetMs);
-    setWhitelistStart(local.toISOString().slice(0, 16));
+    setWhitelistStart(dateToLocalDateTimeValue(suggested));
   }, [whitelistEnabled, whitelistStart, saleStart]);
 
   useEffect(() => {
@@ -161,13 +323,6 @@ const CreateNFTPage: React.FC = () => {
     if (!symbol.trim()) return { valid: false, message: 'Collection symbol is required.' };
     const normalizedBaseUri = normalizeBaseURI(baseURI.trim());
     if (!normalizedBaseUri) return { valid: false, message: 'Base URI is required.' };
-    const normalizedCollectionImageUri = normalizeContractURI(collectionImageURI.trim());
-    if (!normalizedCollectionImageUri) {
-      return {
-        valid: false,
-        message: 'Collection image URI is required. Use a CID, ipfs:// URI, or https:// image link.',
-      };
-    }
     if (!maxSupply.trim()) return { valid: false, message: 'Max supply is required.' };
     if (!mintPrice.trim()) return { valid: false, message: 'Public mint price is required.' };
     if (!saleStart) return { valid: false, message: 'Public sale start is required.' };
@@ -234,7 +389,6 @@ const CreateNFTPage: React.FC = () => {
     name,
     symbol,
     baseURI,
-    collectionImageURI,
     maxSupply,
     mintPrice,
     walletLimit,
@@ -256,7 +410,6 @@ const CreateNFTPage: React.FC = () => {
     const saleEndTs = parseDateTimeInput(saleEnd);
     const whitelistStartTs = whitelistEnabled ? parseDateTimeInput(whitelistStart) : null;
     const normalizedBaseUri = normalizeBaseURI(baseURI.trim());
-    const normalizedCollectionImageUri = normalizeContractURI(collectionImageURI.trim());
     const walletLimitValue = walletLimit.trim() ? Number(walletLimit) : 0;
 
     if (!saleStartTs || !saleEndTs) {
@@ -269,8 +422,8 @@ const CreateNFTPage: React.FC = () => {
       return;
     }
 
-    if (!normalizedBaseUri || !normalizedCollectionImageUri) {
-      toast.error('Collection URIs are invalid.');
+    if (!normalizedBaseUri) {
+      toast.error('Base URI is invalid.');
       return;
     }
 
@@ -287,7 +440,7 @@ const CreateNFTPage: React.FC = () => {
             name: name.trim(),
             symbol: symbol.trim(),
             baseURI: normalizedBaseUri,
-            contractURI: normalizedCollectionImageUri,
+            contractURI: '',
             whitelistConfig: {
               enabled: whitelistEnabled,
               whitelistStart: BigInt(whitelistStartTs ?? 0),
@@ -309,25 +462,54 @@ const CreateNFTPage: React.FC = () => {
     }
   };
 
-  const handleCollectionImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const setCollectionImageFromFile = async (file: File | undefined | null) => {
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Select an image file for the collection preview.');
-      event.target.value = '';
+    if (!COLLECTION_IMAGE_ACCEPTED_TYPES.has(file.type)) {
+      toast.error('Use a PNG, JPG, or WebP image for the collection image.');
       return;
     }
 
+    if (file.size > COLLECTION_IMAGE_MAX_BYTES) {
+      toast.error('Collection image must be 5MB or smaller.');
+      return;
+    }
+
+    const dimensions = await getImageDimensions(file);
+    const detailParts = [formatFileSize(file.size)];
+    if (dimensions) {
+      detailParts.push(`${dimensions.width}×${dimensions.height}`);
+      if (dimensions.width !== dimensions.height) {
+        detailParts.push('square recommended');
+      } else {
+        detailParts.push('square');
+      }
+    }
+
+    setCollectionImageName(file.name);
+    setCollectionImageMeta(detailParts.join(' · '));
     setCollectionImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleCollectionImageFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    await setCollectionImageFromFile(file);
+    if (!file) {
+      return;
+    }
+  };
+
+  const handleCollectionImageDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setCollectionImageDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    await setCollectionImageFromFile(file);
   };
 
   const saleModel = whitelistEnabled ? 'Whitelist + Public' : 'Public Only';
   const walletLimitLabel = walletLimit.trim() && Number(walletLimit) > 0 ? walletLimit : 'Unlimited';
-  const normalizedCollectionImagePreviewUri = normalizeContractURI(collectionImageURI.trim());
-  const collectionImagePreviewSrc =
-    collectionImagePreview ||
-    (normalizedCollectionImagePreviewUri ? contractUriToHttp(normalizedCollectionImagePreviewUri) : '');
+  const collectionImagePreviewSrc = collectionImagePreview;
+  const saleStartDate = dateTimeValueToDate(saleStart);
 
   if (isSuccess && createdCollectionAddress) {
     return (
@@ -390,7 +572,7 @@ const CreateNFTPage: React.FC = () => {
               <ol className="list-decimal pl-5 space-y-2 text-body-sm text-ink-muted">
                 <li>Open `Manage Collection` and confirm public sale price, wallet limit, and required sale end.</li>
                 <li>Upload whitelist wallets before the whitelist window starts if you enabled allowlist minting.</li>
-                <li>Set or confirm your payout wallet and metadata URIs.</li>
+                <li>Set or confirm your payout wallet and token metadata base URI.</li>
                 <li>Share the collection page or explorer link with your community.</li>
               </ol>
               <div className="flex flex-wrap gap-2">
@@ -465,7 +647,7 @@ const CreateNFTPage: React.FC = () => {
           <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-5">
             <div className="space-y-1">
               <h2 className="font-display text-display-sm text-ink">Identity & Metadata</h2>
-              <p className="text-body-sm text-ink-muted">Set the collection identity and metadata endpoints.</p>
+              <p className="text-body-sm text-ink-muted">Set the collection identity, token metadata base URI, and launch art.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -500,45 +682,68 @@ const CreateNFTPage: React.FC = () => {
               </div>
               <div className="space-y-3 md:col-span-2">
                 <div className="space-y-1.5">
-                  <label className="text-body-sm text-ink-muted font-medium">Collection Image URI</label>
-                  <input
-                    type="text"
-                    value={collectionImageURI}
-                    onChange={(e) => setCollectionImageURI(e.target.value)}
-                    placeholder="CID, ipfs://..., or https://..."
-                    className="input-field w-full"
-                  />
+                  <label className="text-body-sm text-ink-muted font-medium">Collection Image</label>
                   <p className="text-xs text-ink-faint">
-                    Required. This is stored onchain as contractURI and normalized for launch cards, collection pages, and dashboards.
+                    Upload a square image. WebP is best for future database storage because it keeps files smaller; PNG is best
+                    for flat artwork and logos. Keep it under 5MB.
                   </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_9rem] gap-4">
-                  <label className="rounded-2xl border border-dashed border-border bg-canvas-alt p-4 cursor-pointer hover:border-accent/40 transition-colors">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_11rem] gap-4">
+                  <div
+                    className={`create-nft-upload-dropzone ${collectionImageDragActive ? 'is-dragging' : ''}`}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setCollectionImageDragActive(true);
+                    }}
+                    onDragLeave={() => setCollectionImageDragActive(false)}
+                    onDrop={handleCollectionImageDrop}
+                  >
                     <input
+                      ref={collectionImageInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/webp"
                       onChange={handleCollectionImageFileChange}
                       className="sr-only"
                     />
-                    <span className="flex items-start gap-3">
-                      <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
                         <Upload className="w-5 h-5" />
-                      </span>
-                      <span className="space-y-1">
-                        <span className="block text-body-sm font-medium text-ink">Upload collection image</span>
-                        <span className="block text-xs text-ink-faint">
-                          Preview-only until storage/database wiring is added. Paste the uploaded CID or URL above before deployment.
-                        </span>
-                      </span>
-                    </span>
-                  </label>
-                  <div className="h-36 rounded-2xl border border-border bg-canvas-alt overflow-hidden flex items-center justify-center">
-                    <FallbackImage
-                      src={collectionImagePreviewSrc}
-                      alt="Collection image preview"
-                      className="w-full h-full object-cover"
-                      placeholder={<Image className="w-8 h-8 text-ink-faint" />}
-                    />
+                      </div>
+                      <div className="space-y-1 min-w-0">
+                        <div className="text-body-sm font-medium text-ink">Drag & drop your image</div>
+                        <div className="text-xs text-ink-faint">
+                          or{' '}
+                          <button
+                            type="button"
+                            onClick={() => collectionImageInputRef.current?.click()}
+                            className="font-medium text-accent hover:text-accent-hover transition-colors"
+                          >
+                            browse files
+                          </button>{' '}
+                          · PNG, JPG, WebP up to 5MB. Square (1:1) recommended.
+                        </div>
+                        <div className="text-[11px] text-ink-faint">
+                          This currently stays local as a preview until the upload API is wired.
+                        </div>
+                        {collectionImageName ? (
+                          <div className="text-xs text-ink-muted break-all">
+                            <span className="font-medium text-ink">{collectionImageName}</span>
+                            {collectionImageMeta ? ` · ${collectionImageMeta}` : ''}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="create-nft-upload-preview">
+                    <div className="text-label text-ink-faint uppercase tracking-[0.18em]">Preview</div>
+                    <div className="create-nft-upload-preview-frame">
+                      <FallbackImage
+                        src={collectionImagePreviewSrc}
+                        alt="Collection image preview"
+                        className="w-full h-full object-cover"
+                        placeholder={<Image className="w-8 h-8 text-ink-faint" />}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -602,74 +807,74 @@ const CreateNFTPage: React.FC = () => {
                   className="input-field w-full"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Public Sale Start</label>
-                <input
-                  type="datetime-local"
-                  value={saleStart}
-                  onChange={(e) => setSaleStart(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Sale End</label>
-                <input
-                  type="datetime-local"
-                  value={saleEnd}
-                  onChange={(e) => setSaleEnd(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
+              <DateTimePickerField
+                label="Public Sale Start"
+                value={saleStart}
+                onChange={setSaleStart}
+                placeholder="Pick the public launch time"
+              />
+              <DateTimePickerField
+                label="Sale End"
+                value={saleEnd}
+                onChange={setSaleEnd}
+                placeholder="Pick when the sale closes"
+                minDate={saleStartDate}
+              />
             </div>
           </motion.section>
 
-          <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-5">
-            <div className="flex items-start justify-between gap-4">
+          <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6">
+            <div className={`flex items-start justify-between gap-4 ${whitelistEnabled ? 'mb-5' : ''}`}>
               <div className="space-y-1">
                 <h2 className="font-display text-display-sm text-ink">Whitelist Mint</h2>
                 <p className="text-body-sm text-ink-muted">
                   Add an earlier allowlist window with a separate price before public mint opens.
                 </p>
               </div>
-              <label className="inline-flex items-center gap-2 text-body-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={whitelistEnabled}
-                  onChange={(e) => setWhitelistEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-                />
-                Enable
-              </label>
+              <button
+                type="button"
+                aria-label={whitelistEnabled ? 'Disable whitelist mint' : 'Enable whitelist mint'}
+                aria-pressed={whitelistEnabled}
+                onClick={() => setWhitelistEnabled((enabled) => !enabled)}
+                className={`ds-switch ${whitelistEnabled ? 'is-on' : ''}`}
+              />
             </div>
 
-            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${whitelistEnabled ? '' : 'opacity-60'}`}>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Whitelist Start</label>
-                <input
-                  type="datetime-local"
-                  value={whitelistStart}
-                  onChange={(e) => setWhitelistStart(e.target.value)}
-                  disabled={!whitelistEnabled}
-                  className="input-field w-full disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Whitelist Price (ETH)</label>
-                <input
-                  type="text"
-                  value={whitelistPrice}
-                  onChange={(e) => setWhitelistPrice(e.target.value)}
-                  disabled={!whitelistEnabled}
-                  placeholder="0.03"
-                  className="input-field w-full disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-canvas-alt p-4 text-body-sm text-ink-muted">
-              When enabled, whitelist mint must start before the public sale. Approved wallets will pay the whitelist
-              price until the public window opens.
-            </div>
+            <AnimatePresence initial={false}>
+              {whitelistEnabled && (
+                <motion.div
+                  key="whitelist-fields"
+                  initial={{ height: 0, opacity: 0, y: -8 }}
+                  animate={{ height: 'auto', opacity: 1, y: 0 }}
+                  exit={{ height: 0, opacity: 0, y: -8 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <DateTimePickerField
+                      label="Whitelist Start"
+                      value={whitelistStart}
+                      onChange={setWhitelistStart}
+                      placeholder="Pick the allowlist start time"
+                    />
+                    <div className="space-y-1.5">
+                      <label className="text-body-sm text-ink-muted font-medium">Whitelist Price (ETH)</label>
+                      <input
+                        type="text"
+                        value={whitelistPrice}
+                        onChange={(e) => setWhitelistPrice(e.target.value)}
+                        placeholder="0.03"
+                        className="input-field w-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="ds-callout-accent mt-4">
+                    When enabled, whitelist mint must start before the public sale. Approved wallets pay the whitelist price
+                    until the public window opens.
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.section>
 
           {writeError && (
@@ -705,6 +910,7 @@ const CreateNFTPage: React.FC = () => {
               {[
                 { label: 'Collection', value: name.trim() || 'Untitled Collection' },
                 { label: 'Symbol', value: symbol.trim() || '--' },
+                { label: 'Collection image', value: collectionImageName || 'Not added yet' },
                 { label: 'Supply', value: maxSupply.trim() || '--' },
                 { label: 'Wallet limit', value: walletLimitLabel },
                 { label: 'Public price', value: mintPrice.trim() ? `${mintPrice.trim()} ETH` : '--' },

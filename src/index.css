@@ -612,6 +612,148 @@
       inset 0 1px 0 rgba(255, 251, 244, 0.72);
   }
 
+  .create-nft-upload-dropzone {
+    @apply rounded-2xl border border-dashed border-border bg-canvas-alt p-5;
+    transition: border-color 220ms ease, background-color 220ms ease, transform 220ms ease, box-shadow 220ms ease;
+  }
+
+  .create-nft-upload-dropzone.is-dragging {
+    border-color: rgb(var(--color-accent) / 0.7);
+    background: rgb(var(--color-accent) / 0.08);
+    box-shadow: 0 0 0 3px rgb(var(--color-accent) / 0.10);
+    transform: translateY(-1px);
+  }
+
+  .create-nft-upload-preview {
+    @apply rounded-2xl border border-border bg-canvas-alt p-4;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .create-nft-upload-preview-frame {
+    aspect-ratio: 1 / 1;
+    @apply overflow-hidden rounded-2xl border border-border bg-canvas;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .create-nft-date-trigger {
+    width: 100%;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.85rem;
+    border: 1px solid rgb(var(--color-border) / 0.82);
+    background: rgb(var(--color-canvas-alt) / 0.82);
+    color: rgb(var(--color-ink));
+    text-align: left;
+    transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+  }
+
+  .create-nft-date-trigger:hover {
+    border-color: rgb(var(--color-accent) / 0.28);
+    background: rgb(var(--color-canvas-alt));
+  }
+
+  .create-nft-date-trigger:focus-visible {
+    outline: none;
+    border-color: rgb(var(--color-accent-secondary) / 0.58);
+    box-shadow:
+      0 0 0 3px rgb(var(--color-accent-secondary) / 0.12),
+      0 0 18px rgb(var(--color-accent-secondary) / 0.06);
+  }
+
+  .create-nft-date-trigger-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .create-nft-datetime-popover {
+    width: min(calc(100vw - 2rem), 19rem);
+    overflow: hidden;
+    border-radius: 1.15rem;
+    border-color: rgb(var(--color-border));
+    background: rgb(var(--color-canvas-alt));
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.34),
+      0 8px 20px rgba(0, 0, 0, 0.18);
+  }
+
+  .create-nft-time-panel {
+    border-top: 1px solid rgb(var(--color-border));
+    background: rgb(var(--color-canvas) / 0.72);
+    padding: 0.75rem;
+  }
+
+  .create-nft-time-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .create-nft-time-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(var(--color-ink-faint));
+    white-space: nowrap;
+  }
+
+  .create-nft-time-input {
+    width: 100%;
+    min-height: 36px;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--color-border));
+    background: rgb(var(--color-canvas-alt));
+    padding: 0 0.75rem;
+    color: rgb(var(--color-ink));
+    font-family: 'Inconsolata', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+    color-scheme: dark;
+  }
+
+  .create-nft-time-input:focus {
+    border-color: rgb(var(--color-accent-secondary) / 0.6);
+    box-shadow: 0 0 0 3px rgb(var(--color-accent-secondary) / 0.12);
+  }
+
+  :root[data-theme='light'] .create-nft-time-input {
+    background: rgb(255 251 244 / 0.88);
+    border-color: rgb(var(--color-border) / 0.62);
+    color-scheme: light;
+  }
+
+  :root[data-theme='light'] .create-nft-date-trigger {
+    background: rgb(255 251 244 / 0.88);
+    border-color: rgb(var(--color-border) / 0.62);
+    box-shadow: inset 0 1px 0 rgba(255, 251, 244, 0.6);
+  }
+
+  :root[data-theme='light'] .create-nft-datetime-popover {
+    background: rgb(var(--color-canvas-alt));
+    box-shadow:
+      0 24px 54px rgba(98, 75, 45, 0.18),
+      0 8px 18px rgba(98, 75, 45, 0.08);
+  }
+
   /* Divider */
   .divider {
     @apply w-full h-px bg-border;
@@ -1133,6 +1275,49 @@
   --rk-colors-accentColorForeground: rgb(var(--color-accent-foreground)) !important;
   --rk-radii-connectButton: 9999px !important;
   --rk-fonts-body: 'Work Sans', 'Bricolage Grotesque', sans-serif !important;
+}
+
+/* ── Toggle switch (iOS-style) ───────────────────────────────────── */
+.ds-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgb(var(--color-ink) / 0.14);
+  border: none;
+  cursor: pointer;
+  transition: background 200ms ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+.ds-switch.is-on { background: rgb(var(--color-accent)); }
+.ds-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 200ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+.ds-switch.is-on::after { transform: translateX(20px); }
+.ds-switch:focus-visible {
+  outline: 2px solid rgb(var(--color-accent) / 0.6);
+  outline-offset: 2px;
+}
+
+/* ── Accent callout (info banner) ────────────────────────────────── */
+.ds-callout-accent {
+  border-radius: 14px;
+  border: 1px solid rgb(var(--color-accent) / 0.25);
+  background: rgb(var(--color-accent) / 0.05);
+  padding: 13px 15px;
+  font-size: 13px;
+  color: rgb(var(--color-ink-muted));
+  line-height: 1.5;
 }
 
 /* ═════════════════════════════════════════════════════════════════
@@ -2748,4 +2933,3 @@
     animation: none !important;
   }
 }
-

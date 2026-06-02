@@ -13,10 +13,8 @@ import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useOffchainTokenImages } from '@/lib/hooks/useOffchainProjectImages';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
-import { useRnsSubgraphDomainsForOwner } from '@/lib/hooks/rns/useRnsSubgraph';
-import { getCachedRnsLabel, seedCacheFromCandidates } from '@/lib/rns/label-cache';
+import { useRnsOwnedLabel } from '@/lib/hooks/rns/useRnsOwnedLabel';
 import { getPrimaryLabel, setPrimaryLabel } from '@/lib/rns/primary-label';
-import { rnsNamehash } from '@/lib/rns/utils';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
 import { useIsAdmin } from '@/lib/utils/admin';
@@ -89,10 +87,10 @@ interface DashboardLockItem {
 const Dashboard: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { displayName: domainDisplayName } = useUserDomain(address);
-  const { data: ownedDomains, isLoading: isDomainsLoading } = useRnsSubgraphDomainsForOwner(
-    address as Address | undefined,
-    { enabled: isConnected && Boolean(address) },
-  );
+  const {
+    allDomains: ownedDomains,
+    isLoading: isDomainsLoading,
+  } = useRnsOwnedLabel(address);
   const { isAdmin } = useIsAdmin(address as Address | undefined);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
@@ -149,22 +147,9 @@ const Dashboard: React.FC = () => {
     return () => window.clearInterval(timer);
   }, []);
 
-  // Seed the label cache from search history for domains registered before the
-  // cache was introduced (subgraph returns empty labels on Rise Testnet).
-  useEffect(() => {
-    if (!ownedDomains?.length) return;
-    const emptyNodes = ownedDomains.filter((d) => !d.label).map((d) => d.node);
-    if (!emptyNodes.length) return;
-    try {
-      const raw = localStorage.getItem('rns_search_history');
-      const history: string[] = raw ? JSON.parse(raw) : [];
-      if (history.length) {
-        seedCacheFromCandidates(emptyNodes, history, rnsNamehash);
-      }
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [ownedDomains]);
+  // ownedDomains already has labels resolved from resolver text records (on-chain).
+  // No localStorage or pending-registration merging needed.
+  const domainsToDisplay = ownedDomains;
 
   const { data: stakingTokenData } = useReadContracts({
     contracts: [
@@ -417,7 +402,7 @@ const Dashboard: React.FC = () => {
           <div className="bg-canvas-alt border border-border rounded-3xl p-8 text-center text-ink-muted text-sm">
             Loading names…
           </div>
-        ) : !ownedDomains || ownedDomains.length === 0 ? (
+        ) : domainsToDisplay.length === 0 ? (
           <div className="bg-canvas-alt border border-border rounded-3xl p-10 text-center">
             <Globe className="w-5 h-5 mx-auto mb-3 text-ink-faint" />
             <p className="text-ink-muted text-sm mb-4">You don't own any .rise names yet.</p>
@@ -427,11 +412,11 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           <div className="bg-canvas-alt border border-border rounded-3xl overflow-hidden">
-            {ownedDomains.map((domain, i) => {
-              const label = domain.label || getCachedRnsLabel(domain.node) || '';
+            {domainsToDisplay.map((domain, i) => {
+              const label = domain.label || '';
               // Determine if this domain is the active primary. If none is stored,
               // the first domain is the implicit primary.
-              const effectivePrimary = primaryLabel ?? (ownedDomains[0].label || getCachedRnsLabel(ownedDomains[0].node) || '');
+              const effectivePrimary = primaryLabel ?? (domainsToDisplay[0].label || '');
               const isPrimary = label !== '' && label === effectivePrimary;
               const expiryDate = domain.expiry
                 ? new Date(Number(domain.expiry) * 1000).toLocaleDateString(undefined, {
@@ -440,7 +425,7 @@ const Dashboard: React.FC = () => {
                   day: 'numeric',
                 })
                 : '—';
-              const isLastItem = i === ownedDomains.length - 1;
+              const isLastItem = i === domainsToDisplay.length - 1;
               return (
                 <div
                   key={domain.node}
@@ -490,10 +475,10 @@ const Dashboard: React.FC = () => {
                 </div>
               );
             })}
-            {ownedDomains.length > 0 && (
+            {domainsToDisplay.length > 0 && (
               <div className="px-6 py-3 border-t border-border/50 flex items-center justify-between">
                 <span className="text-[12px] text-ink-muted">
-                  {ownedDomains.length} name{ownedDomains.length !== 1 ? 's' : ''} registered
+                  {domainsToDisplay.length} name{domainsToDisplay.length !== 1 ? 's' : ''} registered
                 </span>
                 <Link
                   to="/domains"

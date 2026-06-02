@@ -6,20 +6,62 @@ import {
 } from "../generated/RNSRegistrar/RNSRegistrar";
 import { RnsDomain } from "../generated/schema";
 
+// register(string,uint256,address) selector = keccak256(sig)[0:4]
+const REGISTER_SELECTOR: u8[] = [0x5d, 0xc1, 0xaa, 0xd3];
+
+/**
+ * Find the byte offset of a 4-byte selector within a Bytes buffer.
+ * Returns -1 when not found.
+ */
+function findSelector(haystack: Bytes, needle: u8[]): i32 {
+  const end = haystack.length - 4;
+  for (let i = 0; i <= end; i++) {
+    if (
+      haystack[i] === needle[0] &&
+      haystack[i + 1] === needle[1] &&
+      haystack[i + 2] === needle[2] &&
+      haystack[i + 3] === needle[3]
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 /**
  * The `name` parameter is indexed in the contract ABI which means only its
  * keccak256 hash is stored in the log — the original string is unrecoverable
  * from event.params.name (a Bytes hash).
  *
- * We recover the original label by ABI-decoding the transaction calldata:
- *   register(string name, uint256 duration, address resolver_)
+ * Strategy 1 – Direct call: transaction goes straight to the registrar.
+ *   → Decode input[4:] as (string,uint256,address).
+ *
+ * Strategy 2 – Orchestrator call (ERC-7702 / Rise Wallet): the outer
+ *   transaction goes to the Orchestrator which embeds the inner register()
+ *   call in its payload.
+ *   → Search for the register() selector in the raw input, then decode the
+ *     bytes that follow as (string,uint256,address).
  */
 function decodeLabelFromRegisterCalldata(input: Bytes): string {
   if (input.length <= 4) return "";
-  const data = Bytes.fromUint8Array(input.slice(4));
-  const decoded = ethereum.decode("(string,uint256,address)", data);
-  if (!decoded) return "";
-  return decoded.toTuple()[0].toString().toLowerCase();
+
+  // Strategy 1: direct call to registrar
+  const directData = Bytes.fromUint8Array(input.slice(4));
+  const directDecoded = ethereum.decode("(string,uint256,address)", directData);
+  if (directDecoded) {
+    const label = directDecoded.toTuple()[0].toString().toLowerCase();
+    if (label.length > 0) return label;
+  }
+
+  // Strategy 2: inner call wrapped by an Orchestrator (Rise ERC-7702 wallet)
+  const selectorOffset = findSelector(input, REGISTER_SELECTOR);
+  if (selectorOffset < 0) return "";
+
+  const innerData = Bytes.fromUint8Array(input.slice(selectorOffset + 4));
+  const innerDecoded = ethereum.decode("(string,uint256,address)", innerData);
+  if (!innerDecoded) return "";
+
+  return innerDecoded.toTuple()[0].toString().toLowerCase();
 }
 
 /**

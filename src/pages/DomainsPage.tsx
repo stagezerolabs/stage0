@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { formatEther } from 'viem';
-import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi';
+import { useAccount, useBalance, useChainId, useSwitchChain, useWriteContract } from 'wagmi';
 import { getExplorerUrl, riseTestnet } from '@/config';
 import {
   formatDomainDisplay,
@@ -10,10 +10,13 @@ import {
   validateDomainName
 } from '@/lib/domains/storage';
 import { RESERVED_NAMES } from '@/lib/rns/constants';
-import { cacheRnsLabel } from '@/lib/rns/label-cache';
 import { rnsNamehash } from '@/lib/rns/utils';
+import { RNSResolver } from '@/lib/rns/abis';
 import {
+  useRnsApproveForAll,
+  useRnsContracts,
   useRnsExpiry,
+  useRnsIsApproved,
   useRnsNameStatus,
   useRnsOwnedLabel,
   useRnsRegister,
@@ -22,6 +25,7 @@ import {
   useRnsRenew,
 } from '@/lib/hooks/rns';
 import { setPrimaryLabel } from '@/lib/rns/primary-label';
+import { saveRecentRegistration } from '@/lib/rns/recent-registration';
 import {
   AlertTriangle,
   ExternalLink,
@@ -52,6 +56,9 @@ const DomainsPage: React.FC = () => {
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const explorerUrl = getExplorerUrl(chainId);
 
+  const { resolver: resolverAddress } = useRnsContracts();
+  const { writeContract: writeResolverText } = useWriteContract();
+
   const { data: balanceData } = useBalance({
     address,
     query: { enabled: isConnected && Boolean(address) },
@@ -59,6 +66,8 @@ const DomainsPage: React.FC = () => {
 
   // Local hint: lets us show a just-registered name while the subgraph indexes it.
   const [hintLabel, setHintLabel] = useState<string | null>(null);
+  // Survives renders and potential wallet-triggered page reloads within the same session.
+  const lastRegisteredRef = useRef<string>('');
 
   const {
     label: ownedLabel,
@@ -149,6 +158,20 @@ const DomainsPage: React.FC = () => {
     reset: resetRegister,
   } = useRnsRegister();
 
+  const { isApproved, refetch: refetchApproval } = useRnsIsApproved(address);
+
+  const {
+    approve,
+    isPending: isApprovePending,
+    isConfirming: isApproveConfirming,
+    isSuccess: isApproveSuccess,
+    error: approveError,
+    reset: resetApprove,
+  } = useRnsApproveForAll();
+
+  // Name to register once approval TX confirms (two-step flow).
+  const pendingRegisterAfterApproval = useRef<string>('');
+
   const {
     renew,
     isPending: isRenewPending,
@@ -169,6 +192,7 @@ const DomainsPage: React.FC = () => {
     enabled: validation.valid && Boolean(normalized) && isTaken && !available,
   });
 
+  const isApproving = isApprovePending || isApproveConfirming;
   const isRegistering = isRegisterPending || isRegisterConfirming;
   const isRenewing = isRenewPending || isRenewConfirming;
   const isReleasing = isReleasePending || isReleaseConfirming;
@@ -224,12 +248,34 @@ const DomainsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!isRegisterSuccess || !address || !normalized) return;
-    setHintLabel(normalized);
-    cacheRnsLabel(rnsNamehash(normalized), normalized);
+    if (!isRegisterSuccess || !address) return;
+    // Recover the name from the ref or localStorage in case React state was
+    // cleared by a wallet-triggered page reload after TX confirmation.
+    const registeredName =
+      normalized ||
+      lastRegisteredRef.current ||
+      localStorage.getItem('rns_pending_reg') ||
+      '';
+    if (!registeredName) return;
+
+    localStorage.removeItem('rns_pending_reg');
+    lastRegisteredRef.current = '';
+
+    const node = rnsNamehash(registeredName);
+    saveRecentRegistration(address, registeredName, node);
+    // Set as primary immediately so Dashboard shows it without waiting for subgraph.
+    setPrimaryLabel(address, registeredName);
+    // Store label on-chain so any device can recover it without the indexer.
+    writeResolverText({
+      address: resolverAddress,
+      abi: RNSResolver,
+      functionName: "setText",
+      args: [node, "label", registeredName],
+    });
+    setHintLabel(registeredName);
     void refetchOwned();
     void refetchStatus();
-    toast.success(`Registered ${formatDomainDisplay(normalized)}`);
+    toast.success(`Registered ${formatDomainDisplay(registeredName)}`);
     resetRegister();
   }, [
     address,
@@ -238,6 +284,8 @@ const DomainsPage: React.FC = () => {
     refetchOwned,
     refetchStatus,
     resetRegister,
+    resolverAddress,
+    writeResolverText,
   ]);
 
   useEffect(() => {
@@ -251,6 +299,26 @@ const DomainsPage: React.FC = () => {
       toast.error(registerError.message.split('\n')[0] ?? 'Registration failed.');
     }
   }, [registerError]);
+
+  // When the approval TX confirms, proceed to register automatically.
+  useEffect(() => {
+    if (!isApproveSuccess) return;
+    const nameToRegister = pendingRegisterAfterApproval.current;
+    pendingRegisterAfterApproval.current = '';
+    resetApprove();
+    void refetchApproval();
+    if (!nameToRegister) return;
+    lastRegisteredRef.current = nameToRegister;
+    localStorage.setItem('rns_pending_reg', nameToRegister);
+    register({ name: nameToRegister, value: registerPrice });
+  }, [isApproveSuccess, register, registerPrice, refetchApproval, resetApprove]);
+
+  useEffect(() => {
+    if (approveError) {
+      pendingRegisterAfterApproval.current = '';
+      toast.error(approveError.message.split('\n')[0] ?? 'Approval failed.');
+    }
+  }, [approveError]);
 
   useEffect(() => {
     if (isRenewSuccess) {
@@ -285,6 +353,18 @@ const DomainsPage: React.FC = () => {
       return;
     }
     if (!validation.valid || !available) return;
+
+    if (!isApproved) {
+      // Step 1: approve the registrar as an operator so it can call
+      // resolver.setAddr(node, user) on our behalf during registration.
+      pendingRegisterAfterApproval.current = normalized;
+      approve();
+      return;
+    }
+
+    // Registrar already approved — go straight to register.
+    lastRegisteredRef.current = normalized;
+    localStorage.setItem('rns_pending_reg', normalized);
 
     register({
       name: normalized,
@@ -526,6 +606,7 @@ const DomainsPage: React.FC = () => {
                                   type="button"
                                   onClick={handleRegister}
                                   disabled={
+                                    isApproving ||
                                     isRegistering ||
                                     isOwnedLoading ||
                                     !hasSufficientBalance ||
@@ -533,15 +614,22 @@ const DomainsPage: React.FC = () => {
                                   }
                                   className="btn-primary py-2.5 px-6 bg-[#A5F95A] hover:bg-[#92E446] text-black font-semibold rounded-xl text-body-sm shadow-md shadow-[#A5F95A]/10 active:scale-98 transition-all flex items-center gap-2 flex-1 md:flex-initial"
                                 >
-                                  {isRegistering ? (
+                                  {isApproving ? (
+                                    <>
+                                      <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                                      Approving…
+                                    </>
+                                  ) : isRegistering ? (
                                     <>
                                       <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
                                       Confirming…
                                     </>
                                   ) : isRegisterQuoteLoading ? (
                                     'Loading…'
+                                  ) : !isApproved ? (
+                                    'Approve & Register'
                                   ) : (
-                                    `Register`
+                                    'Register'
                                   )}
                                 </button>
                               </>
@@ -728,41 +816,7 @@ const DomainsPage: React.FC = () => {
                   </button>
                 </div>
               </motion.div>
-            ) : (
-              <motion.div
-                variants={itemVariants}
-                className="glass-card rounded-3xl border border-border p-6 md:p-8 flex flex-col justify-between gap-6"
-              >
-                <div className="space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-canvas-alt border border-border flex items-center justify-center">
-                    <Search className="w-5 h-5 text-ink-faint" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-display text-lg font-bold text-ink">Get your name</h4>
-                    <p className="text-body-sm text-ink-muted leading-relaxed">
-                      You don't have a <span className="font-mono text-accent">.rise</span> name yet! Find a clean one on the left to claim your identity.
-                    </p>
-                  </div>
-                  <div className="border-t border-border/60 pt-4 space-y-3">
-                    <h5 className="text-xs font-mono text-ink-muted tracking-wider uppercase font-semibold">Why get one?</h5>
-                    <ul className="space-y-2.5 text-body-xs text-ink-muted">
-                      <li className="flex items-start gap-2">
-                        <span className="text-accent shrink-0">✦</span>
-                        <span>Ditch long, complex addresses. Use a readable name instead.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-accent shrink-0">✦</span>
-                        <span>One username for all dApps built on the RISE chain.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-accent shrink-0">✦</span>
-                        <span>Add your social profiles, website links, or a custom avatar.</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+            ) : null}
 
             {/* All Owned Names List (shown when user has more than 1) */}
             {ownedDomains.length > 1 && (

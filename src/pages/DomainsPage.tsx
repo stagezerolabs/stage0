@@ -68,6 +68,8 @@ const DomainsPage: React.FC = () => {
   const [hintLabel, setHintLabel] = useState<string | null>(null);
   // Survives renders and potential wallet-triggered page reloads within the same session.
   const lastRegisteredRef = useRef<string>('');
+  // Prevents setText from firing more than once per registration success.
+  const setTextFiredRef = useRef(false);
 
   const {
     label: ownedLabel,
@@ -249,6 +251,9 @@ const DomainsPage: React.FC = () => {
 
   useEffect(() => {
     if (!isRegisterSuccess || !address) return;
+    if (setTextFiredRef.current) return;
+    setTextFiredRef.current = true;
+
     // Recover the name from the ref or localStorage in case React state was
     // cleared by a wallet-triggered page reload after TX confirmation.
     const registeredName =
@@ -353,6 +358,8 @@ const DomainsPage: React.FC = () => {
       return;
     }
     if (!validation.valid || !available) return;
+
+    setTextFiredRef.current = false;
 
     if (!isApproved) {
       // Step 1: approve the registrar as an operator so it can call

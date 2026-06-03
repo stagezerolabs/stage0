@@ -3,11 +3,12 @@ import { useRnsOwner } from "@/lib/hooks/rns/useRnsRegistry";
 import { useRnsExpiry } from "@/lib/hooks/rns/useRnsRegistrar";
 import { useRnsSubgraphDomainsForOwner } from "@/lib/hooks/rns/useRnsSubgraph";
 import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
+import { useRnsLabelRecovery } from "@/lib/hooks/rns/useRnsLabelRecovery";
 import { RNSResolver } from "@/lib/rns/abis";
 import { getPrimaryLabel } from "@/lib/rns/primary-label";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Address, Hex } from "viem";
-import { useReadContracts } from "wagmi";
+import { useReadContracts, useWriteContract } from "wagmi";
 
 /**
  * Returns the connected wallet's primary `.rise` label.
@@ -15,14 +16,20 @@ import { useReadContracts } from "wagmi";
  * Priority order (all on-chain — no localStorage):
  *  1. resolver.text(node, "label") — canonical on-chain source set during registration
  *  2. Subgraph label — fallback for names registered before setText was implemented
- *  3. On-chain ownership check for hintLabel (post-registration before subgraph indexes)
+ *  3. Calldata recovery — decodes label from NameRegistered tx input via getLogs+getTransaction
+ *     (Rise Testnet subgraph cannot access calldata server-side, so we do it client-side)
+ *
+ * When a label is recovered via calldata, setText is auto-called so future loads
+ * hit source #1 directly without needing recovery.
  *
  * Pass `hintLabel` immediately after a successful registration so the UI
  * shows the new name while the subgraph indexes the transaction.
  */
 export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
   const typedAddress = address as Address | undefined;
-  const { resolver: resolverAddress } = useRnsContracts();
+  const { resolver: resolverAddress, registrar } = useRnsContracts();
+  const { writeContract } = useWriteContract();
+  const healedRef = useRef<Set<string>>(new Set());
 
   const {
     data: subgraphDomains,
@@ -44,14 +51,46 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     query: { enabled: rawDomains.length > 0 },
   });
 
-  // Merge: resolver text record first, subgraph label as fallback.
-  const resolvedDomains = useMemo(() => {
-    return rawDomains.map((d, i) => {
-      const onChainLabel = (resolverTextResults?.[i]?.result as string | undefined) || "";
-      const label = onChainLabel || d.label || "";
-      return { ...d, label };
+  // Domains that still have no label after resolver.text — these need calldata recovery.
+  const domainsNeedingRecovery = useMemo(() => {
+    return rawDomains.filter((d, i) => {
+      const onChainLabel = (resolverTextResults?.[i]?.result as string | undefined) ?? "";
+      return !onChainLabel && !d.label;
     });
   }, [rawDomains, resolverTextResults]);
+
+  // Recover labels from on-chain NameRegistered calldata for domains with no label source.
+  const { recoveredLabels } = useRnsLabelRecovery(
+    domainsNeedingRecovery,
+    typedAddress,
+    registrar,
+  );
+
+  // Auto-heal: write recovered labels to the resolver so future loads use source #1.
+  // Fires once per recovered node per session; never re-fires after setText is written.
+  useEffect(() => {
+    if (!recoveredLabels.size || !resolverAddress) return;
+    recoveredLabels.forEach((label, nodeKey) => {
+      if (healedRef.current.has(nodeKey)) return;
+      healedRef.current.add(nodeKey);
+      writeContract({
+        address: resolverAddress,
+        abi: RNSResolver,
+        functionName: "setText",
+        args: [nodeKey as Hex, "label", label],
+      });
+    });
+  }, [recoveredLabels, resolverAddress, writeContract]);
+
+  // Merge: resolver text first, subgraph label second, calldata recovery third.
+  const resolvedDomains = useMemo(() => {
+    return rawDomains.map((d, i) => {
+      const onChainLabel = (resolverTextResults?.[i]?.result as string | undefined) ?? "";
+      const recoveredLabel = recoveredLabels.get(d.node.toLowerCase()) ?? "";
+      const label = onChainLabel || d.label || recoveredLabel;
+      return { ...d, label };
+    });
+  }, [rawDomains, resolverTextResults, recoveredLabels]);
 
   // Pick the user's preferred primary if it's still in their owned list,
   // otherwise fall back to the first domain. Primary preference is stored
@@ -106,6 +145,8 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     fqdn: label ? `${label}${DOMAIN_SUFFIX}` : null,
     owner: owner ?? null,
     expiry: expiry ?? 0n,
+    // isRecovering intentionally excluded — recovery is a background enrichment pass
+    // that should not block the UI from rendering whatever labels are already available.
     isLoading: isSubgraphLoading || isHintLoading || isExpiryLoading || isResolverLoading,
     allDomains: resolvedDomains,
     refetch,

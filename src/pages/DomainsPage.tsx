@@ -1,17 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
-import { formatEther } from 'viem';
-import { useAccount, useBalance, useChainId, useSwitchChain, useWriteContract } from 'wagmi';
 import { getExplorerUrl, riseTestnet } from '@/config';
 import {
   formatDomainDisplay,
   normalizeDomainName,
   validateDomainName
 } from '@/lib/domains/storage';
-import { RESERVED_NAMES } from '@/lib/rns/constants';
-import { rnsNamehash } from '@/lib/rns/utils';
-import { RNSResolver } from '@/lib/rns/abis';
 import {
   useRnsApproveForAll,
   useRnsContracts,
@@ -24,19 +16,27 @@ import {
   useRnsRelease,
   useRnsRenew,
 } from '@/lib/hooks/rns';
+import { RNSResolver } from '@/lib/rns/abis';
+import { RESERVED_NAMES } from '@/lib/rns/constants';
 import { setPrimaryLabel } from '@/lib/rns/primary-label';
 import { saveRecentRegistration } from '@/lib/rns/recent-registration';
+import { rnsNamehash } from '@/lib/rns/utils';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
+  ArrowRight,
   ExternalLink,
+  History,
   Search,
+  Star,
+  Trash2,
   Wallet,
   X,
-  Trash2,
-  ArrowRight,
-  History,
-  Star,
 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { formatEther } from 'viem';
+import { useAccount, useBalance, useChainId, useSwitchChain, useWriteContract } from 'wagmi';
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -834,11 +834,10 @@ const DomainsPage: React.FC = () => {
                     return (
                       <div
                         key={d.node}
-                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${
-                          isPrimary
-                            ? 'border-accent/30 bg-accent/5'
-                            : 'border-transparent hover:border-border/40 hover:bg-canvas/40'
-                        }`}
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${isPrimary
+                          ? 'border-accent/30 bg-accent/5'
+                          : 'border-transparent hover:border-border/40 hover:bg-canvas/40'
+                          }`}
                       >
                         <div className="min-w-0">
                           <span className="font-mono text-body-sm text-ink truncate block">

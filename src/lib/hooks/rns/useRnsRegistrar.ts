@@ -5,7 +5,7 @@ import {
   RNS_QUERY_GC_TIME,
   RNS_QUERY_STALE_TIME,
 } from "@/lib/rns/constants";
-import { normalizeRnsLabel } from "@/lib/rns/utils";
+import { computeRnsFee, normalizeRnsLabel } from "@/lib/rns/utils";
 import { useMemo } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 
@@ -174,11 +174,13 @@ export function useRnsRegistrationQuote(
     },
   });
 
+  const contractFee = (data?.[1]?.result as bigint | undefined) ?? 0n;
+
   return {
     name,
     duration,
     available: data?.[0]?.result === true,
-    price: (data?.[1]?.result as bigint | undefined) ?? 0n,
+    price: computeRnsFee(name, contractFee),
     isLoading,
     error,
     refetch,

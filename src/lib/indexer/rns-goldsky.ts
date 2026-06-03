@@ -22,6 +22,7 @@ type RawRnsDomain = {
   registeredAt: string;
   renewedAt: string | null;
   releasedAt: string | null;
+  createdAtBlock: string;
 };
 
 type RawRnsReverseRecord = {
@@ -43,6 +44,7 @@ export type IndexedRnsDomain = {
   registeredAt: bigint;
   renewedAt: bigint | null;
   releasedAt: bigint | null;
+  createdAtBlock: bigint;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,6 +76,7 @@ function toDomain(raw: RawRnsDomain): IndexedRnsDomain {
     registeredAt: toBigInt(raw.registeredAt),
     renewedAt: toNullableBigInt(raw.renewedAt),
     releasedAt: toNullableBigInt(raw.releasedAt),
+    createdAtBlock: toBigInt(raw.createdAtBlock),
   };
 }
 
@@ -122,6 +125,7 @@ const DOMAIN_FRAGMENT = /* GraphQL */ `
   registeredAt
   renewedAt
   releasedAt
+  createdAtBlock
 `;
 
 /** Fetch one domain by its namehash node (hex). Returns null if not indexed yet. */

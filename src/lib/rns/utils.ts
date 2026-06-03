@@ -1,4 +1,4 @@
-import { DOMAIN_SUFFIX } from "@/lib/rns/constants";
+import { DOMAIN_SUFFIX, RNS_FEE_STANDARD, RNS_MIN_NAME_LENGTH } from "@/lib/rns/constants";
 import { labelhash, namehash } from "viem/ens";
 import type { Hex } from "viem";
 
@@ -26,8 +26,8 @@ export function validateDomainName(name: string): DomainValidationResult {
   if (!name) {
     return { valid: false, error: "Enter a name to search or mint." };
   }
-  if (name.length < 6) {
-    return { valid: false, error: "Names must be at least 6 characters." };
+  if (name.length < RNS_MIN_NAME_LENGTH) {
+    return { valid: false, error: `Names must be at least ${RNS_MIN_NAME_LENGTH} characters.` };
   }
   if (name.length > 32) {
     return { valid: false, error: "Names must be 32 characters or fewer." };
@@ -39,6 +39,20 @@ export function validateDomainName(name: string): DomainValidationResult {
     };
   }
   return { valid: true };
+}
+
+/**
+ * Returns the effective registration fee for a given label.
+ * Takes the higher of the on-chain contract fee and the frontend pricing tier,
+ * so the TX always satisfies the contract's msg.value requirement.
+ *
+ * Pricing tiers (per year):
+ *  5+ chars  → 0.0025 ETH (standard)
+ */
+export function computeRnsFee(label: string, contractFee: bigint): bigint {
+  const len = normalizeRnsLabel(label).length;
+  const tieredFee = len >= RNS_MIN_NAME_LENGTH ? RNS_FEE_STANDARD : 0n;
+  return contractFee > tieredFee ? contractFee : tieredFee;
 }
 
 /**

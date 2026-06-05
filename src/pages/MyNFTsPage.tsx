@@ -1,10 +1,17 @@
 import { Badge } from '@/components/ui/badge';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
 import FallbackImage from '@/components/ui/fallback-image';
 import { NFT_COLLECTION_IMAGES, getExplorerUrl, getNativeTokenLabel } from '@/config';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserOwnedNFTTokens } from '@/lib/hooks/useUserOwnedNFTTokens';
 import { ArrowRight, ExternalLink, Image as ImageIcon, Settings, Wallet } from '@/components/ui/icons';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';
 import { useAccount, useChainId } from 'wagmi';
@@ -22,7 +29,14 @@ const MyNFTsPage: React.FC = () => {
   const chainId = useChainId();
   const explorerUrl = getExplorerUrl(chainId);
   const nativeToken = getNativeTokenLabel(chainId);
-  const [visibleTokenCount, setVisibleTokenCount] = useState(TOKEN_GRID_BATCH_SIZE);
+  const currentAddressKey = address?.toLowerCase() ?? '';
+  const [visibleTokenCursor, setVisibleTokenCursor] = useState({
+    addressKey: '',
+    count: TOKEN_GRID_BATCH_SIZE,
+  });
+  const visibleTokenCount = visibleTokenCursor.addressKey === currentAddressKey
+    ? visibleTokenCursor.count
+    : TOKEN_GRID_BATCH_SIZE;
 
   const {
     tokens,
@@ -60,16 +74,14 @@ const MyNFTsPage: React.FC = () => {
   );
   const hasMoreTokens = visibleTokenCount < tokens.length;
 
-  useEffect(() => {
-    setVisibleTokenCount(TOKEN_GRID_BATCH_SIZE);
-  }, [address]);
-
   if (!isConnected) {
     return (
       <div className="space-y-6">
-        <section className="page-hero-card">
-          <div className="eyebrow">Collectibles</div>
-          <h1 className="ds-h1 mt-2">NFT Portfolio</h1>
+        <section>
+          <h1 className="ds-h1">Collectibles</h1>
+          <p className="text-body text-ink-muted mt-3 max-w-2xl">
+            Track NFT holdings, minted items, and collections created from this wallet.
+          </p>
         </section>
         <div className="glass-card rounded-3xl p-10 text-center space-y-4">
           <div className="w-14 h-14 rounded-full bg-canvas-alt border border-border mx-auto flex items-center justify-center">
@@ -86,32 +98,29 @@ const MyNFTsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <section className="page-hero-card">
-        <div className="eyebrow">Collectibles</div>
-        <h1 className="ds-h1 mt-2">NFT Portfolio</h1>
-        <p className="text-body text-ink-muted mt-3">
+      <section>
+        <h1 className="ds-h1">Collectibles</h1>
+        <p className="text-body text-ink-muted mt-3 max-w-2xl">
           Track NFT holdings, minted items, and collections created from this wallet.
         </p>
       </section>
 
-      <section className="md:hidden rounded-2xl border border-border bg-canvas-alt overflow-hidden">
-        <div className="divide-y divide-border/60">
-          <div className="flex items-center justify-between p-4">
-            <p className="text-label text-ink-faint uppercase">Held Collections</p>
-            <p className="font-display text-display-sm text-ink">{holdings.length}</p>
-          </div>
-          <div className="flex items-center justify-between p-4">
-            <p className="text-label text-ink-faint uppercase">NFTs Held</p>
-            <p className="font-display text-display-sm text-ink">{totalOwned.toString()}</p>
-          </div>
-          <div className="flex items-center justify-between p-4">
-            <p className="text-label text-ink-faint uppercase">Token Items</p>
-            <p className="font-display text-display-sm text-ink">{tokens.length}</p>
-          </div>
-          <div className="flex items-center justify-between p-4">
-            <p className="text-label text-ink-faint uppercase">Created</p>
-            <p className="font-display text-display-sm text-ink">{createdCollections.length}</p>
-          </div>
+      <section className="md:hidden grid grid-cols-2 gap-3">
+        <div className="stat-card rounded-2xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Held Collections</p>
+          <p className="font-display text-[24px] leading-none text-ink mt-3">{holdings.length}</p>
+        </div>
+        <div className="stat-card rounded-2xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">NFTs Held</p>
+          <p className="font-display text-[24px] leading-none text-ink mt-3">{totalOwned.toString()}</p>
+        </div>
+        <div className="stat-card rounded-2xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Token Items</p>
+          <p className="font-display text-[24px] leading-none text-ink mt-3">{tokens.length}</p>
+        </div>
+        <div className="stat-card rounded-2xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Created</p>
+          <p className="font-display text-[24px] leading-none text-ink mt-3">{createdCollections.length}</p>
         </div>
       </section>
 
@@ -157,13 +166,13 @@ const MyNFTsPage: React.FC = () => {
           </Link>
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="flex flex-col gap-10">
           {holdings.length > 0 && (
-            <section className="space-y-4">
+            <section className="order-2 space-y-4">
               <div className="section-head">
                 <div>
                   <div className="eyebrow">Owned collections</div>
-                  <h2 className="ds-h2 mt-1.5">Collection summary</h2>
+                  <h2 className="ds-h2 mt-1.5">Owned collections</h2>
                 </div>
                 <span className="font-mono text-[12px] text-ink-faint">{liveHeldCount} live</span>
               </div>
@@ -208,7 +217,7 @@ const MyNFTsPage: React.FC = () => {
           )}
 
           {tokens.length > 0 && (
-            <section className="space-y-4">
+            <section className="order-3 space-y-4">
               <div className="section-head">
                 <div>
                   <div className="eyebrow">Token items</div>
@@ -299,9 +308,16 @@ const MyNFTsPage: React.FC = () => {
                     type="button"
                     className="btn-secondary inline-flex items-center gap-2"
                     onClick={() =>
-                      setVisibleTokenCount((current) =>
-                        Math.min(current + TOKEN_GRID_BATCH_SIZE, tokens.length)
-                      )
+                      setVisibleTokenCursor((current) => {
+                        const count = current.addressKey === currentAddressKey
+                          ? current.count
+                          : TOKEN_GRID_BATCH_SIZE;
+
+                        return {
+                          addressKey: currentAddressKey,
+                          count: Math.min(count + TOKEN_GRID_BATCH_SIZE, tokens.length),
+                        };
+                      })
                     }
                   >
                     Load more NFTs
@@ -315,81 +331,118 @@ const MyNFTsPage: React.FC = () => {
           )}
 
           {createdCollections.length > 0 && (
-            <section className="space-y-4">
+            <section className="order-1 space-y-4">
               <div className="section-head">
                 <div>
-                  <div className="eyebrow">Creator portfolio</div>
                   <h2 className="ds-h2 mt-1.5">Created collections</h2>
                 </div>
                 <span className="font-mono text-[12px] text-ink-faint">{liveCreatedCount} live</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {createdCollections.map((collection) => {
-                  const statusVariant =
-                    collection.status === 'live'
-                      ? 'live'
-                      : collection.status === 'upcoming'
-                        ? 'upcoming'
-                        : 'closed';
+              <Carousel
+                opts={{
+                  align: 'start',
+                  slidesToScroll: 1,
+                }}
+              >
+                <CarouselContent>
+                  {createdCollections.map((collection) => {
+                    const statusVariant =
+                      collection.status === 'live'
+                        ? 'live'
+                        : collection.status === 'upcoming'
+                          ? 'upcoming'
+                          : 'closed';
 
-                  return (
-                    <div key={collection.address} className="bg-canvas-alt border border-border rounded-2xl p-4 flex gap-4">
-                      <div className="w-20 h-20 rounded-xl bg-canvas border border-border flex items-center justify-center overflow-hidden shrink-0">
-                        <FallbackImage
-                          src={collection.metadataImage}
-                          fallbackSrc={NFT_COLLECTION_IMAGES[collection.address.toLowerCase()]}
-                          alt={collection.name}
-                          className="w-full h-full object-cover"
-                          placeholder={<ImageIcon className="w-5 h-5 text-ink-muted" />}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="font-medium text-ink truncate">{collection.name}</div>
-                            <div className="font-mono text-[11px] text-ink-muted">{collection.symbol}</div>
-                          </div>
-                          <Badge variant={statusVariant}>{collection.status}</Badge>
-                        </div>
+                    return (
+                      <CarouselItem key={collection.address} className="basis-1/2 md:basis-1/3">
+                        <div className="group h-full overflow-hidden rounded-3xl border border-border bg-canvas-alt shadow-sm transition duration-300 hover:-translate-y-1 hover:border-border-strong">
+                          <Link to={`/nfts/${collection.address}`} className="block">
+                            <div className="relative aspect-[4/3] overflow-hidden bg-canvas">
+                              <FallbackImage
+                                src={collection.metadataImage}
+                                fallbackSrc={NFT_COLLECTION_IMAGES[collection.address.toLowerCase()]}
+                                alt={collection.name}
+                                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                placeholder={
+                                  <div className="flex h-full w-full items-center justify-center">
+                                    <ImageIcon className="h-6 w-6 text-ink-muted md:h-8 md:w-8" />
+                                  </div>
+                                }
+                              />
+                              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
+                              <div className="absolute left-3 top-3 md:left-4 md:top-4">
+                                <Badge variant={statusVariant}>{collection.status}</Badge>
+                              </div>
+                            </div>
+                          </Link>
 
-                        <div className="grid grid-cols-2 gap-2 text-[12px]">
-                          <div className="rounded-xl bg-canvas/40 border border-border p-3">
-                            <div className="text-ink-muted">Minted</div>
-                            <div className="font-mono text-ink mt-1">
-                              {collection.totalMinted.toLocaleString()} / {collection.maxSupply.toLocaleString()}
+                          <div className="flex flex-col gap-4 p-3 md:p-5">
+                            <div className="min-w-0">
+                              <Link
+                                to={`/nfts/${collection.address}`}
+                                className="block truncate font-display text-[17px] font-semibold leading-tight text-ink transition hover:text-accent md:text-[20px]"
+                              >
+                                {collection.name}
+                              </Link>
+                              <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted">
+                                {collection.symbol}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 text-[12px] md:grid-cols-2">
+                              <div className="rounded-2xl border border-border bg-canvas/50 p-3">
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                                  Minted
+                                </div>
+                                <div className="mt-1 font-mono text-[12px] text-ink md:text-[13px]">
+                                  {collection.totalMinted.toLocaleString()} / {collection.maxSupply.toLocaleString()}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-border bg-canvas/50 p-3">
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                                  Price
+                                </div>
+                                <div className="mt-1 truncate font-mono text-[12px] text-ink md:text-[13px]">
+                                  {formatMintPrice(collection.mintPrice, nativeToken)}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-auto flex flex-col gap-2 md:flex-row md:flex-wrap">
+                              <Link
+                                to={`/nfts/manage/${collection.address}`}
+                                className="btn-secondary btn-sm inline-flex items-center justify-center gap-1.5"
+                              >
+                                <Settings className="h-3.5 w-3.5" />
+                                Manage
+                              </Link>
+                              <Link
+                                to={`/nfts/${collection.address}`}
+                                className="btn-ghost btn-sm inline-flex items-center justify-center"
+                              >
+                                View
+                              </Link>
+                              <a
+                                href={`${explorerUrl}/address/${collection.address}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn-ghost btn-sm inline-flex items-center justify-center gap-1.5"
+                              >
+                                Explorer <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
                             </div>
                           </div>
-                          <div className="rounded-xl bg-canvas/40 border border-border p-3">
-                            <div className="text-ink-muted">Mint price</div>
-                            <div className="font-mono text-ink mt-1">
-                              {formatMintPrice(collection.mintPrice, nativeToken)}
-                            </div>
-                          </div>
                         </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <Link to={`/nfts/manage/${collection.address}`} className="btn-secondary btn-sm inline-flex items-center gap-1.5">
-                            <Settings className="w-3.5 h-3.5" />
-                            Manage
-                          </Link>
-                          <a
-                            href={`${explorerUrl}/address/${collection.address}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn-ghost btn-sm inline-flex items-center gap-1.5"
-                          >
-                            Explorer <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                          <Link to={`/nfts/${collection.address}`} className="btn-ghost btn-sm">
-                            View
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                      </CarouselItem>
+                    );
+                  })}
+                </CarouselContent>
+                <div className="mt-4 flex justify-end gap-2">
+                  <CarouselPrevious className="static h-9 w-9 translate-x-0 translate-y-0" />
+                  <CarouselNext className="static h-9 w-9 translate-x-0 translate-y-0" />
+                </div>
+              </Carousel>
             </section>
           )}
         </div>

@@ -207,20 +207,6 @@ const PresalesPage: React.FC = () => {
     [unifiedLaunches, featured]
   );
 
-  const totalLive = useMemo(
-    () =>
-      presales.filter((p) => p.status === 'live').length +
-      nftDeployments.filter((d) => d.status === 'live').length,
-    [presales, nftDeployments]
-  );
-  const totalUpcoming = useMemo(
-    () =>
-      presales.filter((p) => p.status === 'upcoming').length +
-      nftDeployments.filter((d) => d.status === 'upcoming').length,
-    [presales, nftDeployments]
-  );
-  const totalProjects = presales.length + nftDeployments.length;
-
   const isLoading = (typeFilter !== 'nft' && isPresalesLoading) || (typeFilter !== 'token' && isNFTLoading);
   const hasAnyResult = unifiedLaunches.length > 0;
 
@@ -230,20 +216,13 @@ const PresalesPage: React.FC = () => {
       <section>
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">
-            <div className="eyebrow">Launchpad</div>
-            <h1 className="ds-h1 mt-2">
+            <h1 className="ds-h1">
               The launch layer for{' '}
               <span style={{ color: 'rgb(var(--color-accent))' }}>RISE</span>
             </h1>
             <p className="text-ink-muted mt-3 text-[15px] leading-relaxed">
-              Discover and back the next generation of projects shipping on RISE. Audited contracts,
-              transparent vesting, instant claims.
+              Discover and back the next generation of projects shipping on RISE.
             </p>
-          </div>
-          <div className="flex flex-wrap items-start gap-x-8 gap-y-4 ml-auto">
-            <HeroStat label="Live now" value={String(totalLive)} />
-            <HeroStat label="Upcoming" value={String(totalUpcoming)} />
-            <HeroStat label="Projects" value={String(totalProjects)} />
           </div>
         </div>
       </section>
@@ -397,15 +376,6 @@ const PresalesPage: React.FC = () => {
     </div>
   );
 };
-
-const HeroStat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div>
-    <div className="eyebrow">{label}</div>
-    <div className="font-display font-bold mt-1.5 text-ink" style={{ fontSize: 28, letterSpacing: '-0.01em' }}>
-      {value}
-    </div>
-  </div>
-);
 
 function formatRate(rate: bigint | undefined): string {
   if (!rate || rate <= 0n) return '—';

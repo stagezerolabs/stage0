@@ -774,7 +774,7 @@ const HomePage: React.FC = () => {
                                     </div>
                                   )}
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-canvas-alt to-transparent" />
+                                <div className="featured-launch-card-image-overlay" />
                                 {/* Status badge */}
                                 <span className={`status-pill featured-launch-status-pill absolute top-5 right-5 ${isLive
                                     ? 'featured-launch-status-pill-live'
@@ -792,15 +792,10 @@ const HomePage: React.FC = () => {
                                   }`}>
                                   {item.type === 'nft' ? 'NFT' : 'Token'}
                                 </span>
-                                {isPinned && (
-                                  <span className="absolute top-5 left-5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-accent/90 text-accent-foreground border border-accent/20 shadow-lg flex items-center gap-1">
-                                    <Pin className="w-3 h-3" /> Pinned
-                                  </span>
-                                )}
                               </div>
 
                               {/* Launch Details */}
-                              <div className="p-8 pt-4 flex-1 flex flex-col justify-between space-y-6 relative z-10">
+                              <div className="featured-launch-card-body p-8 pt-4 flex-1 flex flex-col justify-between space-y-6 relative z-10">
                                 <div>
                                   <h3 className="font-display text-2xl font-bold text-ink">{item.name}</h3>
                                   <p className="text-sm font-semibold text-accent mt-1">${item.symbol}</p>

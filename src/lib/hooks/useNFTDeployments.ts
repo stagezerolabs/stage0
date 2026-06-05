@@ -9,6 +9,7 @@ import {
   normalizeContractURI,
 } from '@/lib/utils/ipfs';
 import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
+import { isBlacklistedNFTCollection } from '@/lib/utils/nft-collection-blacklist';
 import {
   getNFTSalePhase,
   getNFTSaleStatus,
@@ -289,6 +290,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
       .reverse()
       .map(normalizeCollectionInfo)
       .filter((entry): entry is CollectionInfo => entry !== null)
+      .filter((entry) => !isBlacklistedNFTCollection(entry))
       .map(toDeployment);
   }, [chainRaw]);
 

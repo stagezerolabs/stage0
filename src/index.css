@@ -2885,6 +2885,30 @@
   -webkit-backface-visibility: hidden;
 }
 
+.featured-launch-card-image-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  background: linear-gradient(to top, rgb(var(--color-canvas-alt)), transparent);
+}
+
+:root[data-theme='dark'] .featured-launch-card-image-overlay {
+  display: block;
+}
+
+:root[data-theme='light'] .featured-launch-card-media {
+  border-bottom: 1px solid rgb(var(--color-border));
+}
+
+:root[data-theme='light'] .featured-launch-card-body {
+  background: rgb(var(--color-canvas-alt));
+}
+
+:root[data-theme='light'] .featured-launch-card-surface {
+  background-image: none;
+}
+
 .footer-wordmark {
   display: block;
   width: 126px;

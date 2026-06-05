@@ -1,4 +1,11 @@
 import { Badge } from '@/components/ui/badge';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
 import FallbackImage from '@/components/ui/fallback-image';
 import {
   LaunchpadPresaleContract,
@@ -306,7 +313,7 @@ const Dashboard: React.FC = () => {
   const createdAssetsCount = createdTokenList.length + createdPresales.length + myNFTDeployments.length;
 
   return (
-    <div className="space-y-10">
+    <div className="flex flex-col gap-10">
       {/* Wallet hero */}
       <section>
         <div className="wallet-header">
@@ -384,116 +391,250 @@ const Dashboard: React.FC = () => {
         />
       </section>
 
-      {/* My Names */}
-      <section>
+      {/* Identity + Builder carousel */}
+      <section className="order-4 space-y-6">
         <div className="section-head">
           <div>
-            <div className="eyebrow">Identity</div>
-            <h2 className="ds-h2 mt-1.5">My Names</h2>
+            <div className="eyebrow">Builder</div>
+            <h2 className="ds-h2 mt-1.5">My creations</h2>
           </div>
-          <Link to="/domains" className="btn-ghost btn-sm inline-flex">
-            Manage names <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Link>
         </div>
 
         {!isConnected ? (
-          <ConnectWalletPlaceholder message="Connect your wallet to see your .rise names." />
-        ) : isDomainsLoading ? (
-          <div className="bg-canvas-alt border border-border rounded-3xl p-8 text-center text-ink-muted text-sm">
-            Loading names…
-          </div>
-        ) : domainsToDisplay.length === 0 ? (
-          <div className="bg-canvas-alt border border-border rounded-3xl p-10 text-center">
-            <Globe className="w-5 h-5 mx-auto mb-3 text-ink-faint" />
-            <p className="text-ink-muted text-sm mb-4">You don't own any .rise names yet.</p>
-            <Link to="/domains" className="btn-secondary btn-sm inline-flex">
-              Register a name <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Link>
-          </div>
+          <ConnectWalletPlaceholder message="Connect your wallet to manage names, created tokens, launches, and locks." />
         ) : (
-          <div className="bg-canvas-alt border border-border rounded-3xl overflow-hidden">
-            {domainsToDisplay.map((domain, i) => {
-              const label = domain.label || '';
-              // Determine if this domain is the active primary. If none is stored,
-              // the first domain is the implicit primary.
-              const effectivePrimary = primaryLabel ?? (domainsToDisplay[0].label || '');
-              const isPrimary = label !== '' && label === effectivePrimary;
-              const expiryDate = domain.expiry
-                ? new Date(Number(domain.expiry) * 1000).toLocaleDateString(undefined, {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                })
-                : '—';
-              const isLastItem = i === domainsToDisplay.length - 1;
-              return (
-                <div
-                  key={domain.node}
-                  className={`flex items-center justify-between gap-4 px-6 py-4 ${!isLastItem ? 'border-b border-border/50' : ''
-                    }`}
+          <DashboardCarousel>
+            <CreationCard
+              eyebrow="ERC-20"
+              title="Created tokens"
+              count={isTokensLoading ? '…' : String(createdTokenList.length)}
+              accent="rgb(var(--color-accent))"
+              empty={
+                isTokensLoading && createdTokenList.length === 0
+                  ? 'Loading tokens…'
+                  : createdTokenList.length === 0
+                    ? "You haven't deployed a token yet."
+                    : null
+              }
+              cta={{
+                label: createdTokenList.length > 0 ? 'Manage tokens' : 'Create token',
+                to: createdTokenList.length > 0 ? '/tokens' : isAdmin ? '/create/token' : '/tools',
+              }}
+            >
+              {createdTokenList.slice(0, 5).map((token) => (
+                <Link
+                  key={token.address}
+                  to="/tokens"
+                  className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
                 >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span className="w-7 h-7 rounded-md overflow-hidden bg-accent/10 flex items-center justify-center shrink-0">
+                      <FallbackImage
+                        src={token.imageUrl}
+                        alt={`${token.symbol} token image`}
+                        className="w-full h-full object-cover"
+                        placeholder={
+                          <span className="font-mono text-[11px] font-bold uppercase text-accent">
+                            {token.symbol.slice(0, 2)}
+                          </span>
+                        }
+                      />
+                    </span>
+                    <span className="font-medium text-[13px] text-ink truncate">{token.symbol}</span>
+                  </span>
+                  <span className="font-mono text-[11px] text-ink-faint shrink-0">
+                    {shortenAddress(token.address)}
+                  </span>
+                </Link>
+              ))}
+            </CreationCard>
+
+            <CreationCard
+              eyebrow="Presales"
+              title="Created launches"
+              count={isPresalesLoading ? '…' : String(createdPresales.length)}
+              accent="rgb(var(--color-accent-secondary))"
+              empty={
+                isPresalesLoading && createdPresales.length === 0
+                  ? 'Loading launches…'
+                  : createdPresales.length === 0
+                    ? 'Launch your next presale or manage existing ones.'
+                    : null
+              }
+              cta={{
+                label: createdPresales.length > 0 ? 'Create another' : 'Create launch',
+                to: isAdmin ? '/create/presale' : '/tools',
+              }}
+            >
+              {createdPresales.slice(0, 5).map((presale) => {
+                const statusVariant =
+                  presale.status === 'live'
+                    ? 'live'
+                    : presale.status === 'upcoming'
+                      ? 'upcoming'
+                      : 'closed';
+                const symbol = presale.saleTokenSymbol ?? 'TKN';
+                return (
                   <Link
-                    to={`/domains?q=${label}`}
-                    className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+                    key={presale.address}
+                    to={`/presales/manage/${presale.address}`}
+                    className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
                   >
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ background: 'rgb(var(--color-accent) / 0.12)' }}
+                    <span className="flex items-center gap-3 min-w-0">
+                      <span
+                        className="w-7 h-7 rounded-md flex items-center justify-center font-mono text-[11px] font-bold uppercase shrink-0"
+                        style={{
+                          background: 'rgb(var(--color-accent-secondary) / 0.14)',
+                          color: 'rgb(var(--color-accent-secondary))',
+                        }}
+                      >
+                        {symbol.slice(0, 2)}
+                      </span>
+                      <span className="font-medium text-[13px] text-ink truncate">{symbol}</span>
+                    </span>
+                    <Badge variant={statusVariant}>{presale.status}</Badge>
+                  </Link>
+                );
+              })}
+            </CreationCard>
+
+            <CreationCard
+              eyebrow="Timelock"
+              title="Token locks"
+              count={isLocksLoading ? '…' : String(myLocks.length)}
+              accent="rgb(var(--color-accent-violet))"
+              empty={
+                isLocksLoading && myLocks.length === 0
+                  ? 'Loading locks…'
+                  : myLocks.length === 0
+                    ? 'No token locks yet.'
+                    : null
+              }
+              cta={{
+                label: myLocks.length > 0 ? 'Manage locks' : 'Create lock',
+                to: isAdmin ? '/tools/token-locker' : '/tools',
+              }}
+            >
+              {myLocks.slice(0, 5).map((lock) => {
+                const secondsUntilUnlock = Number(lock.unlockDate) - nowSec;
+                const isUnlockable = !lock.withdrawn && secondsUntilUnlock <= 0;
+                const timerLabel = lock.withdrawn
+                  ? 'Withdrawn'
+                  : isUnlockable
+                    ? 'Ready'
+                    : formatCountdownFromSeconds(secondsUntilUnlock);
+
+                return (
+                  <Link
+                    key={lock.id.toString()}
+                    to={`/locks/${lock.id.toString()}`}
+                    className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-[13px] text-ink">
+                        {lock.name?.trim() ? lock.name : `Lock #${lock.id.toString()}`}
+                      </span>
+                      <span className="block truncate font-mono text-[11px] text-ink-muted mt-0.5">
+                        {formatLockAmount(lock.formattedAmount)} {lock.tokenSymbol}
+                      </span>
+                    </span>
+                    <span
+                      className={`font-mono text-[11px] whitespace-nowrap uppercase tracking-wider shrink-0 ${lock.withdrawn
+                        ? 'text-ink-faint'
+                        : isUnlockable
+                          ? 'text-status-live'
+                          : 'text-status-upcoming'
+                        }`}
                     >
-                      <Globe className="w-4 h-4" style={{ color: 'rgb(var(--color-accent))' }} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-[14px] text-ink truncate">
+                      {timerLabel}
+                    </span>
+                  </Link>
+                );
+              })}
+            </CreationCard>
+
+            <CreationCard
+              eyebrow="Identity"
+              title="My Names"
+              count={isDomainsLoading ? '…' : String(domainsToDisplay.length)}
+              accent="rgb(var(--color-accent-sky))"
+              empty={
+                isDomainsLoading && domainsToDisplay.length === 0
+                  ? 'Loading names…'
+                  : domainsToDisplay.length === 0
+                    ? "You don't own any .rise names yet."
+                    : null
+              }
+              cta={{
+                label: domainsToDisplay.length > 0 ? 'Manage names' : 'Register a name',
+                to: '/domains',
+              }}
+            >
+              {domainsToDisplay.slice(0, 5).map((domain) => {
+                const label = domain.label || '';
+                const effectivePrimary = primaryLabel ?? (domainsToDisplay[0].label || '');
+                const isPrimary = label !== '' && label === effectivePrimary;
+                const expiryDate = domain.expiry
+                  ? new Date(Number(domain.expiry) * 1000).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })
+                  : '—';
+
+                return (
+                  <div
+                    key={domain.node}
+                    className="flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0"
+                  >
+                    <Link
+                      to={`/domains?q=${label}`}
+                      className="flex items-center gap-3 min-w-0 flex-1 hover:text-accent transition-colors"
+                    >
+                      <span
+                        className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+                        style={{ background: 'rgb(var(--color-accent-sky) / 0.14)' }}
+                      >
+                        <Globe className="w-3.5 h-3.5" style={{ color: 'rgb(var(--color-accent-sky))' }} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-medium text-[13px] text-ink truncate">
                           {label || <span className="text-ink-muted font-mono text-[12px]">{domain.node.slice(0, 10)}…</span>}
                           {label && <span className="text-ink-muted">.rise</span>}
                         </span>
-                        {isPrimary && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
-                            style={{ background: 'rgb(var(--color-accent) / 0.12)', color: 'rgb(var(--color-accent))' }}>
-                            <Star className="w-2.5 h-2.5" />
-                            main
-                          </span>
-                        )}
-                      </div>
-                      <div className="font-mono text-[11px] text-ink-muted">Expires {expiryDate}</div>
-                    </div>
-                  </Link>
-                  {!isPrimary && label && (
-                    <button
-                      type="button"
-                      onClick={() => handleSetPrimary(label)}
-                      className="text-[11px] font-medium text-ink-muted hover:text-accent transition-colors shrink-0 flex items-center gap-1"
-                      title={`Set ${label}.rise as primary identity`}
-                    >
-                      <Star className="w-3 h-3" />
-                    </button>
-                  )}
-                  {isPrimary && (
-                    <ArrowRight className="w-4 h-4 text-ink-faint shrink-0 pointer-events-none" />
-                  )}
-                </div>
-              );
-            })}
-            {domainsToDisplay.length > 0 && (
-              <div className="px-6 py-3 border-t border-border/50 flex items-center justify-between">
-                <span className="text-[12px] text-ink-muted">
-                  {domainsToDisplay.length} name{domainsToDisplay.length !== 1 ? 's' : ''} registered
-                </span>
-                <Link
-                  to="/domains"
-                  className="text-[12px] font-medium text-accent hover:text-accent/80 transition-colors"
-                >
-                  Register another →
-                </Link>
-              </div>
-            )}
-          </div>
+                        <span className="block font-mono text-[11px] text-ink-muted mt-0.5">
+                          Expires {expiryDate}
+                        </span>
+                      </span>
+                    </Link>
+                    {!isPrimary && label ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSetPrimary(label)}
+                        className="text-[11px] font-medium text-ink-muted hover:text-accent transition-colors shrink-0 flex items-center gap-1"
+                        title={`Set ${label}.rise as primary identity`}
+                      >
+                        <Star className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0"
+                        style={{ background: 'rgb(var(--color-accent-sky) / 0.14)', color: 'rgb(var(--color-accent-sky))' }}
+                      >
+                        <Star className="w-2.5 h-2.5" />
+                        main
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </CreationCard>
+          </DashboardCarousel>
         )}
       </section>
 
       {/* Allocations */}
-      <section>
+      <section className="order-3">
         <div className="section-head">
           <div>
             <div className="eyebrow">My positions</div>
@@ -683,173 +824,6 @@ const Dashboard: React.FC = () => {
         )}
       </section>
 
-      {/* My creations + NFT holdings */}
-      <section className="space-y-6">
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Builder</div>
-            <h2 className="ds-h2 mt-1.5">My creations</h2>
-          </div>
-        </div>
-
-        {!isConnected ? (
-          <ConnectWalletPlaceholder message="Connect your wallet to manage your created tokens, launches, and locks." />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {/* Created Tokens */}
-            <CreationCard
-              eyebrow="ERC-20"
-              title="Created tokens"
-              count={isTokensLoading ? '…' : String(createdTokenList.length)}
-              accent="rgb(var(--color-accent))"
-              empty={
-                isTokensLoading && createdTokenList.length === 0
-                  ? 'Loading tokens…'
-                  : createdTokenList.length === 0
-                    ? "You haven't deployed a token yet."
-                    : null
-              }
-              cta={{
-                label: createdTokenList.length > 0 ? 'Manage tokens' : 'Create token',
-                to: createdTokenList.length > 0 ? '/tokens' : isAdmin ? '/create/token' : '/tools',
-              }}
-            >
-              {createdTokenList.slice(0, 5).map((token) => (
-                <Link
-                  key={token.address}
-                  to="/tokens"
-                  className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <span className="w-7 h-7 rounded-md overflow-hidden bg-accent/10 flex items-center justify-center shrink-0">
-                      <FallbackImage
-                        src={token.imageUrl}
-                        alt={`${token.symbol} token image`}
-                        className="w-full h-full object-cover"
-                        placeholder={
-                          <span className="font-mono text-[11px] font-bold uppercase text-accent">
-                            {token.symbol.slice(0, 2)}
-                          </span>
-                        }
-                      />
-                    </span>
-                    <span className="font-medium text-[13px] text-ink truncate">{token.symbol}</span>
-                  </span>
-                  <span className="font-mono text-[11px] text-ink-faint shrink-0">
-                    {shortenAddress(token.address)}
-                  </span>
-                </Link>
-              ))}
-            </CreationCard>
-
-            {/* Created Launches */}
-            <CreationCard
-              eyebrow="Presales"
-              title="Created launches"
-              count={isPresalesLoading ? '…' : String(createdPresales.length)}
-              accent="rgb(var(--color-accent-secondary))"
-              empty={
-                isPresalesLoading && createdPresales.length === 0
-                  ? 'Loading launches…'
-                  : createdPresales.length === 0
-                    ? 'Launch your next presale or manage existing ones.'
-                    : null
-              }
-              cta={{
-                label: createdPresales.length > 0 ? 'Create another' : 'Create launch',
-                to: isAdmin ? '/create/presale' : '/tools',
-              }}
-            >
-              {createdPresales.slice(0, 5).map((presale) => {
-                const statusVariant =
-                  presale.status === 'live'
-                    ? 'live'
-                    : presale.status === 'upcoming'
-                      ? 'upcoming'
-                      : 'closed';
-                const symbol = presale.saleTokenSymbol ?? 'TKN';
-                return (
-                  <Link
-                    key={presale.address}
-                    to={`/presales/manage/${presale.address}`}
-                    className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
-                  >
-                    <span className="flex items-center gap-3 min-w-0">
-                      <span
-                        className="w-7 h-7 rounded-md flex items-center justify-center font-mono text-[11px] font-bold uppercase shrink-0"
-                        style={{
-                          background: 'rgb(var(--color-accent-secondary) / 0.14)',
-                          color: 'rgb(var(--color-accent-secondary))',
-                        }}
-                      >
-                        {symbol.slice(0, 2)}
-                      </span>
-                      <span className="font-medium text-[13px] text-ink truncate">{symbol}</span>
-                    </span>
-                    <Badge variant={statusVariant}>{presale.status}</Badge>
-                  </Link>
-                );
-              })}
-            </CreationCard>
-
-            {/* Token Locks */}
-            <CreationCard
-              eyebrow="Timelock"
-              title="Token locks"
-              count={isLocksLoading ? '…' : String(myLocks.length)}
-              accent="rgb(var(--color-accent-violet))"
-              empty={
-                isLocksLoading && myLocks.length === 0
-                  ? 'Loading locks…'
-                  : myLocks.length === 0
-                    ? 'No token locks yet.'
-                    : null
-              }
-              cta={{
-                label: myLocks.length > 0 ? 'Manage locks' : 'Create lock',
-                to: isAdmin ? '/tools/token-locker' : '/tools',
-              }}
-            >
-              {myLocks.slice(0, 5).map((lock) => {
-                const secondsUntilUnlock = Number(lock.unlockDate) - nowSec;
-                const isUnlockable = !lock.withdrawn && secondsUntilUnlock <= 0;
-                const timerLabel = lock.withdrawn
-                  ? 'Withdrawn'
-                  : isUnlockable
-                    ? 'Ready'
-                    : formatCountdownFromSeconds(secondsUntilUnlock);
-
-                return (
-                  <Link
-                    key={lock.id.toString()}
-                    to={`/locks/${lock.id.toString()}`}
-                    className="group flex items-center justify-between gap-3 py-2 border-b border-border/40 last:border-b-0 hover:text-accent transition-colors"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-[13px] text-ink">
-                        {lock.name?.trim() ? lock.name : `Lock #${lock.id.toString()}`}
-                      </span>
-                      <span className="block truncate font-mono text-[11px] text-ink-muted mt-0.5">
-                        {formatLockAmount(lock.formattedAmount)} {lock.tokenSymbol}
-                      </span>
-                    </span>
-                    <span
-                      className={`font-mono text-[11px] whitespace-nowrap uppercase tracking-wider shrink-0 ${lock.withdrawn
-                        ? 'text-ink-faint'
-                        : isUnlockable
-                          ? 'text-status-live'
-                          : 'text-status-upcoming'
-                        }`}
-                    >
-                      {timerLabel}
-                    </span>
-                  </Link>
-                );
-              })}
-            </CreationCard>
-          </div>
-        )}
-      </section>
     </div>
   );
 };
@@ -874,6 +848,28 @@ const StatTile: React.FC<StatTileProps> = ({ label, value, meta, icon, tint, tin
   </div>
 );
 
+const DashboardCarousel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Carousel
+    opts={{
+      align: 'start',
+      slidesToScroll: 1,
+    }}
+    className="dashboard-carousel"
+  >
+    <CarouselContent>
+      {React.Children.toArray(children).map((child, index) => (
+        <CarouselItem key={index} className="basis-full md:basis-1/3">
+          <div className="h-full">{child}</div>
+        </CarouselItem>
+      ))}
+    </CarouselContent>
+    <div className="mt-4 flex justify-end gap-2">
+      <CarouselPrevious className="static translate-x-0 translate-y-0" />
+      <CarouselNext className="static translate-x-0 translate-y-0" />
+    </div>
+  </Carousel>
+);
+
 type CreationCardProps = {
   eyebrow: string;
   title: string;
@@ -885,7 +881,7 @@ type CreationCardProps = {
 };
 
 const CreationCard: React.FC<CreationCardProps> = ({ eyebrow, title, count, accent, empty, cta, children }) => (
-  <div className="relative bg-canvas-alt border border-border rounded-3xl p-5 flex flex-col gap-4 overflow-hidden">
+  <div className="relative bg-canvas-alt border border-border rounded-3xl p-5 flex h-full flex-col gap-4 overflow-hidden">
     <div
       aria-hidden
       className="absolute top-0 left-5 h-[3px] w-10 rounded-b-full"

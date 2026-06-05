@@ -129,7 +129,7 @@ const Tools: React.FC = () => {
           Create & Manage
         </h1>
         <p className="text-body-lg text-ink-muted max-w-2xl">
-          Deploy premium NFT collections natively on RISE Testnet.
+          Create NFT drops on RISE.
         </p>
       </motion.section>
 

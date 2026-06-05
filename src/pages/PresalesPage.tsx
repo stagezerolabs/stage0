@@ -9,7 +9,7 @@ import { NFT_COLLECTION_IMAGES } from '@/config';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import FallbackImage from '@/components/ui/fallback-image';
 import { resolveNFTSaleCountdown } from '@/lib/utils/nft-sales';
-import { ArrowRight, Loader2, Search } from 'lucide-react';
+import { ArrowRight, Loader2, Search } from '@/components/ui/icons';
 
 type StatusFilter = 'all' | 'live' | 'upcoming' | 'ended';
 type TypeFilter = 'all' | 'token' | 'nft';

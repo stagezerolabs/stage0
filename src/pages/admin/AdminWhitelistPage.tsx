@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isAddress, type Address } from 'viem';
 import { toast } from 'sonner';
-import { ArrowLeft, ShieldCheck, ShieldX, UserPlus, UserMinus } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, ShieldX, UserPlus, UserMinus } from '@/components/ui/icons';
 import { useWhitelistedCreator } from '@/lib/hooks/useWhitelistedCreator';
 import { useRemoveWhitelistedCreator, useSetWhitelistedCreator } from '@/lib/hooks/useAdminActions';
 

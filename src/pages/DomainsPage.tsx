@@ -32,7 +32,7 @@ import {
   Trash2,
   Wallet,
   X,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { formatEther } from 'viem';

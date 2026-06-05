@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAccount, useReadContract } from 'wagmi';
 import { formatUnits, type Address } from 'viem';
 import { toast } from 'sonner';
-import { ArrowLeft, ExternalLink, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, ExternalLink, RefreshCcw } from '@/components/ui/icons';
 import { LaunchpadPresaleContract } from '@/config';
 import { useLaunchpadPresales, type PresaleWithStatus } from '@/lib/hooks/useLaunchpadPresales';
 import { useUpdatePresaleFees } from '@/lib/hooks/useAdminActions';

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { formatUnits, isAddress, type Address } from 'viem';
 import { toast } from 'sonner';
-import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from '@/components/ui/icons';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useSetFeeRecipient, useSetNFTFactoryProceedsFeeBps } from '@/lib/hooks/useAdminActions';

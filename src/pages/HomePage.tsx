@@ -30,7 +30,7 @@ import {
   TrendingUp,
   Users,
   Wallet,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';

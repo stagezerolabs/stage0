@@ -31,7 +31,7 @@ import {
   Coins,
   FileText,
   Trash2,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 const containerVariants = {
   hidden: { opacity: 0 },

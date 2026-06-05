@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, Globe, Lock, Sliders, Send, Image, ArrowRight } from 'lucide-react';
+import { DollarSign, Globe, Lock, Sliders, Send, Image, ArrowRight } from '@/components/ui/icons';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import type { Address } from 'viem';

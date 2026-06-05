@@ -13,7 +13,7 @@ import {
   ArrowRightLeft,
   Loader2,
   User,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { TokenLocker, erc20Abi } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 

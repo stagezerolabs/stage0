@@ -3,7 +3,7 @@ import FallbackImage from '@/components/ui/fallback-image';
 import { NFT_COLLECTION_IMAGES, getExplorerUrl, getNativeTokenLabel } from '@/config';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserOwnedNFTTokens } from '@/lib/hooks/useUserOwnedNFTTokens';
-import { ArrowRight, ExternalLink, Image as ImageIcon, Settings, Wallet } from 'lucide-react';
+import { ArrowRight, ExternalLink, Image as ImageIcon, Settings, Wallet } from '@/components/ui/icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';

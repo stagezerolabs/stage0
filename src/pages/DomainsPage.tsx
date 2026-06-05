@@ -32,7 +32,7 @@ import {
   ArrowRight,
   History,
   Star,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },

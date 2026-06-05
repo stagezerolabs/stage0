@@ -28,7 +28,7 @@ import {
   ExternalLink,
   Settings,
   ShieldAlert,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 const containerVariants = {
   hidden: { opacity: 0 },

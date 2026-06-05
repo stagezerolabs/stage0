@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from '@/components/ui/icons';
 
 type Status = 'Live' | 'Closed' | 'Upcoming';
 

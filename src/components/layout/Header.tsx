@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount, useConnect, useConnectors } from 'wagmi';
-import { AlertTriangle, Menu, Moon, Sun, Wallet, X } from 'lucide-react';
+import { AlertTriangle, Menu, Moon, Sun, Wallet, X } from '@/components/ui/icons';
 import { RISE_CONNECTOR_ID } from '@/config';
 import { useIsAdmin } from '@/lib/utils/admin';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';

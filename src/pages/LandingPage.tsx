@@ -1,7 +1,7 @@
 import ProjectCard from '@/components/ProjectCard';
 import stage0Logo from '@/assets/STAGE0.png';
 import { motion } from 'framer-motion';
-import { Rocket, Zap, Shield } from 'lucide-react';
+import { Rocket, Zap, Shield } from '@/components/ui/icons';
 import React from 'react';
 
 const projects = [

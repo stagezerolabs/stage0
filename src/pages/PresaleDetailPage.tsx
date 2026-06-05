@@ -30,7 +30,7 @@ import {
   Info,
   AlertTriangle,
   Shield,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 const containerVariants = {
   hidden: { opacity: 0 },

@@ -15,7 +15,7 @@ import {
   Layers,
   Loader2,
   Upload,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { format, isSameDay, setHours, setMinutes, startOfDay } from 'date-fns';
 import { toast } from 'sonner';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';

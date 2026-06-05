@@ -20,7 +20,7 @@ import {
   Loader2,
   Shield,
   Users,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { NFTCollectionContract, NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import {

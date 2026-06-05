@@ -16,7 +16,7 @@ import {
   Info,
   Image as ImageIcon,
   Upload,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { Link, useSearchParams } from 'react-router-dom';
 import FallbackImage from '@/components/ui/fallback-image';
 import { contractUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';

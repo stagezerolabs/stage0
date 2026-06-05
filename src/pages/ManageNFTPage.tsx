@@ -12,7 +12,7 @@ import {
 } from 'wagmi';
 import { formatEther, isAddress, parseEther, type Address } from 'viem';
 import { toast } from 'sonner';
-import { ArrowLeft, ExternalLink, Loader2, Wallet } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Wallet } from '@/components/ui/icons';
 import { NFT_COLLECTION_IMAGES, NFTCollectionContract, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';

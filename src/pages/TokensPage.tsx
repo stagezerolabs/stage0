@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAccount, useChainId, useReadContracts } from 'wagmi';
-import { Copy, ExternalLink, Image as ImageIcon, Package, Plus, Trash2, X } from 'lucide-react';
+import { Copy, ExternalLink, Image as ImageIcon, Package, Plus, Trash2, X } from '@/components/ui/icons';
 import { erc20Abi, getExplorerUrl } from '@/config';
 import { formatUnits, isAddress, type Address } from 'viem';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';

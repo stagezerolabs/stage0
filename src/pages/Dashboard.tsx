@@ -29,7 +29,7 @@ import {
   Package,
   Star,
   Wallet,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';

@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   Image as ImageIcon,
   Upload,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { useBlockchainStore } from '@/lib/store/blockchain-store';
 import FallbackImage from '@/components/ui/fallback-image';

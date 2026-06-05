@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useChainId } from 'wagmi';
+import { RefreshCcw, Send, X } from '@/components/ui/icons';
 
 type CopilotCard = {
   title: string;
@@ -296,10 +297,7 @@ const AICopilot: React.FC = () => {
                 title="New chat"
                 onClick={startNewChat}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 12a9 9 0 1 0 9-9" />
-                  <path d="M3 4v5h5" />
-                </svg>
+                <RefreshCcw className="h-4 w-4" />
               </button>
               <button
                 type="button"
@@ -307,9 +305,7 @@ const AICopilot: React.FC = () => {
                 title="Close"
                 onClick={() => setChatOpen(false)}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
+                <X className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -389,10 +385,7 @@ const AICopilot: React.FC = () => {
               />
             </div>
             <button type="button" className="ai-send" onClick={() => send()} disabled={!input.trim() || typing} aria-label="Send message">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 2 11 13" />
-                <path d="M22 2l-7 20-4-9-9-4 20-7z" />
-              </svg>
+              <Send className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -405,9 +398,7 @@ const AICopilot: React.FC = () => {
         aria-label={chatOpen ? 'Close Senna' : 'Open Senna'}
       >
         {chatOpen ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+          <X className="h-[22px] w-[22px]" />
         ) : (
           <SennaGlyph className="h-[26px] w-[26px]" />
         )}

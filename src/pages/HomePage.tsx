@@ -26,7 +26,6 @@ import {
   Rocket,
   Search,
   Send,
-  Sliders,
   TrendingUp,
   Users,
   Wallet,
@@ -177,7 +176,7 @@ const itemVariants = {
 
 const creatorTools = [
   { title: 'NFT Launch', icon: ImageIcon, href: '/create/nft', description: 'Deploy and manage NFT collections with whitelist and public mint support.', enabledForAll: true },
-  { title: 'Token Launch', icon: Sliders, href: '/create/presale', description: 'Run presales and fair launches with flexible configurations.', enabledForAll: false },
+  { title: 'Token Launch', icon: Rocket, href: '/create/presale', description: 'Run presales and fair launches with flexible configurations.', enabledForAll: false },
   { title: 'Create Token', icon: DollarSign, href: '/create/token', description: 'Deploy a token contract with custom supply and parameters.', enabledForAll: false },
   { title: 'Locker', icon: Lock, href: '/tools/token-locker', description: 'Lock tokens or liquidity to secure assets onchain.', enabledForAll: false },
   { title: 'Distribution', icon: Send, href: '/tools/airdrop', description: 'Send tokens to multiple wallets in a single transaction.', enabledForAll: false },
@@ -830,9 +829,6 @@ const HomePage: React.FC = () => {
           className="space-y-14 py-12 md:py-16"
         >
           <div className="mx-auto max-w-2xl text-center space-y-4">
-            <div className="inline-flex items-center rounded-full border border-border/70 bg-canvas-alt/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
-              Three steps
-            </div>
             <h2 className="font-display text-3xl md:text-5xl text-ink">How Stage0 Works</h2>
             <p className="text-lg text-ink-muted">
               Launching and participating in early-stage projects on RISE is simple. Stage0 provides the infrastructure for token launches, NFT drops, and distribution all in one place.

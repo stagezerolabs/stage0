@@ -1,10 +1,7 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { DollarSign, Globe, Lock, Sliders, Send, Image, ArrowRight } from '@/components/ui/icons';
+import React, { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { DollarSign, Lock, Sliders, Send, Image as ImageIcon } from '@/components/ui/icons';
 import { Link } from 'react-router-dom';
-import { useAccount } from 'wagmi';
-import type { Address } from 'viem';
-import { useIsAdmin } from '@/lib/utils/admin';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -30,91 +27,76 @@ const itemVariants = {
   },
 };
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 30, filter: 'blur(3px)' },
-  visible: {
-    opacity: 1,
-    y: 0,
-    filter: 'blur(0px)',
-    transition: {
-      duration: 0.8,
-      ease: [0.16, 1, 0.3, 1] as const,
-    },
-  },
-};
-
 const tools: Array<{
-  id: string;
   title: string;
   description: string;
-  icon: typeof Globe;
+  icon: React.FC<{ className?: string }>;
   href: string;
-  bgColor: string;
-  textColor: string;
-  iconBg: string;
-  enabledForAll?: boolean;
-  adminOnly?: boolean;
 }> = [
-    {
-      id: 'nft',
-      title: 'Create an NFT',
-      description: 'Deploy and manage NFT collections onchain.',
-      icon: Image,
-      href: '/create/nft',
-      bgColor: 'bg-canvas-alt',
-      textColor: 'text-ink',
-      iconBg: 'bg-ink/10',
-      enabledForAll: true,
-    },
-    {
-      id: 'createToken',
-      title: 'Create a Token',
-      description: 'Deploy a standard, mintable, burnable, or taxable ERC20 token.',
-      icon: DollarSign,
-      href: '/create/token',
-      bgColor: 'bg-canvas-alt',
-      textColor: 'text-ink',
-      iconBg: 'bg-ink/10',
-    },
-    {
-      id: 'createPresale',
-      title: 'Create Launch',
-      description: 'Launch your token sale with configurable onchain parameters.',
-      icon: Sliders,
-      href: '/create/presale',
-      bgColor: 'bg-canvas-alt',
-      textColor: 'text-ink',
-      iconBg: 'bg-ink/10',
-    },
-    {
-      id: 'tokenLocker',
-      title: 'Locker',
-      description: 'Lock token and liquidity.',
-      icon: Lock,
-      href: '/tools/token-locker',
-      bgColor: 'bg-canvas-alt',
-      textColor: 'text-ink',
-      iconBg: 'bg-ink/10',
-    },
-    {
-      id: 'airdrop',
-      title: 'Airdrop / Multi-Send',
-      description: 'Send tokens or native currency to multiple addresses at once.',
-      icon: Send,
-      href: '/tools/airdrop',
-      bgColor: 'bg-canvas-alt',
-      textColor: 'text-ink',
-      iconBg: 'bg-ink/10',
-    },
-  ];
+  {
+    title: 'Create an NFT',
+    description: 'Deploy and manage NFT collections with whitelist and public mint support.',
+    icon: ImageIcon,
+    href: '/create/nft',
+  },
+  {
+    title: 'Token Launch',
+    description: 'Run presales and fair launches with flexible configurations.',
+    icon: Sliders,
+    href: '/create/presale',
+  },
+  {
+    title: 'Create Token',
+    description: 'Deploy a token contract with custom supply and parameters.',
+    icon: DollarSign,
+    href: '/create/token',
+  },
+  {
+    title: 'Locker',
+    description: 'Lock tokens or liquidity to secure assets onchain.',
+    icon: Lock,
+    href: '/tools/token-locker',
+  },
+  {
+    title: 'Distribution',
+    description: 'Send tokens to multiple wallets in a single transaction.',
+    icon: Send,
+    href: '/tools/airdrop',
+  },
+];
 
 const Tools: React.FC = () => {
-  const { address } = useAccount();
-  const { isAdmin } = useIsAdmin(address as Address | undefined);
+  const reducedMotion = useReducedMotion();
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
+    if (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light') {
+      return 'light';
+    }
+    return 'dark';
+  });
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const shouldDisableAnimations = reducedMotion || prefersReducedMotion;
 
-  // Group tools into active (live) and upcoming (coming soon) categories
-  const activeTools = tools.filter((t) => t.id === 'nft');
-  const comingSoonTools = tools.filter((t) => t.id !== 'nft');
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'data-theme') {
+          const newTheme = document.documentElement.dataset.theme as 'dark' | 'light';
+          if (newTheme) {
+            setThemeMode(newTheme);
+          }
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <motion.div
@@ -125,109 +107,72 @@ const Tools: React.FC = () => {
     >
       {/* Header */}
       <motion.section variants={itemVariants} className="space-y-3 text-left">
-        <h1 className="font-display text-display-lg text-ink">
-          Create & Manage
-        </h1>
-        <p className="text-body-lg text-ink-muted max-w-2xl">
-          Create NFT drops on RISE.
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-canvas-alt/80 border border-border/70 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+          For Builders
+        </div>
+        <h1 className="font-display text-3xl md:text-5xl text-ink">Creator Suite</h1>
+        <p className="text-lg text-ink-muted max-w-2xl">
+          Create tokens, run fair launches, deploy NFTs, distribute and lock assets in one place.
         </p>
       </motion.section>
 
-      {/* Active Tools Section */}
+      {/* Bento Layout */}
       <motion.section variants={itemVariants} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {activeTools.map((tool) => {
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 auto-rows-[220px]">
+          {tools.map((tool, idx) => {
+            const layoutClasses = [
+              'md:col-span-3 md:row-span-2 md:col-start-1 md:row-start-1',
+              'md:col-span-3 md:row-span-1 md:col-start-4 md:row-start-1',
+              'md:col-span-3 md:row-span-1 md:col-start-4 md:row-start-2',
+              'md:col-span-3 md:row-span-1 md:col-start-1 md:row-start-3',
+              'md:col-span-3 md:row-span-1 md:col-start-4 md:row-start-3',
+            ];
+            const offsetClasses = [
+              'md:-translate-y-1',
+              'md:-translate-y-2',
+              'md:translate-y-2',
+              'md:translate-y-1',
+              'md:-translate-y-1',
+            ];
+            const isFeatureCard = idx === 0;
             const IconComponent = tool.icon;
 
             return (
-              <motion.div key={tool.id} variants={cardVariants} className="h-full">
-                <Link
-                  to={tool.href}
-                  className={`${tool.bgColor} ${tool.textColor} rounded-3xl border border-accent/40 hover:border-accent hover:ring-1 hover:ring-accent/40 p-8 md:p-10 text-left relative overflow-hidden group transition-all duration-500 backdrop-blur-md shadow-float hover:shadow-float-hover hover:-translate-y-2 flex flex-col justify-between h-full`}
-                >
-                  {/* Atmospheric Glow Backdrops */}
-                  <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-accent/15 blur-2xl pointer-events-none" />
-                  <div className="absolute -left-10 -bottom-10 h-36 w-36 rounded-full bg-accent-secondary/10 blur-3xl pointer-events-none" />
+              <motion.div
+                key={tool.href}
+                className={`relative overflow-hidden rounded-3xl group border border-border/70 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${
+                  themeMode === 'light' ? 'hover:border-purple-500' : 'hover:border-amber-700'
+                }`}
+                whileHover={shouldDisableAnimations ? {} : { scale: 0.99 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              >
+                <Link to={tool.href} className="block w-full h-full relative">
+                  <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
 
-                  <div className="relative flex flex-col justify-between h-full z-10">
-                    <div>
-                      <div className={`${tool.iconBg} w-14 h-14 rounded-full flex items-center justify-center mb-6 group-hover:bg-accent/20 group-hover:text-accent transition-colors`}>
-                        <IconComponent className="w-7 h-7" />
-                      </div>
-                      <h3 className="font-display text-3xl font-semibold mb-3 group-hover:text-accent transition-colors">
-                        {tool.title}
-                      </h3>
-                      <p className="text-body opacity-80 mb-8 max-w-md">
-                        {tool.description}
-                      </p>
-                    </div>
-                    <div className="inline-flex items-center gap-2 text-body-sm font-medium text-ink group-hover:text-accent transition-colors">
-                      Open Tool <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            );
-          })}
-        </div>
-      </motion.section>
-
-      {/* Coming Soon Section */}
-      <motion.section variants={itemVariants} className="space-y-6">
-        <h2 className="font-display text-display-sm text-ink">
-          {isAdmin ? 'Creator Tools (Admin Access)' : 'Coming Soon'}
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {comingSoonTools.map((tool) => {
-            const IconComponent = tool.icon;
-            const isEnabled = isAdmin || Boolean(tool.enabledForAll);
-
-            if (isEnabled) {
-              return (
-                <motion.div key={tool.id} variants={cardVariants}>
-                  <Link
-                    to={tool.href}
-                    className={`${tool.bgColor} ${tool.textColor} tool-surface-card p-6 md:p-8 text-left group block`}
+                  <div
+                    className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${
+                      isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'
+                    }`}
                   >
-                    <div className={`${tool.iconBg} w-12 h-12 rounded-full flex items-center justify-center mb-4 group-hover:bg-accent/20 group-hover:text-accent transition-colors`}>
-                      <IconComponent className="w-6 h-6" />
+                    <div
+                      className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${
+                        isFeatureCard ? 'mb-7' : 'mb-5'
+                      }`}
+                    >
+                      <IconComponent className="w-7 h-7" />
                     </div>
-                    <h3 className="font-display text-display-sm font-semibold mb-2 group-hover:text-accent transition-colors">
+                    <h3
+                      className={`font-display font-bold text-ink mb-2 ${
+                        isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'
+                      }`}
+                    >
                       {tool.title}
                     </h3>
-                    <p className="text-body-sm opacity-80 mb-6">
+                    <p className="text-sm font-medium text-ink-muted/90 max-w-sm">
                       {tool.description}
                     </p>
-                    <div className="absolute bottom-6 right-6">
-                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-                    </div>
-                  </Link>
-                </motion.div>
-              );
-            }
-
-            return (
-              <motion.div key={tool.id} variants={cardVariants}>
-                <div
-                  aria-disabled="true"
-                  className={`${tool.bgColor} ${tool.textColor} rounded-3xl border border-border p-6 md:p-8 text-left relative overflow-hidden backdrop-blur-md shadow-float opacity-50 grayscale select-none cursor-not-allowed`}
-                >
-                  <div className="absolute top-4 right-4 text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-1 rounded-full bg-ink/10 text-ink-muted">
-                    Soon
                   </div>
-                  <div className={`${tool.iconBg} w-12 h-12 rounded-full flex items-center justify-center mb-4`}>
-                    <IconComponent className="w-6 h-6" />
-                  </div>
-                  <h3 className="font-display text-display-sm font-semibold mb-2">
-                    {tool.title}
-                  </h3>
-                  <p className="text-body-sm opacity-80 mb-6">
-                    {tool.description}
-                  </p>
-                  <div className="absolute bottom-6 right-6">
-                    <ArrowRight className="w-5 h-5" />
-                  </div>
-                </div>
+                </Link>
               </motion.div>
             );
           })}

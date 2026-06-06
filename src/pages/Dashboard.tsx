@@ -24,7 +24,6 @@ import { useRnsOwnedLabel } from '@/lib/hooks/rns/useRnsOwnedLabel';
 import { getPrimaryLabel, setPrimaryLabel } from '@/lib/rns/primary-label';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
-import { useIsAdmin } from '@/lib/utils/admin';
 import {
   ArrowRight,
   Globe,
@@ -98,7 +97,6 @@ const Dashboard: React.FC = () => {
     allDomains: ownedDomains,
     isLoading: isDomainsLoading,
   } = useRnsOwnedLabel(address);
-  const { isAdmin } = useIsAdmin(address as Address | undefined);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
   // Which label the user has chosen as their primary identity.
@@ -418,7 +416,7 @@ const Dashboard: React.FC = () => {
               }
               cta={{
                 label: createdTokenList.length > 0 ? 'Manage tokens' : 'Create token',
-                to: createdTokenList.length > 0 ? '/tokens' : isAdmin ? '/create/token' : '/tools',
+                to: createdTokenList.length > 0 ? '/tokens' : '/create/token',
               }}
             >
               {createdTokenList.slice(0, 5).map((token) => (
@@ -463,7 +461,7 @@ const Dashboard: React.FC = () => {
               }
               cta={{
                 label: createdPresales.length > 0 ? 'Create another' : 'Create launch',
-                to: isAdmin ? '/create/presale' : '/tools',
+                to: '/create/presale',
               }}
             >
               {createdPresales.slice(0, 5).map((presale) => {
@@ -512,7 +510,7 @@ const Dashboard: React.FC = () => {
               }
               cta={{
                 label: myLocks.length > 0 ? 'Manage locks' : 'Create lock',
-                to: isAdmin ? '/tools/token-locker' : '/tools',
+                to: '/tools/token-locker',
               }}
             >
               {myLocks.slice(0, 5).map((lock) => {

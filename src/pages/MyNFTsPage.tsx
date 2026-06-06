@@ -56,16 +56,6 @@ const MyNFTsPage: React.FC = () => {
     enabled: isConnected && Boolean(address),
   });
 
-  const liveHeldCount = useMemo(
-    () => holdings.filter((holding) => holding.status === 'live').length,
-    [holdings]
-  );
-
-  const liveCreatedCount = useMemo(
-    () => createdCollections.filter((collection) => collection.status === 'live').length,
-    [createdCollections]
-  );
-
   const hasAnyNFTPortfolio = tokens.length > 0 || holdings.length > 0 || createdCollections.length > 0;
   const isPortfolioLoading = isLoading || isCreatedCollectionsLoading;
   const visibleTokens = useMemo(
@@ -171,10 +161,8 @@ const MyNFTsPage: React.FC = () => {
             <section className="order-2 space-y-4">
               <div className="section-head">
                 <div>
-                  <div className="eyebrow">Owned collections</div>
                   <h2 className="ds-h2 mt-1.5">Owned collections</h2>
                 </div>
-                <span className="font-mono text-[12px] text-ink-faint">{liveHeldCount} live</span>
               </div>
 
               <div className="holdings-grid">
@@ -336,7 +324,6 @@ const MyNFTsPage: React.FC = () => {
                 <div>
                   <h2 className="ds-h2 mt-1.5">Created collections</h2>
                 </div>
-                <span className="font-mono text-[12px] text-ink-faint">{liveCreatedCount} live</span>
               </div>
 
               <Carousel

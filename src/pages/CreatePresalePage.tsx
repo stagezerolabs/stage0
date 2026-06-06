@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAccount, useChainId, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { isAddress, parseUnits, type Address } from 'viem';
@@ -19,7 +19,12 @@ import {
 } from '@/components/ui/icons';
 import { Link, useSearchParams } from 'react-router-dom';
 import FallbackImage from '@/components/ui/fallback-image';
-import { contractUriToHttp, normalizeContractURI } from '@/lib/utils/ipfs';
+import { toast } from 'sonner';
+import {
+  formatStage0ImageFileSize,
+  getStage0ImageValidationError,
+  uploadTokenImage,
+} from '@/lib/api/media';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -73,8 +78,14 @@ const CreatePresalePage: React.FC = () => {
   const queryTokenName = useMemo(() => searchParams.get('name')?.trim() ?? '', [searchParams]);
 
   const [saleToken, setSaleToken] = useState(querySaleToken);
-  const [projectImageURI, setProjectImageURI] = useState('');
+  const [projectImageFile, setProjectImageFile] = useState<File | null>(null);
   const [projectImagePreview, setProjectImagePreview] = useState('');
+  const [projectImageMeta, setProjectImageMeta] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [projectWebsiteUrl, setProjectWebsiteUrl] = useState('');
+  const [projectXUrl, setProjectXUrl] = useState('');
+  const [projectTelegramUrl, setProjectTelegramUrl] = useState('');
+  const [projectDiscordUrl, setProjectDiscordUrl] = useState('');
   const [paymentToken, setPaymentToken] = useState('');
   const [useNativeToken, setUseNativeToken] = useState(true);
   const [hardCap, setHardCap] = useState('');
@@ -85,12 +96,7 @@ const CreatePresalePage: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [saleAmount, setSaleAmount] = useState('');
   const [requiresWhitelist, setRequiresWhitelist] = useState(false);
-
-  useEffect(() => {
-    if (querySaleToken) {
-      setSaleToken(querySaleToken);
-    }
-  }, [querySaleToken]);
+  const uploadedProfileKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -172,6 +178,61 @@ const CreatePresalePage: React.FC = () => {
     return null;
   }, [isSuccess, receipt]);
 
+  useEffect(() => {
+    if (!isSuccess || !isAddress(saleToken)) return;
+
+    const profile = {
+      description: projectDescription.trim(),
+      websiteUrl: projectWebsiteUrl.trim(),
+      xUrl: projectXUrl.trim(),
+      telegramUrl: projectTelegramUrl.trim(),
+      discordUrl: projectDiscordUrl.trim(),
+    };
+    const hasProfileInfo = Object.values(profile).some(Boolean);
+    if (!projectImageFile && !hasProfileInfo) return;
+
+    const uploadKey = [
+      chainId,
+      saleToken.toLowerCase(),
+      projectImageFile?.name ?? '',
+      projectImageFile?.size ?? 0,
+      projectImageFile?.lastModified ?? 0,
+      profile.description,
+      profile.websiteUrl,
+      profile.xUrl,
+      profile.telegramUrl,
+      profile.discordUrl,
+    ].join(':');
+
+    if (uploadedProfileKeyRef.current === uploadKey) return;
+    uploadedProfileKeyRef.current = uploadKey;
+
+    uploadTokenImage({
+      chainId,
+      address: saleToken as Address,
+      file: projectImageFile,
+      profile,
+    })
+      .then(() => {
+        toast.success('Launch profile saved.');
+      })
+      .catch((error) => {
+        uploadedProfileKeyRef.current = null;
+        const message = error instanceof Error ? error.message : 'Launch created, but profile upload failed.';
+        toast.error(message);
+      });
+  }, [
+    chainId,
+    isSuccess,
+    saleToken,
+    projectDescription,
+    projectDiscordUrl,
+    projectImageFile,
+    projectTelegramUrl,
+    projectWebsiteUrl,
+    projectXUrl,
+  ]);
+
   const handleSubmit = () => {
     if (!saleToken || !hardCap || !softCap || !minContribution || !maxContribution || !startDate || !endDate || !saleAmount) return;
 
@@ -219,18 +280,19 @@ const CreatePresalePage: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    const validationError = getStage0ImageValidationError(file, 'launch image');
+    if (validationError) {
+      toast.error(validationError);
       event.target.value = '';
       return;
     }
 
+    setProjectImageFile(file);
+    setProjectImageMeta(`${file.name} · ${formatStage0ImageFileSize(file.size)}`);
     setProjectImagePreview(URL.createObjectURL(file));
   };
 
-  const normalizedProjectImagePreviewUri = normalizeContractURI(projectImageURI.trim());
-  const projectImagePreviewSrc =
-    projectImagePreview ||
-    (normalizedProjectImagePreviewUri ? contractUriToHttp(normalizedProjectImagePreviewUri) : '');
+  const projectImagePreviewSrc = projectImagePreview;
 
   // Not whitelisted
   if (isConnected && !isCheckingWhitelist && isWhitelisted === false) {
@@ -361,47 +423,98 @@ const CreatePresalePage: React.FC = () => {
           )}
         </div>
 
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-body-sm text-ink-muted font-medium">Launch Image URI</label>
-            <input
-              type="text"
-              value={projectImageURI}
-              onChange={(e) => setProjectImageURI(e.target.value)}
-              placeholder="CID, ipfs://..., or https://..."
-              className="input-field w-full"
-            />
-            <p className="text-xs text-ink-faint">
-              Optional for now. Token presales do not expose a launch image onchain yet, so this is staged for later metadata/database wiring.
+        <div className="rounded-3xl border border-border bg-canvas-alt/55 p-5 space-y-4">
+          <div className="space-y-1">
+            <h3 className="font-display text-xl font-semibold text-ink">Token Info</h3>
+            <p className="text-body-sm text-ink-muted">
+              App-level profile details for Stage0 surfaces. ERC20 contract data still comes from the deployed token.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_9rem] gap-4">
-            <label className="rounded-2xl border border-dashed border-border bg-canvas-alt p-4 cursor-pointer hover:border-accent/40 transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleProjectImageFileChange}
-                className="sr-only"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-body-sm text-ink-muted font-medium">Description</label>
+              <textarea
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                placeholder="A short intro for the token profile."
+                className="input-field min-h-24 w-full resize-y"
+                maxLength={1200}
               />
-              <span className="flex items-start gap-3">
-                <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
-                  <Upload className="w-5 h-5" />
-                </span>
-                <span className="space-y-1">
-                  <span className="block text-body-sm font-medium text-ink">Upload launch image</span>
-                  <span className="block text-xs text-ink-faint">
-                    Preview-only until storage is wired. Paste the uploaded CID or URL above when available.
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">Website</label>
+              <input
+                type="url"
+                value={projectWebsiteUrl}
+                onChange={(e) => setProjectWebsiteUrl(e.target.value)}
+                placeholder="https://example.xyz"
+                className="input-field w-full"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">X / Twitter</label>
+              <input
+                type="url"
+                value={projectXUrl}
+                onChange={(e) => setProjectXUrl(e.target.value)}
+                placeholder="https://x.com/stage0_"
+                className="input-field w-full"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">Telegram</label>
+              <input
+                type="url"
+                value={projectTelegramUrl}
+                onChange={(e) => setProjectTelegramUrl(e.target.value)}
+                placeholder="https://t.me/project"
+                className="input-field w-full"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-body-sm text-ink-muted font-medium">Discord</label>
+              <input
+                type="url"
+                value={projectDiscordUrl}
+                onChange={(e) => setProjectDiscordUrl(e.target.value)}
+                placeholder="https://discord.gg/project"
+                className="input-field w-full"
+              />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label className="text-body-sm text-ink-muted font-medium">Launch Image</label>
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_9rem] gap-4">
+              <label className="rounded-2xl border border-dashed border-border bg-canvas p-4 cursor-pointer hover:border-accent/40 transition-colors">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleProjectImageFileChange}
+                  className="sr-only"
+                />
+                <span className="flex items-start gap-3">
+                  <span className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                    <Upload className="w-5 h-5" />
+                  </span>
+                  <span className="space-y-1">
+                    <span className="block text-body-sm font-medium text-ink">Upload launch image</span>
+                    <span className="block text-xs text-ink-faint">
+                      PNG, JPG, or WebP up to 2MB. Stage0 saves this profile after deployment.
+                    </span>
+                    {projectImageMeta ? (
+                      <span className="block text-xs text-ink-muted break-all">{projectImageMeta}</span>
+                    ) : null}
                   </span>
                 </span>
-              </span>
-            </label>
-            <div className="h-36 rounded-2xl border border-border bg-canvas-alt overflow-hidden flex items-center justify-center">
-              <FallbackImage
-                src={projectImagePreviewSrc}
-                alt="Launch image preview"
-                className="w-full h-full object-cover"
-                placeholder={<ImageIcon className="w-8 h-8 text-ink-faint" />}
-              />
+              </label>
+              <div className="h-36 rounded-2xl border border-border bg-canvas overflow-hidden flex items-center justify-center">
+                <FallbackImage
+                  src={projectImagePreviewSrc}
+                  alt="Launch image preview"
+                  className="w-full h-full object-cover"
+                  placeholder={<ImageIcon className="w-8 h-8 text-ink-faint" />}
+                />
+              </div>
             </div>
           </div>
         </div>

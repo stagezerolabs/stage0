@@ -175,11 +175,11 @@ const itemVariants = {
 /* ─── Creator Tools Data ─── */
 
 const creatorTools = [
-  { title: 'NFT Launch', icon: ImageIcon, href: '/create/nft', description: 'Deploy and manage NFT collections with whitelist and public mint support.', enabledForAll: true },
-  { title: 'Token Launch', icon: Rocket, href: '/create/presale', description: 'Run presales and fair launches with flexible configurations.', enabledForAll: false },
-  { title: 'Create Token', icon: DollarSign, href: '/create/token', description: 'Deploy a token contract with custom supply and parameters.', enabledForAll: false },
-  { title: 'Locker', icon: Lock, href: '/tools/token-locker', description: 'Lock tokens or liquidity to secure assets onchain.', enabledForAll: false },
-  { title: 'Distribution', icon: Send, href: '/tools/airdrop', description: 'Send tokens to multiple wallets in a single transaction.', enabledForAll: false },
+  { title: 'NFT Launch', icon: ImageIcon, href: '/create/nft', description: 'Deploy and manage NFT collections with whitelist and public mint support.' },
+  { title: 'Token Launch', icon: Rocket, href: '/create/presale', description: 'Run presales and fair launches with flexible configurations.' },
+  { title: 'Create Token', icon: DollarSign, href: '/create/token', description: 'Deploy a token contract with custom supply and parameters.' },
+  { title: 'Locker', icon: Lock, href: '/tools/token-locker', description: 'Lock tokens or liquidity to secure assets onchain.' },
+  { title: 'Distribution', icon: Send, href: '/tools/airdrop', description: 'Send tokens to multiple wallets in a single transaction.' },
 ];
 
 /* ─── Rise Glow Orbs (dark mode only) ─── */
@@ -930,47 +930,28 @@ const HomePage: React.FC = () => {
                 'md:-translate-y-1',
               ];
               const isFeatureCard = idx === 0;
-              const isToolEnabled = tool.enabledForAll || isAdmin;
 
               return (
                 <motion.div
                   key={tool.href}
-                  className={`relative overflow-hidden rounded-3xl group border border-border/70 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${isToolEnabled ? (
-                    themeMode === 'light'
-                      ? 'hover:border-purple-500'
-                      : 'hover:border-amber-700'
-                  ) : 'opacity-60 grayscale'}`}
-                  whileHover={shouldDisableAnimations || !isToolEnabled ? {} : { scale: 0.99 }}
+                  className={`relative overflow-hidden rounded-3xl group border border-border/70 bg-canvas-alt min-h-[220px] transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${themeMode === 'light'
+                    ? 'hover:border-purple-500'
+                    : 'hover:border-amber-700'
+                    }`}
+                  whileHover={shouldDisableAnimations ? {} : { scale: 0.99 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  {isToolEnabled ? (
-                    <Link to={tool.href} className="block w-full h-full relative">
-                      <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
+                  <Link to={tool.href} className="block w-full h-full relative">
+                    <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
 
-                      <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
-                        <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
-                          <tool.icon className="w-7 h-7" />
-                        </div>
-                        <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
-                        <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
+                    <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
+                      <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center transition-all duration-300 group-hover:bg-accent group-hover:text-white shadow-[0_0_20px_rgba(255,138,0,0)] group-hover:shadow-[0_0_30px_rgba(255,138,0,0.3)] ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
+                        <tool.icon className="w-7 h-7" />
                       </div>
-                    </Link>
-                  ) : (
-                    <div aria-disabled="true" className="block w-full h-full relative cursor-not-allowed select-none">
-                      <div className="absolute top-4 right-4 text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-1 rounded-full bg-ink/10 text-ink-muted z-20">
-                        Soon
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/60 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
-
-                      <div className={`absolute inset-x-0 bottom-0 flex flex-col justify-end ${isFeatureCard ? 'p-10 md:p-12' : 'p-7 md:p-8'}`}>
-                        <div className={`w-14 h-14 rounded-2xl bg-canvas-alt text-accent flex items-center justify-center ${isFeatureCard ? 'mb-7' : 'mb-5'}`}>
-                          <tool.icon className="w-7 h-7" />
-                        </div>
-                        <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
-                        <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
-                      </div>
+                      <h3 className={`font-display font-bold text-ink mb-2 ${isFeatureCard ? 'text-3xl md:text-4xl' : 'text-2xl'}`}>{tool.title}</h3>
+                      <p className="text-sm font-medium text-ink-muted/90 max-w-sm">{tool.description}</p>
                     </div>
-                  )}
+                  </Link>
                 </motion.div>
               );
             })}

@@ -2639,12 +2639,14 @@
 .ai-msg.bot { align-self: flex-start; }
 .ai-msg-row { display: flex; gap: 10px; align-items: flex-end; }
 .ai-msg.user .ai-msg-row { flex-direction: row-reverse; }
+.ai-msg-content { min-width: 0; width: 100%; }
 .ai-msg-bubble {
   padding: 10px 14px;
   border-radius: 18px;
   font-size: 13.5px;
   line-height: 1.5;
   word-wrap: break-word;
+  white-space: pre-line;
 }
 .ai-msg.bot .ai-msg-bubble {
   background: rgb(var(--color-canvas));
@@ -2657,14 +2659,6 @@
   color: rgb(var(--color-accent-foreground));
   border-bottom-right-radius: 6px;
   font-weight: 500;
-}
-.ai-msg-mini-avatar {
-  width: 26px; height: 26px;
-  border-radius: 50%;
-  background: rgb(var(--senna-bubble));
-  color: rgb(var(--color-accent-foreground));
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
 }
 .ai-msg-time { font-size: 10px; color: rgb(var(--color-ink-faint)); padding: 0 4px; }
 .ai-msg.user .ai-msg-time { text-align: right; }
@@ -2764,7 +2758,7 @@
 .ai-input-wrap {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   background: rgb(var(--color-canvas));
   border: 1px solid rgb(var(--color-border));
@@ -2784,8 +2778,14 @@
   color: rgb(var(--color-ink));
   font-family: inherit;
   font-size: 13.5px;
+  line-height: 1.45;
   padding: 8px 0;
   min-width: 0;
+  max-height: 132px;
+  resize: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .ai-input::placeholder { color: rgb(var(--color-ink-faint)); }
 .ai-input-tools { display: flex; gap: 2px; }
@@ -2825,6 +2825,225 @@
   text-align: center;
   padding: 0 0 10px;
   letter-spacing: 0.04em;
+}
+
+/* -------- Senna sign card -------- */
+.senna-card {
+  margin-top: 8px;
+  padding: 14px;
+  background: linear-gradient(180deg, rgb(var(--color-accent) / 0.06), rgb(var(--color-canvas)) 60%);
+  border: 1px solid rgb(var(--color-accent) / 0.25);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 0 rgb(var(--color-ink) / 0.04), 0 8px 24px -16px rgb(var(--color-accent) / 0.3);
+}
+.senna-card-head { display: flex; flex-direction: column; gap: 4px; }
+.senna-card-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgb(var(--color-accent));
+  font-weight: 600;
+}
+.senna-card-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgb(var(--color-status-live, var(--color-accent)));
+  box-shadow: 0 0 0 3px rgb(var(--color-accent) / 0.15);
+}
+.senna-card-title { font-weight: 600; font-size: 14px; color: rgb(var(--color-ink)); }
+.senna-card-summary { font-size: 12px; color: rgb(var(--color-ink-muted)); margin: 0; line-height: 1.4; }
+
+.senna-card-fields {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgb(var(--color-canvas) / 0.5);
+  border: 1px solid rgb(var(--color-border));
+  display: flex; flex-direction: column; gap: 6px;
+}
+.senna-card-row {
+  display: grid; grid-template-columns: 5.5rem 1fr; gap: 8px; align-items: baseline;
+  font-size: 12px;
+}
+.senna-card-row dt { color: rgb(var(--color-ink-faint)); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; font-size: 10px; }
+.senna-card-row dd { color: rgb(var(--color-ink)); font-weight: 500; margin: 0; word-break: break-all; }
+
+.senna-card-steps {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: rgb(var(--color-ink-faint));
+}
+.senna-card-step {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px;
+  background: rgb(var(--color-ink) / 0.04);
+  border: 1px solid rgb(var(--color-border));
+}
+.senna-card-step[data-active='true'] {
+  background: rgb(var(--color-accent) / 0.1);
+  color: rgb(var(--color-accent));
+  border-color: rgb(var(--color-accent) / 0.4);
+}
+.senna-card-step span {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 999px;
+  background: rgb(var(--color-ink) / 0.08);
+  color: rgb(var(--color-ink-muted));
+  font-size: 9px; font-weight: 700;
+}
+.senna-card-step[data-active='true'] span {
+  background: rgb(var(--color-accent));
+  color: rgb(var(--color-accent-foreground));
+}
+.senna-card-step-divider {
+  flex: 1; height: 1px; background: rgb(var(--color-border));
+}
+
+.senna-card-primary {
+  appearance: none; border: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px 16px; border-radius: 12px;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  background: rgb(var(--color-accent));
+  color: rgb(var(--color-accent-foreground));
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  box-shadow: 0 6px 16px -8px rgb(var(--color-accent) / 0.5);
+}
+.senna-card-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -8px rgb(var(--color-accent) / 0.6);
+}
+.senna-card-primary:disabled {
+  background: rgb(var(--color-ink) / 0.08);
+  color: rgb(var(--color-ink-faint));
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.senna-card-primary[data-phase='success'] {
+  background: rgb(var(--color-status-live, var(--color-accent)));
+}
+.senna-card-primary[data-phase='error'] {
+  background: rgb(var(--color-status-error, var(--color-accent)));
+}
+
+.senna-card-error {
+  display: inline-flex; align-items: flex-start; gap: 6px;
+  font-size: 11.5px; color: rgb(var(--color-status-error, var(--color-accent)));
+  margin: 0;
+}
+
+.senna-card-receipts {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.senna-card-receipt {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: rgb(var(--color-accent));
+  background: rgb(var(--color-accent) / 0.06);
+  border-radius: 999px;
+  padding: 4px 9px;
+  text-decoration: none;
+}
+.senna-card-receipt:hover { background: rgb(var(--color-accent) / 0.12); }
+
+.senna-card-result {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px; border-radius: 10px;
+  background: rgb(var(--color-canvas) / 0.6);
+  border: 1px solid rgb(var(--color-border));
+  font-size: 11px;
+}
+.senna-card-result span { color: rgb(var(--color-ink-faint)); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+.senna-card-result code { font-size: 11px; color: rgb(var(--color-ink)); word-break: break-all; }
+.senna-card-hint { margin: 0; font-size: 11px; color: rgb(var(--color-ink-faint)); }
+
+/* -------- Senna slash menu -------- */
+.senna-quick-menu {
+  position: absolute;
+  bottom: calc(100% + 8px); left: 12px; right: 12px;
+  background: rgb(var(--color-canvas));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 14px;
+  box-shadow: 0 16px 40px -12px rgb(var(--color-ink) / 0.25);
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  z-index: 20;
+}
+.senna-quick-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 10px;
+  background: transparent; border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit; font-size: 13px;
+  color: rgb(var(--color-ink));
+}
+.senna-quick-item[data-active='true'] {
+  background: rgb(var(--color-accent) / 0.08);
+}
+.senna-quick-icon {
+  width: 26px; height: 26px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgb(var(--color-accent) / 0.12); color: rgb(var(--color-accent));
+  flex-shrink: 0;
+}
+.senna-quick-label { font-weight: 600; font-size: 13px; }
+.senna-quick-sub { font-size: 11px; color: rgb(var(--color-ink-muted)); }
+
+/* -------- Senna suggestion strip -------- */
+.senna-suggests {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 0 18px 10px;
+}
+.senna-suggests-empty { padding: 0; }
+.senna-suggest {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgb(var(--color-accent) / 0.08);
+  border: 1px solid rgb(var(--color-accent) / 0.25);
+  color: rgb(var(--color-accent));
+  font-size: 12px; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+  font-family: inherit;
+  transition: background 200ms ease, transform 180ms ease;
+}
+.senna-suggest:hover {
+  background: rgb(var(--color-accent) / 0.16);
+  transform: translateY(-1px);
+}
+
+/* -------- Senna mic -------- */
+.senna-mic {
+  width: 42px; height: 42px; border-radius: 16px;
+  border: none;
+  background: rgb(var(--color-ink) / 0.06);
+  color: rgb(var(--color-ink-muted));
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 200ms ease;
+  flex-shrink: 0;
+}
+.senna-mic svg {
+  width: 20px;
+  height: 20px;
+}
+.senna-mic:hover { background: rgb(var(--color-ink) / 0.1); color: rgb(var(--color-ink)); }
+.senna-mic[data-active='true'] {
+  background: rgb(var(--color-status-error-bg, var(--color-accent) / 0.16));
+  color: rgb(var(--color-status-error, var(--color-accent)));
+  animation: sennaMicPulse 1.4s ease-in-out infinite;
+}
+@keyframes sennaMicPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--color-status-error, var(--color-accent)) / 0.4); }
+  50% { box-shadow: 0 0 0 6px rgb(var(--color-status-error, var(--color-accent)) / 0); }
+}
+
+@media (max-width: 640px) {
+  .ai-input {
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
 }
 
 .featured-launch-card-shell {

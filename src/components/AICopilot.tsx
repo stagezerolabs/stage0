@@ -1,30 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAccount, useChainId } from 'wagmi';
 import { RefreshCcw, Send, X } from '@/components/ui/icons';
+import SennaSignCard from '@/components/senna/SennaSignCard';
+import QuickActionMenu, { type QuickAction } from '@/components/senna/QuickActionMenu';
+import SuggestionStrip from '@/components/senna/SuggestionStrip';
+import VoiceMic from '@/components/senna/VoiceMic';
+import type { SennaActionDraft, SennaActionType } from '@/components/senna/types';
 
-type CopilotCard = {
-  title: string;
-  sub: string;
-  value: string;
-  icon: React.ReactNode;
-  route?: string;
-};
+type SennaRole = 'user' | 'assistant';
 
 type CopilotMessage = {
   role: 'bot' | 'user';
   text: string;
   time: string;
-  card?: CopilotCard;
-};
-
-type SennaRole = 'user' | 'assistant';
-
-type SennaActionDraft = {
-  actionType: string;
-  targetRoute: string;
-  summary: string;
-  warnings?: string[];
+  actionDraft?: SennaActionDraft | null;
 };
 
 type SennaChatResponse = {
@@ -32,6 +21,7 @@ type SennaChatResponse = {
   sessionId?: string;
   answer?: string;
   actionDraft?: SennaActionDraft | null;
+  suggestions?: string[];
 };
 
 const nowTime = (): string => {
@@ -39,32 +29,24 @@ const nowTime = (): string => {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 };
 
-const SUGGESTIONS = [
-  'What launches are live?',
-  'Help me create an NFT',
-  'How do I lock tokens?',
-  'RISE testnet setup',
-];
-
 const INTRO_MESSAGES = [
-  "Hey, Senna here. What's the move?",
-  "Hi, I'm Senna. What's up?",
-  "Hey. Launchpad, NFTs, tokens, or chaos?",
-  "Hi, Senna here. Fire away.",
+  "Hey, I'm Senna. What would you like to do today?",
+  "Hi, I'm here. Tell me what you're trying to do on Stage0.",
+  "Hey. Want help with a launch, token, NFT, lock, airdrop, or name?",
+  "Hi. We can take it step by step. What are you building?",
 ];
 
 const RESET_MESSAGES = [
-  "Clean slate. What's next?",
-  "Fresh lap. What are we sorting?",
-  "New chat. Fire away.",
-  "Pit stop done. What's the next move?",
-  "Reset complete. Send the next Stage0 thing.",
-  "Back on track. What are we checking?",
-  "New run. Launchpad, NFT, token, or something spicy?",
-  "Fresh line. Where to?",
-  "All clear. What do you need?",
-  "Clean board. What's up?",
-  "New chat loaded. Let's go.",
+  "Fresh start. What would you like to do next?",
+  "All clear. What can I help with?",
+  "Reset done. Tell me what you want to work on.",
+  "Clean slate. Where should we start?",
+];
+
+const DEFAULT_SUGGESTIONS = [
+  'Create a token',
+  'Lock tokens',
+  'Buy a .rise name',
 ];
 
 const SENNA_API_URL =
@@ -73,10 +55,11 @@ const SENNA_API_URL =
 
 const randomItem = (items: string[]) => items[Math.floor(Math.random() * items.length)];
 
-const makeBotMessage = (text: string): CopilotMessage => ({
+const makeBotMessage = (text: string, actionDraft?: SennaActionDraft | null): CopilotMessage => ({
   role: 'bot',
   text,
   time: nowTime(),
+  actionDraft: actionDraft ?? null,
 });
 
 const toApiMessages = (messages: CopilotMessage[], nextUserMessage: string) => {
@@ -94,16 +77,19 @@ const buildChatPayload = (input: {
   address?: string;
   chainId?: number;
   messages: Array<{ role: SennaRole; content: string }>;
+  mode?: 'auto' | 'fast' | 'deep';
+  quickAction?: SennaActionType;
 }) => {
   const payload: {
     sessionId?: string;
-    mode: 'auto';
+    mode: 'auto' | 'fast' | 'deep';
     walletAddress?: string;
     evmAddress?: string;
     chainId?: number;
     messages: Array<{ role: SennaRole; content: string }>;
+    quickAction?: SennaActionType;
   } = {
-    mode: 'auto',
+    mode: input.mode ?? 'auto',
     messages: input.messages,
   };
 
@@ -113,40 +99,19 @@ const buildChatPayload = (input: {
     payload.evmAddress = input.address;
   }
   if (input.chainId) payload.chainId = input.chainId;
+  if (input.quickAction) payload.quickAction = input.quickAction;
 
   return payload;
 };
 
-const readApiError = async (response: Response) => {
-  let detail = '';
-
+async function safeReadError(response: Response): Promise<string> {
   try {
-    const data = await response.json();
-    detail = data?.detail || data?.error || '';
-  } catch {
-    detail = await response.text().catch(() => '');
-  }
-
-  if (response.status === 429) {
-    return 'Senna is rate-limiting this chat for a moment. Give it a few seconds and try again.';
-  }
-
-  return detail
-    ? `Senna API returned ${response.status}: ${detail}`
-    : `Senna API returned ${response.status}.`;
-};
-
-const cardForAction = (actionDraft?: SennaActionDraft | null): CopilotCard | undefined => {
-  if (!actionDraft?.targetRoute) return undefined;
-
-  return {
-    title: actionDraft.summary || 'Open in Stage0',
-    sub: actionDraft.targetRoute,
-    value: 'Open',
-    icon: 'S0',
-    route: actionDraft.targetRoute,
-  };
-};
+    const data = await response.clone().json();
+    if (data?.detail) return String(data.detail);
+    if (data?.error) return '';
+  } catch { /* fallthrough */ }
+  return '';
+}
 
 const SennaGlyph: React.FC<{ className?: string }> = ({ className }) => (
   <svg
@@ -166,7 +131,6 @@ const SennaGlyph: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const AICopilot: React.FC = () => {
-  const navigate = useNavigate();
   const { address } = useAccount();
   const chainId = useChainId();
   const [chatOpen, setChatOpen] = useState(false);
@@ -175,13 +139,24 @@ const AICopilot: React.FC = () => {
   const [typing, setTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [bottomOffset, setBottomOffset] = useState(24);
+  const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [voiceRecording, setVoiceRecording] = useState(false);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (chatOpen && bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
   }, [chatOpen, messages, typing]);
+
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 132)}px`;
+  }, [input, chatOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -219,15 +194,21 @@ const AICopilot: React.FC = () => {
   const startNewChat = () => {
     setSessionId(null);
     setMessages([makeBotMessage(randomItem(RESET_MESSAGES))]);
+    setSuggestions(DEFAULT_SUGGESTIONS);
   };
 
-  const send = async (text?: string) => {
+  const send = async (
+    text?: string,
+    options?: { mode?: 'auto' | 'fast' | 'deep'; quickAction?: SennaActionType },
+  ) => {
     const msg = (text ?? input).trim();
     if (!msg || typing) return;
     const nextMessages = [...messages, { role: 'user' as const, text: msg, time: nowTime() }];
     setMessages((m) => [...m, { role: 'user', text: msg, time: nowTime() }]);
     setInput('');
+    setSlashOpen(false);
     setTyping(true);
+    setSuggestions([]);
 
     try {
       const response = await fetch(`${SENNA_API_URL}/api/chat`, {
@@ -238,11 +219,18 @@ const AICopilot: React.FC = () => {
           chainId,
           address,
           messages: toApiMessages(messages, msg),
+          mode: options?.mode,
+          quickAction: options?.quickAction,
         })),
       });
 
       if (!response.ok) {
-        throw new Error(await readApiError(response));
+        const detail = await safeReadError(response);
+        const fallback = response.status === 429
+          ? 'Slow down for a few seconds, then try again.'
+          : detail || 'Senna is having trouble right now. Try again in a moment.';
+        setMessages([...nextMessages, makeBotMessage(fallback)]);
+        return;
       }
 
       const data = (await response.json()) as SennaChatResponse;
@@ -250,33 +238,42 @@ const AICopilot: React.FC = () => {
 
       setMessages([
         ...nextMessages,
-        {
-          role: 'bot',
-          text: data.answer || 'Senna did not return an answer.',
-          time: nowTime(),
-          card: cardForAction(data.actionDraft),
-        },
+        makeBotMessage(data.answer || 'Hmm, blanked on that one. Try once more?', data.actionDraft),
       ]);
-    } catch (error) {
-      const fallbackText =
-        error instanceof TypeError
-          ? `I cannot connect to Senna at ${SENNA_API_URL}. Confirm the local API is running, then try again.`
-          : error instanceof Error
-            ? error.message
-            : `I cannot connect to Senna at ${SENNA_API_URL}. Confirm the local API is running, then try again.`;
-
+      setSuggestions(data.suggestions ?? []);
+    } catch {
       setMessages([
         ...nextMessages,
-        {
-          role: 'bot',
-          text: fallbackText,
-          time: nowTime(),
-        },
+        makeBotMessage("I can't reach Senna right now. Check your connection and try again."),
       ]);
     } finally {
       setTyping(false);
     }
   };
+
+  const handleQuickActionPick = (action: QuickAction) => {
+    setInput('');
+    setSlashOpen(false);
+    void send(action.prompt, { mode: 'deep', quickAction: action.actionType });
+  };
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const next = event.target.value;
+    setInput(next);
+    setSlashOpen(next.startsWith('/'));
+  };
+
+  const handleVoicePartial = (text: string) => {
+    setInput(text);
+    setSlashOpen(false);
+  };
+
+  const handleVoiceFinal = (text: string) => {
+    setInput(text);
+  };
+
+  const trimmedInput = input.trim();
+  const hasInputText = trimmedInput.length > 0;
 
   return (
     <div className="ai-bubble-wrap" style={{ bottom: `${bottomOffset}px` }}>
@@ -288,7 +285,7 @@ const AICopilot: React.FC = () => {
             </div>
             <div>
               <div className="ai-chat-name">Senna</div>
-              <div className="ai-chat-status">Online · Stage0 assistant</div>
+              <div className="ai-chat-status">Online, Stage0 assistant</div>
             </div>
             <div className="ai-chat-actions">
               <button
@@ -314,34 +311,9 @@ const AICopilot: React.FC = () => {
             {messages.map((m, i) => (
               <div key={i} className={`ai-msg ${m.role}`}>
                 <div className="ai-msg-row">
-                  {m.role === 'bot' && (
-                    <div className="ai-msg-mini-avatar">
-                      <SennaGlyph className="h-4 w-4" />
-                    </div>
-                  )}
-                  <div style={{ minWidth: 0 }}>
+                  <div className="ai-msg-content">
                     <div className="ai-msg-bubble">{m.text}</div>
-                    {m.card && (
-                      <button
-                        type="button"
-                        className="ai-msg-card"
-                        onClick={() => {
-                          if (m.card?.route) {
-                            setChatOpen(false);
-                            navigate(m.card.route);
-                          }
-                        }}
-                      >
-                        <div className="ai-msg-card-head">
-                          <div className="ai-msg-card-icon">{m.card.icon}</div>
-                          <div style={{ minWidth: 0 }}>
-                            <div className="ai-msg-card-title">{m.card.title}</div>
-                            <div className="ai-msg-card-sub">{m.card.sub}</div>
-                          </div>
-                          <div className="ai-msg-card-value">{m.card.value}</div>
-                        </div>
-                      </button>
-                    )}
+                    {m.actionDraft && <SennaSignCard draft={m.actionDraft} />}
                   </div>
                 </div>
                 <div className="ai-msg-time">{m.time}</div>
@@ -350,9 +322,6 @@ const AICopilot: React.FC = () => {
             {typing && (
               <div className="ai-msg bot">
                 <div className="ai-msg-row">
-                  <div className="ai-msg-mini-avatar">
-                    <SennaGlyph className="h-4 w-4" />
-                  </div>
                   <div className="ai-typing">
                     <span />
                     <span />
@@ -363,30 +332,55 @@ const AICopilot: React.FC = () => {
             )}
           </div>
 
-          <div className="ai-suggests">
-            {SUGGESTIONS.map((s) => (
-              <button key={s} type="button" className="ai-suggest" onClick={() => send(s)}>
-                {s}
-              </button>
-            ))}
-          </div>
+          <SuggestionStrip
+            suggestions={suggestions}
+            disabled={typing}
+            onPick={(s) => void send(s)}
+          />
 
-          <div className="ai-chat-input">
+          <div className="ai-chat-input" style={{ position: 'relative' }}>
+            <QuickActionMenu
+              open={slashOpen}
+              filter={input}
+              onPick={handleQuickActionPick}
+              onClose={() => setSlashOpen(false)}
+            />
             <div className="ai-input-wrap">
-              <input
+              <textarea
+                ref={inputRef}
                 className="ai-input"
-                placeholder="Ask anything about Stage0…"
+                placeholder="Ask Senna, or type / for quick actions"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') send();
+                  if (e.key === 'Enter' && !e.shiftKey && !slashOpen) {
+                    e.preventDefault();
+                    void send();
+                  }
                 }}
                 disabled={typing}
+                rows={1}
               />
             </div>
-            <button type="button" className="ai-send" onClick={() => send()} disabled={!input.trim() || typing} aria-label="Send message">
-              <Send className="h-4 w-4" />
-            </button>
+            {hasInputText && !voiceRecording ? (
+              <button
+                type="button"
+                className="ai-send"
+                onClick={() => void send()}
+                disabled={typing}
+                aria-label="Send message"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            ) : (
+              <VoiceMic
+                apiBaseUrl={SENNA_API_URL}
+                onPartial={handleVoicePartial}
+                onFinal={handleVoiceFinal}
+                onRecordingChange={setVoiceRecording}
+                disabled={typing}
+              />
+            )}
           </div>
         </div>
       )}

@@ -34,6 +34,7 @@ import {
   X,
 } from '@/components/ui/icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatEther } from 'viem';
 import { useAccount, useBalance, useChainId, useSwitchChain, useWriteContract } from 'wagmi';
@@ -81,8 +82,25 @@ const DomainsPage: React.FC = () => {
   } = useRnsOwnedLabel(address, hintLabel ?? undefined);
 
   // Search Queries
-  const [query, setQuery] = useState('');
-  const [submittedQuery, setSubmittedQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialQueryName = useMemo(() => {
+    const raw = searchParams.get('name')?.trim().toLowerCase() ?? '';
+    if (!raw) return '';
+    return /^[a-z0-9_-]{3,32}$/.test(raw) ? raw : '';
+  }, [searchParams]);
+  const [query, setQuery] = useState(initialQueryName);
+  const [submittedQuery, setSubmittedQuery] = useState(initialQueryName);
+
+  useEffect(() => {
+    if (!initialQueryName) return;
+    setQuery(initialQueryName);
+    setSubmittedQuery(initialQueryName);
+    // Drop the param so the next user-typed query doesn't get fought by the URL
+    const next = new URLSearchParams(searchParams);
+    next.delete('name');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQueryName]);
 
   // Search History State (localStorage backed)
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {

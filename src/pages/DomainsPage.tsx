@@ -56,12 +56,12 @@ const DomainsPage: React.FC = () => {
   const isCorrectChain = chainId === riseTestnet.id;
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const explorerUrl = getExplorerUrl(chainId);
-
   const { resolver: resolverAddress } = useRnsContracts();
   const { writeContract: writeResolverText } = useWriteContract();
 
   const { data: balanceData } = useBalance({
     address,
+    chainId: riseTestnet.id,
     query: { enabled: isConnected && Boolean(address) },
   });
 
@@ -69,7 +69,7 @@ const DomainsPage: React.FC = () => {
   const [hintLabel, setHintLabel] = useState<string | null>(null);
   // Survives renders and potential wallet-triggered page reloads within the same session.
   const lastRegisteredRef = useRef<string>('');
-  // Prevents setText from firing more than once per registration success.
+  // Prevents the post-register label write from firing more than once.
   const setTextFiredRef = useRef(false);
 
   const {
@@ -84,7 +84,7 @@ const DomainsPage: React.FC = () => {
   // Search Queries
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQueryName = useMemo(() => {
-    const raw = searchParams.get('name')?.trim().toLowerCase() ?? '';
+    const raw = (searchParams.get('name') ?? searchParams.get('q'))?.trim().toLowerCase() ?? '';
     if (!raw) return '';
     return /^[a-z0-9_-]{3,32}$/.test(raw) ? raw : '';
   }, [searchParams]);
@@ -98,6 +98,7 @@ const DomainsPage: React.FC = () => {
     // Drop the param so the next user-typed query doesn't get fought by the URL
     const next = new URLSearchParams(searchParams);
     next.delete('name');
+    next.delete('q');
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQueryName]);
@@ -286,9 +287,8 @@ const DomainsPage: React.FC = () => {
 
     const node = rnsNamehash(registeredName);
     saveRecentRegistration(address, registeredName, node);
-    // Set as primary immediately so Dashboard shows it without waiting for subgraph.
+    // Set as primary immediately so Dashboard shows it while the API index catches up.
     setPrimaryLabel(address, registeredName);
-    // Store label on-chain so any device can recover it without the indexer.
     writeResolverText({
       address: resolverAddress,
       abi: RNSResolver,
@@ -416,7 +416,7 @@ const DomainsPage: React.FC = () => {
   };
 
   const userBalance = balanceData?.value ?? 0n;
-  const hasSufficientBalance = registerPrice === 0n || userBalance >= registerPrice;
+  const hasSufficientBalance = !balanceData || registerPrice === 0n || userBalance >= registerPrice;
 
   const nowSec = Math.floor(Date.now() / 1000);
   const ownedExpirySec = Number(ownedExpiry);
@@ -634,7 +634,7 @@ const DomainsPage: React.FC = () => {
                                     isApproving ||
                                     isRegistering ||
                                     isOwnedLoading ||
-                                    !hasSufficientBalance ||
+                                    Boolean(balanceData && !hasSufficientBalance) ||
                                     isRegisterQuoteLoading
                                   }
                                   className="btn-primary py-2.5 px-6 bg-[#A5F95A] hover:bg-[#92E446] text-black font-semibold rounded-xl text-body-sm shadow-md shadow-[#A5F95A]/10 active:scale-98 transition-all flex items-center gap-2 flex-1 md:flex-initial"

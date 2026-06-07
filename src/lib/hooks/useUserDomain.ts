@@ -8,7 +8,8 @@ import { useRnsOwnedLabel } from '@/lib/hooks/rns/useRnsOwnedLabel';
 import { useCallback } from 'react';
 
 /**
- * User's `.rise` name — sourced from the Goldsky subgraph (onchain, no localStorage).
+ * User's `.rise` name — sourced from Senna's RNS indexer first, with on-chain
+ * verification layered on top inside the underlying hooks.
  */
 export function useUserDomain(address?: string) {
   const {

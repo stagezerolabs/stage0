@@ -55,9 +55,9 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     register({ name: requestedName, value: registerPrice });
   }, [approveSuccess, requestedName, available, reserved, register, registerPrice]);
 
-  // Bridge the Goldsky indexing lag: when the register tx confirms, persist a
-  // local hint so DomainsPage/MyDomains can show the new name immediately, and
-  // invalidate the subgraph query so it refetches once Goldsky catches up.
+  // Bridge indexer lag: when the register tx confirms, persist a local hint so
+  // DomainsPage/MyDomains can show the new name immediately, then invalidate
+  // both the Senna-backed and legacy subgraph caches.
   const persistedRef = useRef(false);
   useEffect(() => {
     if (!isSuccess || persistedRef.current) return;
@@ -68,6 +68,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     } catch {
       // localStorage may be unavailable in some browser modes; safe to ignore.
     }
+    queryClient.invalidateQueries({ queryKey: ['rns', 'api', 'domains', 'owner'] });
     queryClient.invalidateQueries({ queryKey: ['rns', 'subgraph', 'domains', 'owner'] });
   }, [isSuccess, address, requestedName, queryClient]);
 

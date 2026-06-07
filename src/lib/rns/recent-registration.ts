@@ -27,8 +27,12 @@ function readAll(): RecentRegistration[] {
 function writeAll(entries: RecentRegistration[]): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(entries));
-  } catch {}
+  } catch {
+    // localStorage may be unavailable (private mode, quota, etc.) — safe to ignore.
+  }
 }
+
+export const RNS_RECENT_REGISTRATION_EVENT = 'rns:recent-registration-changed';
 
 /** Save a just-registered domain. Deduplicates by (address, label). */
 export function saveRecentRegistration(
@@ -48,6 +52,9 @@ export function saveRecentRegistration(
     (r) => !(r.address === entry.address && r.label === entry.label),
   );
   writeAll([entry, ...existing]);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(RNS_RECENT_REGISTRATION_EVENT));
+  }
 }
 
 /** Get recent registrations for a given address, excluding expired TTL entries. */

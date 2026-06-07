@@ -2660,6 +2660,15 @@
   border-bottom-right-radius: 6px;
   font-weight: 500;
 }
+.ai-msg-link {
+  color: rgb(var(--color-accent));
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ai-msg.user .ai-msg-link {
+  color: rgb(var(--color-accent-foreground));
+}
 .ai-msg-time { font-size: 10px; color: rgb(var(--color-ink-faint)); padding: 0 4px; }
 .ai-msg.user .ai-msg-time { text-align: right; }
 

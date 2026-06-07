@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { riseTestnet } from '@/config';
 import {
   useRnsApproveForAll,
@@ -9,7 +10,8 @@ import {
   useRnsRegistrationQuote,
 } from '@/lib/hooks/rns';
 import { RESERVED_NAMES } from '@/lib/rns/constants';
-import { normalizeRnsLabel } from '@/lib/rns/utils';
+import { saveRecentRegistration } from '@/lib/rns/recent-registration';
+import { normalizeRnsLabel, rnsNamehash } from '@/lib/rns/utils';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import type { SennaActionDraft, SignerState } from '../types';
 
@@ -17,6 +19,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
+  const queryClient = useQueryClient();
   const onWrongChain = chainId !== riseTestnet.id;
 
   const requestedName = normalizeRnsLabel(draft.prefill.name || '');
@@ -51,6 +54,22 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     chainedRef.current = true;
     register({ name: requestedName, value: registerPrice });
   }, [approveSuccess, requestedName, available, reserved, register, registerPrice]);
+
+  // Bridge the Goldsky indexing lag: when the register tx confirms, persist a
+  // local hint so DomainsPage/MyDomains can show the new name immediately, and
+  // invalidate the subgraph query so it refetches once Goldsky catches up.
+  const persistedRef = useRef(false);
+  useEffect(() => {
+    if (!isSuccess || persistedRef.current) return;
+    if (!address || !requestedName) return;
+    persistedRef.current = true;
+    try {
+      saveRecentRegistration(address, requestedName, rnsNamehash(requestedName));
+    } catch {
+      // localStorage may be unavailable in some browser modes; safe to ignore.
+    }
+    queryClient.invalidateQueries({ queryKey: ['rns', 'subgraph', 'domains', 'owner'] });
+  }, [isSuccess, address, requestedName, queryClient]);
 
   const errorMessage =
     reserved ? 'That name is reserved.' :

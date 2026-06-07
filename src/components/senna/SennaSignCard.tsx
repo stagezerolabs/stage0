@@ -105,6 +105,18 @@ function useSignerForDraft(draft: SennaActionDraft): SignerState | null {
   }
 }
 
+function getRouteButtonLabel(draft: SennaActionDraft) {
+  if (draft.actionType === 'open_dashboard' || draft.targetRoute === '/dashboard') return 'Open Dashboard';
+  if (draft.targetRoute === '/my-nfts') return 'Open Collectibles';
+  if (draft.targetRoute === '/presales') return 'Open Launchpad';
+  if (draft.targetRoute === '/tools') return 'Open Tools';
+  if (draft.targetRoute === '/domains') return 'Open Names';
+  if (draft.targetRoute === '/tokens') return 'Open Tokens';
+  if (draft.targetRoute.startsWith('/create/nft')) return 'Open NFT Creator';
+  if (draft.targetRoute.startsWith('/create/presale')) return 'Open Launch Creator';
+  return 'Open Page';
+}
+
 export const SennaSignCard: React.FC<{ draft: SennaActionDraft }> = ({ draft }) => {
   const chainId = useChainId();
   const signer = useSignerForDraft(draft);
@@ -186,7 +198,7 @@ export const SennaSignCard: React.FC<{ draft: SennaActionDraft }> = ({ draft }) 
 
       {!isSignable && draft.targetRoute && (
         <Link to={draft.targetRoute} className="senna-card-primary">
-          <span>Open in Stage0</span>
+          <span>{getRouteButtonLabel(draft)}</span>
           <ExternalLink className="h-4 w-4" />
         </Link>
       )}

@@ -6,7 +6,13 @@ import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
 import { useRnsLabelRecovery } from "@/lib/hooks/rns/useRnsLabelRecovery";
 import { RNSResolver } from "@/lib/rns/abis";
 import { getPrimaryLabel } from "@/lib/rns/primary-label";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  getRecentRegistrations,
+  removeRecentRegistration,
+  RNS_RECENT_REGISTRATION_EVENT,
+  type RecentRegistration,
+} from "@/lib/rns/recent-registration";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Address, Hex } from "viem";
 import { useReadContracts, useWriteContract } from "wagmi";
 
@@ -37,7 +43,64 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     refetch: refetchSubgraph,
   } = useRnsSubgraphDomainsForOwner(typedAddress, { enabled: Boolean(address) });
 
-  const rawDomains = useMemo(() => subgraphDomains ?? [], [subgraphDomains]);
+  // Recent registrations from localStorage bridge the 30s–few-minute Goldsky lag.
+  // Stored on tx success by Senna's buy-name signer and the legacy DomainsPage flow.
+  const [recentTick, setRecentTick] = useState(0);
+  const recentRegistrations = useMemo<RecentRegistration[]>(() => {
+    if (!address) return [];
+    return getRecentRegistrations(address);
+    // recentTick lets the merge re-evaluate after a fresh save without remounting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, recentTick]);
+
+  // Re-read localStorage when the tab regains focus or another component
+  // dispatches the recent-registration event (Senna's buy-name signer fires
+  // it on tx success so /domains updates without a focus change).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const bump = () => setRecentTick((t) => t + 1);
+    window.addEventListener("focus", bump);
+    window.addEventListener(RNS_RECENT_REGISTRATION_EVENT, bump);
+    return () => {
+      window.removeEventListener("focus", bump);
+      window.removeEventListener(RNS_RECENT_REGISTRATION_EVENT, bump);
+    };
+  }, []);
+
+  // Merge recent localStorage entries with the subgraph result.
+  // If the subgraph already returned a node, the localStorage entry is dropped
+  // from storage (subgraph caught up) and skipped to avoid duplicates.
+  const rawDomains = useMemo(() => {
+    const fromGraph = subgraphDomains ?? [];
+    if (recentRegistrations.length === 0) return fromGraph;
+
+    const graphNodes = new Set(fromGraph.map((d) => d.node.toLowerCase()));
+    const synthetic = recentRegistrations
+      .filter((r) => {
+        if (graphNodes.has(r.node.toLowerCase())) {
+          // Subgraph has it now — clean up the bridge entry.
+          removeRecentRegistration(r.address, r.label);
+          return false;
+        }
+        return true;
+      })
+      .map<typeof fromGraph[number]>((r) => ({
+        node: r.node as Hex,
+        label: r.label,
+        fqdn: `${r.label}${DOMAIN_SUFFIX}`,
+        owner: (typedAddress ?? (r.address as Address)) as Address,
+        resolver: null,
+        resolvedAddress: null,
+        registrant: (typedAddress ?? (r.address as Address)) as Address,
+        expiry: BigInt(r.expiry),
+        registeredAt: BigInt(Math.floor(r.registeredAt / 1000)),
+        renewedAt: null,
+        releasedAt: null,
+        createdAtBlock: 0n,
+      }));
+
+    return [...synthetic, ...fromGraph];
+  }, [subgraphDomains, recentRegistrations, typedAddress]);
 
   // Batch-read resolver.text(node, "label") for every owned domain.
   // This is the authoritative on-chain source of truth — set via setText after registration.

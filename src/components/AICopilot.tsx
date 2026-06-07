@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAccount, useChainId } from 'wagmi';
 import { RefreshCcw, Send, X } from '@/components/ui/icons';
 import SennaSignCard from '@/components/senna/SennaSignCard';
@@ -129,6 +130,38 @@ const SennaGlyph: React.FC<{ className?: string }> = ({ className }) => (
     <circle cx="14.5" cy="11" r="1.1" fill="currentColor" stroke="none" />
   </svg>
 );
+
+const MARKDOWN_LINK_RE = /\[([^\]]{1,80})\]\((\/[A-Za-z0-9/_?=&:%#.-]*|https?:\/\/[^\s)]+)\)/g;
+
+function MessageText({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(MARKDOWN_LINK_RE)) {
+    const [raw, label, href] = match;
+    const index = match.index ?? 0;
+    if (index > lastIndex) parts.push(text.slice(lastIndex, index));
+
+    if (href.startsWith('/')) {
+      parts.push(
+        <Link key={`${href}-${index}`} to={href} className="ai-msg-link">
+          {label}
+        </Link>,
+      );
+    } else {
+      parts.push(
+        <a key={`${href}-${index}`} href={href} target="_blank" rel="noreferrer" className="ai-msg-link">
+          {label}
+        </a>,
+      );
+    }
+
+    lastIndex = index + raw.length;
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return <>{parts}</>;
+}
 
 const AICopilot: React.FC = () => {
   const { address } = useAccount();
@@ -312,7 +345,9 @@ const AICopilot: React.FC = () => {
               <div key={i} className={`ai-msg ${m.role}`}>
                 <div className="ai-msg-row">
                   <div className="ai-msg-content">
-                    <div className="ai-msg-bubble">{m.text}</div>
+                    <div className="ai-msg-bubble">
+                      <MessageText text={m.text} />
+                    </div>
                     {m.actionDraft && <SennaSignCard draft={m.actionDraft} />}
                   </div>
                 </div>

@@ -469,9 +469,9 @@ const DomainsPage: React.FC = () => {
           {/* LEFT COLUMN: Search & Register */}
           <div className="lg:col-span-7 space-y-6">
             {/* Search Input Card */}
-            <div className="glass-card rounded-3xl p-6 border border-border space-y-4">
+            <div className="rounded-3xl border border-border bg-canvas-alt p-6 space-y-4">
               <h3 className="font-display text-lg font-bold text-ink">Find a name</h3>
-              <div className="relative bg-border hover:bg-accent p-[1.5px] rounded-2xl shadow-float hover:shadow-float-hover transition-all duration-300">
+              <div className="relative bg-border hover:bg-accent p-[1.5px] rounded-2xl transition-colors duration-200">
                 <div className="bg-canvas-alt rounded-[14px] flex items-center px-4 py-1.5 w-full">
                   <Search className="w-5 h-5 text-accent pointer-events-none mr-3 shrink-0" />
                   <input
@@ -497,7 +497,7 @@ const DomainsPage: React.FC = () => {
                   <div className="flex items-center gap-3 shrink-0">
                     <button
                       onClick={handleSearchSubmit}
-                      className="btn-primary py-2 px-5 bg-accent hover:bg-accent-hover text-accent-foreground rounded-xl flex items-center gap-1.5 font-display text-[13px] font-semibold tracking-tight shadow-md"
+                      className="btn-primary py-2 px-5 bg-accent hover:bg-accent-hover text-accent-foreground rounded-xl flex items-center gap-1.5 font-display text-[13px] font-semibold tracking-tight shadow-none"
                     >
                       Search
                     </button>

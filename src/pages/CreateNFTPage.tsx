@@ -19,12 +19,13 @@ import {
 import { format, isSameDay, setHours, setMinutes, startOfDay } from 'date-fns';
 import { toast } from 'sonner';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
-import { normalizeBaseURI } from '@/lib/utils/ipfs';
+import { normalizeBaseURI, normalizeContractURI } from '@/lib/utils/ipfs';
 import {
   formatStage0ImageFileSize,
   getStage0ImageValidationError,
   uploadCollectionImage,
 } from '@/lib/api/media';
+import { validateNFTMetadata } from '@/lib/api/nft';
 import FallbackImage from '@/components/ui/fallback-image';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -228,6 +229,7 @@ const CreateNFTPage: React.FC = () => {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [baseURI, setBaseURI] = useState('');
+  const [contractURI, setContractURI] = useState('');
   const [collectionDescription, setCollectionDescription] = useState('');
   const [collectionWebsiteUrl, setCollectionWebsiteUrl] = useState('');
   const [collectionXUrl, setCollectionXUrl] = useState('');
@@ -238,6 +240,8 @@ const CreateNFTPage: React.FC = () => {
   const [collectionImageMeta, setCollectionImageMeta] = useState<string>('');
   const [collectionImageName, setCollectionImageName] = useState('');
   const [collectionImageDragActive, setCollectionImageDragActive] = useState(false);
+  const [isMetadataValidating, setIsMetadataValidating] = useState(false);
+  const [metadataValidationNote, setMetadataValidationNote] = useState<string | null>(null);
   const [maxSupply, setMaxSupply] = useState('');
   const [walletLimit, setWalletLimit] = useState('');
   const [payoutWallet, setPayoutWallet] = useState('');
@@ -382,6 +386,8 @@ const CreateNFTPage: React.FC = () => {
     if (!symbol.trim()) return { valid: false, message: 'Collection symbol is required.' };
     const normalizedBaseUri = normalizeBaseURI(baseURI.trim());
     if (!normalizedBaseUri) return { valid: false, message: 'Base URI is required.' };
+    const normalizedContractUri = normalizeContractURI(contractURI.trim());
+    if (!normalizedContractUri) return { valid: false, message: 'Contract URI is required.' };
     if (!maxSupply.trim()) return { valid: false, message: 'Max supply is required.' };
     if (!mintPrice.trim()) return { valid: false, message: 'Public mint price is required.' };
     if (!saleStart) return { valid: false, message: 'Public sale start is required.' };
@@ -448,6 +454,7 @@ const CreateNFTPage: React.FC = () => {
     name,
     symbol,
     baseURI,
+    contractURI,
     maxSupply,
     mintPrice,
     walletLimit,
@@ -459,7 +466,11 @@ const CreateNFTPage: React.FC = () => {
     whitelistPrice,
   ]);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    setMetadataValidationNote(null);
+  }, [baseURI, contractURI]);
+
+  const handleSubmit = async () => {
     if (!validation.valid) {
       toast.error(validation.message);
       return;
@@ -469,6 +480,7 @@ const CreateNFTPage: React.FC = () => {
     const saleEndTs = parseDateTimeInput(saleEnd);
     const whitelistStartTs = whitelistEnabled ? parseDateTimeInput(whitelistStart) : null;
     const normalizedBaseUri = normalizeBaseURI(baseURI.trim());
+    const normalizedContractUri = normalizeContractURI(contractURI.trim());
     const walletLimitValue = walletLimit.trim() ? Number(walletLimit) : 0;
 
     if (!saleStartTs || !saleEndTs) {
@@ -486,6 +498,44 @@ const CreateNFTPage: React.FC = () => {
       return;
     }
 
+    if (!normalizedContractUri) {
+      toast.error('Contract URI is invalid.');
+      return;
+    }
+
+    setIsMetadataValidating(true);
+    setMetadataValidationNote(null);
+    let metadataValidation;
+    try {
+      metadataValidation = await validateNFTMetadata({
+        baseURI: normalizedBaseUri,
+        contractURI: normalizedContractUri,
+      });
+    } catch (error) {
+      setIsMetadataValidating(false);
+      const message = error instanceof Error ? error.message : 'Could not validate NFT metadata.';
+      setMetadataValidationNote(message);
+      toast.error(message);
+      return;
+    }
+    setIsMetadataValidating(false);
+
+    if (metadataValidation.normalizedBaseURI !== normalizedBaseUri) {
+      setBaseURI(metadataValidation.normalizedBaseURI);
+    }
+    if (metadataValidation.normalizedContractURI !== normalizedContractUri) {
+      setContractURI(metadataValidation.normalizedContractURI);
+    }
+
+    if (metadataValidation.warnings.length > 0) {
+      setMetadataValidationNote(metadataValidation.warnings.join(' '));
+      toast.warning(metadataValidation.warnings.join(' '));
+    } else {
+      setMetadataValidationNote(
+        `Metadata check passed. Token #1 JSON: ${metadataValidation.tokenMetadataUrl}`,
+      );
+    }
+
     const functionName: 'createETHNFT' | 'create721AETHnFT' =
       mode === 'erc721a' ? 'create721AETHnFT' : 'createETHNFT';
 
@@ -498,8 +548,8 @@ const CreateNFTPage: React.FC = () => {
           {
             name: name.trim(),
             symbol: symbol.trim(),
-            baseURI: normalizedBaseUri,
-            contractURI: '',
+            baseURI: metadataValidation.normalizedBaseURI,
+            contractURI: metadataValidation.normalizedContractURI,
             whitelistConfig: {
               enabled: whitelistEnabled,
               whitelistStart: BigInt(whitelistStartTs ?? 0),
@@ -735,6 +785,22 @@ const CreateNFTPage: React.FC = () => {
                   placeholder="CID, ipfs://.../, or https://..."
                   className="input-field w-full"
                 />
+                <p className="text-xs text-ink-faint">
+                  Stage0 normalizes this to a trailing-slash folder path and expects token metadata at `1` or `1.json`.
+                </p>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-body-sm text-ink-muted font-medium">Contract URI</label>
+                <input
+                  type="text"
+                  value={contractURI}
+                  onChange={(e) => setContractURI(e.target.value)}
+                  placeholder="CID, ipfs://.../collection.json, or https://..."
+                  className="input-field w-full"
+                />
+                <p className="text-xs text-ink-faint">
+                  Collection-level metadata JSON for marketplaces and the Stage0 lens.
+                </p>
               </div>
             </div>
           </motion.section>
@@ -1024,9 +1090,11 @@ const CreateNFTPage: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              {[
+                {[
                 { label: 'Collection', value: name.trim() || 'Untitled Collection' },
                 { label: 'Symbol', value: symbol.trim() || '--' },
+                { label: 'Base URI', value: normalizeBaseURI(baseURI.trim()) || '--' },
+                { label: 'Contract URI', value: normalizeContractURI(contractURI.trim()) || '--' },
                 { label: 'Collection image', value: collectionImageName || 'Not added yet' },
                 { label: 'Supply', value: maxSupply.trim() || '--' },
                 { label: 'Wallet limit', value: walletLimitLabel },
@@ -1052,12 +1120,23 @@ const CreateNFTPage: React.FC = () => {
               </div>
             )}
 
+            {metadataValidationNote && validation.valid && (
+              <div className="rounded-2xl border border-border bg-ink/[0.03] p-4 text-sm text-ink-muted">
+                {metadataValidationNote}
+              </div>
+            )}
+
             <button
               onClick={handleSubmit}
-              disabled={!validation.valid || isPending || isConfirming}
+              disabled={!validation.valid || isPending || isConfirming || isMetadataValidating}
               className="btn-primary w-full"
             >
-              {isPending || isConfirming ? (
+              {isMetadataValidating ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Validating Metadata...
+                </span>
+              ) : isPending || isConfirming ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   {isConfirming ? 'Confirming...' : 'Deploying Collection...'}

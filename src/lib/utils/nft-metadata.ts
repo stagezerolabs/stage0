@@ -23,6 +23,11 @@ export type TokenDisplayMetadata = CollectionDisplayMetadata & {
   attributes?: TokenMetadataAttribute[];
 };
 
+export type TokenMetadataResolveOptions = {
+  baseUri?: string;
+  tokenId?: bigint | number | string;
+};
+
 const METADATA_FETCH_TIMEOUT_MS = 5000;
 
 async function fetchWithTimeout(url: string): Promise<Response> {
@@ -50,7 +55,11 @@ function normalizeMetadataValue(value: unknown): string | undefined {
 }
 
 function extractTokenAttributes(parsed: Record<string, unknown>): TokenMetadataAttribute[] | undefined {
-  const rawAttributes = parsed.attributes;
+  const rawAttributes = Array.isArray(parsed.attributes)
+    ? parsed.attributes
+    : Array.isArray(parsed.traits)
+      ? parsed.traits
+      : undefined;
   if (!Array.isArray(rawAttributes)) return undefined;
 
   const attributes = rawAttributes
@@ -70,6 +79,16 @@ function extractTokenAttributes(parsed: Record<string, unknown>): TokenMetadataA
     .filter((attribute): attribute is TokenMetadataAttribute => attribute !== null);
 
   return attributes.length > 0 ? attributes : undefined;
+}
+
+function extractMetadataImage(parsed: Record<string, unknown>): string | undefined {
+  return (
+    normalizeMetadataValue(parsed.image) ??
+    normalizeMetadataValue(parsed.image_url) ??
+    normalizeMetadataValue(parsed.imageUrl) ??
+    normalizeMetadataValue(parsed.thumbnail) ??
+    normalizeMetadataValue(parsed.thumbnail_url)
+  );
 }
 
 function toBrowserImageUri(raw: string): string {
@@ -112,26 +131,60 @@ function resolveMetadataImageUri(imageUri: string, metadataUri: string): string 
   }
 }
 
-function getTokenMetadataCandidateUrls(rawTokenUri: string): string[] {
-  const base = ipfsUriToHttp(rawTokenUri).trim();
-  if (!base) return [];
-
-  const candidates = [base];
+function addJsonFallback(candidates: string[], url: string) {
+  const normalized = url.trim();
+  if (!normalized) return;
+  candidates.push(normalized);
 
   try {
-    const url = new URL(base);
-    const lastSegment = url.pathname.split('/').filter(Boolean).pop() ?? '';
+    const parsed = new URL(normalized);
+    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop() ?? '';
     const hasExtension = /\.[a-z0-9]+$/i.test(lastSegment);
     if (!hasExtension) {
-      candidates.push(`${base}.json`);
+      candidates.push(`${normalized}.json`);
     }
   } catch {
-    const lastSegment = base.split('/').filter(Boolean).pop() ?? '';
+    const lastSegment = normalized.split('/').filter(Boolean).pop() ?? '';
     const hasExtension = /\.[a-z0-9]+$/i.test(lastSegment);
     if (!hasExtension) {
-      candidates.push(`${base}.json`);
+      candidates.push(`${normalized}.json`);
     }
   }
+}
+
+function getBaseUriTokenCandidates(rawBaseUri: string, tokenId: bigint | number | string | undefined): string[] {
+  const id = tokenId === undefined ? '' : String(tokenId).trim();
+  if (!id) return [];
+
+  const base = ipfsUriToHttp(rawBaseUri).trim();
+  if (!base) return [];
+
+  const candidates: string[] = [];
+  const trimmedBase = base.replace(/\/+$/, '');
+  addJsonFallback(candidates, `${trimmedBase}/${id}`);
+
+  if (base.endsWith('/')) {
+    addJsonFallback(candidates, `${base}${id}`);
+  } else {
+    // Keep this candidate for contracts already returning concatenated tokenURI-style bases.
+    addJsonFallback(candidates, `${base}${id}`);
+  }
+
+  return candidates;
+}
+
+function getTokenMetadataCandidateUrls(
+  rawTokenUri: string,
+  options: TokenMetadataResolveOptions = {},
+): string[] {
+  const candidates: string[] = [];
+  const base = ipfsUriToHttp(rawTokenUri).trim();
+
+  if (base) {
+    addJsonFallback(candidates, base);
+  }
+
+  candidates.push(...getBaseUriTokenCandidates(options.baseUri ?? '', options.tokenId));
 
   return Array.from(new Set(candidates));
 }
@@ -165,10 +218,8 @@ async function fetchImageOrMetadata(
         continue;
       }
 
-      const image =
-        typeof parsed.image === 'string' && parsed.image.trim().length > 0
-          ? resolveMetadataImageUri(parsed.image, response.url || url)
-          : undefined;
+      const imageValue = extractMetadataImage(parsed);
+      const image = imageValue ? resolveMetadataImageUri(imageValue, response.url || url) : undefined;
       const description = normalizeMetadataValue(parsed.description);
       const name = normalizeMetadataValue(parsed.name);
       const attributes = extractTokenAttributes(parsed);
@@ -200,25 +251,29 @@ export async function fetchCollectionContractMetadata(
 
 export async function fetchTokenDisplayMetadata(
   rawTokenUri: string,
+  options: TokenMetadataResolveOptions = {},
 ): Promise<TokenDisplayMetadata | null> {
-  return fetchImageOrMetadata(getTokenMetadataCandidateUrls(rawTokenUri));
+  return fetchImageOrMetadata(getTokenMetadataCandidateUrls(rawTokenUri, options));
 }
 
 export async function fetchTokenDisplayImage(
   rawTokenUri: string,
+  options: TokenMetadataResolveOptions = {},
 ): Promise<string | undefined> {
-  const metadata = await fetchTokenDisplayMetadata(rawTokenUri);
+  const metadata = await fetchTokenDisplayMetadata(rawTokenUri, options);
   return metadata?.image;
 }
 
 export async function resolveCollectionDisplayMetadata(options: {
   contractUri?: string;
+  baseUri?: string;
   collectionAddress?: Address;
   totalMinted?: bigint;
   publicClient?: PublicClient;
 }): Promise<CollectionDisplayMetadata | null> {
   const {
     contractUri = '',
+    baseUri = '',
     collectionAddress,
     totalMinted = 0n,
     publicClient,
@@ -231,6 +286,20 @@ export async function resolveCollectionDisplayMetadata(options: {
 
   if (!publicClient || !collectionAddress || totalMinted <= 0n) {
     return contractMetadata;
+  }
+
+  let resolvedBaseUri = baseUri;
+  if (!resolvedBaseUri.trim()) {
+    try {
+      const onchainBaseUri = await publicClient.readContract({
+        abi: NFTCollectionContract,
+        address: collectionAddress,
+        functionName: 'baseURI',
+      });
+      resolvedBaseUri = typeof onchainBaseUri === 'string' ? onchainBaseUri : '';
+    } catch {
+      resolvedBaseUri = '';
+    }
   }
 
   for (const tokenId of [1n, 0n]) {
@@ -246,7 +315,10 @@ export async function resolveCollectionDisplayMetadata(options: {
         continue;
       }
 
-      const tokenMetadata = await fetchTokenDisplayMetadata(tokenUri);
+      const tokenMetadata = await fetchTokenDisplayMetadata(tokenUri, {
+        baseUri: resolvedBaseUri,
+        tokenId,
+      });
       const image = tokenMetadata?.image;
       if (image) {
         return {

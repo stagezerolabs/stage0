@@ -1446,6 +1446,13 @@ export const NFTCollectionContract = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "baseURI",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [{ internalType: "address", name: "newWallet", type: "address" }],
     name: "setPayoutWallet",
     outputs: [],

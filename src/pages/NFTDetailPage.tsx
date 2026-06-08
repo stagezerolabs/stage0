@@ -162,6 +162,7 @@ const NFTDetailPage: React.FC = () => {
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleStart' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'saleEnd' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'contractURI' },
+      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'baseURI' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistEnabled' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistStart' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistPrice' },
@@ -222,9 +223,10 @@ const NFTDetailPage: React.FC = () => {
     const saleStart = (collectionData[6]?.result as bigint | undefined) ?? 0n;
     const saleEnd = (collectionData[7]?.result as bigint | undefined) ?? 0n;
     const contractURI = (collectionData[8]?.result as string | undefined) ?? '';
-    const whitelistEnabled = (collectionData[9]?.result as boolean | undefined) ?? false;
-    const whitelistStart = (collectionData[10]?.result as bigint | undefined) ?? 0n;
-    const whitelistPrice = (collectionData[11]?.result as bigint | undefined) ?? 0n;
+    const baseURI = (collectionData[9]?.result as string | undefined) ?? '';
+    const whitelistEnabled = (collectionData[10]?.result as boolean | undefined) ?? false;
+    const whitelistStart = (collectionData[11]?.result as bigint | undefined) ?? 0n;
+    const whitelistPrice = (collectionData[12]?.result as bigint | undefined) ?? 0n;
     const remaining = maxSupply > 0n ? maxSupply - totalMinted : 0n;
     const salePhase = getNFTSalePhase({
       maxSupply,
@@ -253,6 +255,7 @@ const NFTDetailPage: React.FC = () => {
       saleStart,
       saleEnd,
       contractURI,
+      baseURI,
       whitelistEnabled,
       whitelistStart,
       whitelistPrice,
@@ -284,6 +287,7 @@ const NFTDetailPage: React.FC = () => {
       try {
         const metadata = await resolveCollectionDisplayMetadata({
           contractUri: collection?.contractURI ?? '',
+          baseUri: collection?.baseURI ?? '',
           collectionAddress,
           totalMinted: collection?.totalMinted ?? 0n,
           publicClient,
@@ -324,24 +328,34 @@ const NFTDetailPage: React.FC = () => {
 
     (async () => {
       for (const tokenId of [1n, 0n]) {
+        let tokenUri = '';
         try {
-          const tokenUri = await publicClient.readContract({
+          const result = await publicClient.readContract({
             abi: NFTCollectionContract,
             address: collectionAddress,
             functionName: 'tokenURI',
             args: [tokenId],
           });
 
-          if (typeof tokenUri !== 'string' || !tokenUri.trim()) continue;
+          tokenUri = typeof result === 'string' ? result : '';
+        } catch {
+          tokenUri = '';
+        }
 
-          const tokenMetadata = await fetchTokenDisplayMetadata(tokenUri);
-          if (tokenMetadata?.attributes?.length) {
-            if (!cancelled) {
-              setSampleTraits(tokenMetadata.attributes.slice(0, 8));
-              setIsSampleTraitsLoading(false);
-            }
-            return;
+        if (!tokenUri.trim() && !collection.baseURI.trim()) continue;
+
+        try {
+          const tokenMetadata = await fetchTokenDisplayMetadata(tokenUri, {
+            baseUri: collection.baseURI,
+            tokenId,
+          });
+          if (!tokenMetadata?.attributes?.length) continue;
+
+          if (!cancelled) {
+            setSampleTraits(tokenMetadata.attributes.slice(0, 8));
+            setIsSampleTraitsLoading(false);
           }
+          return;
         } catch {
           continue;
         }

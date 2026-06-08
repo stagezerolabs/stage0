@@ -2,17 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { type Address } from 'viem';
 import { useReadContracts } from 'wagmi';
 import { NFTCollectionContract } from '@/config';
-import { ipfsUriToHttp } from '@/lib/utils/ipfs';
-import { fetchTokenDisplayImage } from '@/lib/utils/nft-metadata';
+import {
+  fetchTokenDisplayMetadata,
+  type TokenDisplayMetadata,
+  type TokenMetadataAttribute,
+} from '@/lib/utils/nft-metadata';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 
 const MAX_TOKEN_SCAN_PER_COLLECTION = 1000;
 
-type TokenMetadata = {
-  image?: string;
-  name?: string;
-  description?: string;
-} | null;
+export type OwnedNFTAttribute = TokenMetadataAttribute;
+type TokenMetadata = TokenDisplayMetadata | null;
 
 type OwnerReadResult = {
   status?: string;
@@ -25,11 +25,13 @@ type OwnedTokenTarget = {
   collectionSymbol: string;
   collectionOwner: Address;
   tokenId: bigint;
+  collectionBaseURI?: string;
   collectionStatus: 'live' | 'upcoming' | 'ended';
   is721A: boolean;
 };
 
 type UseUserOwnedNFTTokensOptions = {
+  collectionAddress?: Address;
   metadataLimit?: number;
 };
 
@@ -38,30 +40,6 @@ function readResult<T>(entry: unknown): T | undefined {
   const result = entry as OwnerReadResult;
   if (result.status && result.status !== 'success') return undefined;
   return result.result as T | undefined;
-}
-
-function resolveMetadataImageUri(imageUri: string, metadataUri: string): string {
-  const normalized = imageUri.trim();
-  if (!normalized) return '';
-
-  if (
-    normalized.startsWith('ipfs://') ||
-    normalized.startsWith('http://') ||
-    normalized.startsWith('https://')
-  ) {
-    return ipfsUriToHttp(normalized);
-  }
-
-  try {
-    const base = ipfsUriToHttp(metadataUri);
-    return new URL(normalized, base).toString();
-  } catch {
-    return ipfsUriToHttp(normalized);
-  }
-}
-
-function looksLikeImageUrl(value: string): boolean {
-  return /\.(png|jpe?g|gif|webp|svg)$/i.test(value);
 }
 
 function compareTokenTargets(a: OwnedTokenTarget, b: OwnedTokenTarget): number {
@@ -82,6 +60,7 @@ export type OwnedNFTToken = {
   image?: string;
   metadataName?: string;
   metadataDescription?: string;
+  attributes?: OwnedNFTAttribute[];
   collectionStatus: 'live' | 'upcoming' | 'ended';
   is721A: boolean;
 };
@@ -97,12 +76,49 @@ export function useUserOwnedNFTTokens(
       ? Math.max(0, Math.floor(options.metadataLimit))
       : undefined;
 
-  const { holdings, totalOwned, isLoading: isHoldingsLoading } = useUserNFTHoldings(userAddress, canRead);
+  const { holdings, isLoading: isHoldingsLoading } = useUserNFTHoldings(userAddress, canRead);
 
   const holdingsWithBalance = useMemo(
-    () => holdings.filter((holding) => holding.ownedCount > 0n),
-    [holdings]
+    () => holdings.filter((holding) => {
+      if (holding.ownedCount <= 0n) return false;
+      if (!options.collectionAddress) return true;
+      return holding.address.toLowerCase() === options.collectionAddress.toLowerCase();
+    }),
+    [holdings, options.collectionAddress]
   );
+
+  const totalOwned = useMemo(
+    () => holdingsWithBalance.reduce((sum, holding) => sum + holding.ownedCount, 0n),
+    [holdingsWithBalance]
+  );
+
+  const baseUriQueries = useMemo(
+    () =>
+      holdingsWithBalance.map((holding) => ({
+        abi: NFTCollectionContract,
+        address: holding.address,
+        functionName: 'baseURI',
+      })),
+    [holdingsWithBalance]
+  );
+
+  const { data: baseUriResults, isLoading: isBaseUriLoading } = useReadContracts({
+    contracts: baseUriQueries as readonly any[],
+    query: {
+      enabled: canRead && baseUriQueries.length > 0,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  });
+
+  const baseUriByCollection = useMemo(() => {
+    const entries = new Map<string, string>();
+    holdingsWithBalance.forEach((holding, index) => {
+      const baseURI = readResult<string>(baseUriResults?.[index]);
+      if (baseURI) entries.set(holding.address.toLowerCase(), baseURI);
+    });
+    return entries;
+  }, [baseUriResults, holdingsWithBalance]);
 
   const ownerScanTargets = useMemo(() => {
     const targets: OwnedTokenTarget[] = [];
@@ -117,6 +133,7 @@ export function useUserOwnedNFTTokens(
           collectionSymbol: holding.symbol,
           collectionOwner: holding.owner,
           tokenId: BigInt(tokenId),
+          collectionBaseURI: baseUriByCollection.get(holding.address.toLowerCase()),
           collectionStatus: holding.status,
           is721A: holding.is721A,
         });
@@ -124,7 +141,7 @@ export function useUserOwnedNFTTokens(
     }
 
     return targets;
-  }, [holdingsWithBalance]);
+  }, [baseUriByCollection, holdingsWithBalance]);
 
   const ownerQueries = useMemo(
     () =>
@@ -196,9 +213,11 @@ export function useUserOwnedNFTTokens(
   const [metadataByToken, setMetadataByToken] = useState<Record<string, TokenMetadata>>({});
 
   useEffect(() => {
+    if (baseUriQueries.length > 0 && isBaseUriLoading) return;
+
     const pending = tokenRows.filter(
       (row) =>
-        row.tokenURI &&
+        (row.tokenURI || row.collectionBaseURI) &&
         metadataByToken[`${row.collectionAddress.toLowerCase()}:${row.tokenId.toString()}`] === undefined
     );
 
@@ -210,35 +229,11 @@ export function useUserOwnedNFTTokens(
       const entries = await Promise.all(
         pending.map(async (row) => {
           const key = `${row.collectionAddress.toLowerCase()}:${row.tokenId.toString()}`;
-          try {
-            const tokenUriHttp = ipfsUriToHttp(row.tokenURI || '');
-            if (!tokenUriHttp) return [key, null] as const;
-
-            const response = await fetch(tokenUriHttp);
-            if (!response.ok) throw new Error(`Metadata fetch failed: ${response.status}`);
-
-            const metadata = (await response.json()) as Record<string, unknown>;
-            const name =
-              typeof metadata.name === 'string' && metadata.name.trim().length > 0
-                ? metadata.name.trim()
-                : undefined;
-            const description =
-              typeof metadata.description === 'string' && metadata.description.trim().length > 0
-                ? metadata.description.trim()
-                : undefined;
-            const image =
-              typeof metadata.image === 'string' && metadata.image.trim().length > 0
-                ? resolveMetadataImageUri(metadata.image, tokenUriHttp)
-                : undefined;
-
-            return [key, { image, name, description } as TokenMetadata] as const;
-          } catch {
-            const directImage = row.tokenURI
-              ? (await fetchTokenDisplayImage(row.tokenURI)) ||
-                (looksLikeImageUrl(row.tokenURI) ? ipfsUriToHttp(row.tokenURI) : undefined)
-              : undefined;
-            return [key, directImage ? ({ image: directImage } as TokenMetadata) : null] as const;
-          }
+          const metadata = await fetchTokenDisplayMetadata(row.tokenURI || '', {
+            baseUri: row.collectionBaseURI,
+            tokenId: row.tokenId,
+          });
+          return [key, metadata] as const;
         })
       );
 
@@ -256,7 +251,7 @@ export function useUserOwnedNFTTokens(
     return () => {
       cancelled = true;
     };
-  }, [tokenRows, metadataByToken]);
+  }, [baseUriQueries.length, isBaseUriLoading, tokenRows, metadataByToken]);
 
   const tokens = useMemo((): OwnedNFTToken[] => {
     return tokenRows.map((row) => {
@@ -272,6 +267,7 @@ export function useUserOwnedNFTTokens(
         image: metadata?.image,
         metadataName: metadata?.name,
         metadataDescription: metadata?.description,
+        attributes: metadata?.attributes,
         collectionStatus: row.collectionStatus,
         is721A: row.is721A,
       };
@@ -290,6 +286,7 @@ export function useUserOwnedNFTTokens(
     totalOwned,
     isLoading:
       isHoldingsLoading ||
+      (baseUriQueries.length > 0 && isBaseUriLoading) ||
       (ownerQueries.length > 0 && isOwnerLoading) ||
       (tokenUriQueries.length > 0 && isTokenUriLoading),
     isTruncatedScan: truncatedCollections.length > 0,

@@ -24,6 +24,7 @@ import AdminPresalesPage from './pages/admin/AdminPresalesPage';
 import AdminWhitelistPage from './pages/admin/AdminWhitelistPage';
 import TokensPage from './pages/TokensPage';
 import MyNFTsPage from './pages/MyNFTsPage';
+import MyNFTCollectionPage from './pages/MyNFTCollectionPage';
 import DomainsPage from './pages/DomainsPage';
 
 type AppRoutesProps = {
@@ -52,6 +53,7 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
           <Route path="/project/:address" element={<ProjectPage />} />
           <Route path="/tokens" element={<TokensPage />} />
           <Route path="/my-nfts" element={<MyNFTsPage />} />
+          <Route path="/my-nfts/:collectionAddress" element={<MyNFTCollectionPage />} />
           <Route path="/domains" element={<DomainsPage />} />
           {/* Admin-only tool access */}
           <Route element={<AdminRoute />}>

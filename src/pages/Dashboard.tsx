@@ -307,11 +307,10 @@ const Dashboard: React.FC = () => {
   const balanceSymbol = balance?.symbol ?? nativeToken;
 
   const totalAllocations = allocations.length + nftPurchaseAllocations.length + (hasStakedAllocation ? 1 : 0);
-  const unlockedLocks = myLocks.filter((lock) => !lock.withdrawn && Number(lock.unlockDate) <= nowSec).length;
   const createdAssetsCount = createdTokenList.length + createdPresales.length + myNFTDeployments.length;
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-7 sm:gap-10">
       {/* Wallet hero */}
       <section>
         <div className="wallet-header">
@@ -354,11 +353,6 @@ const Dashboard: React.FC = () => {
         <StatTile
           label="Created assets"
           value={isConnected ? String(createdAssetsCount) : '0'}
-          meta={
-            isConnected
-              ? `${createdTokenList.length} tokens · ${myNFTDeployments.length} NFT drops`
-              : 'connect wallet'
-          }
           icon={<Package className="w-4 h-4" />}
           tint="rgb(var(--color-accent) / 0.14)"
           tintSolid="rgb(var(--color-accent))"
@@ -366,7 +360,6 @@ const Dashboard: React.FC = () => {
         <StatTile
           label="Allocations"
           value={isConnected ? String(totalAllocations) : '0'}
-          meta={totalAllocations > 0 ? 'live positions' : 'no positions yet'}
           icon={<Layers className="w-4 h-4" />}
           tint="rgb(var(--color-accent-secondary) / 0.14)"
           tintSolid="rgb(var(--color-accent-secondary))"
@@ -374,7 +367,6 @@ const Dashboard: React.FC = () => {
         <StatTile
           label="NFTs owned"
           value={isConnected ? totalOwnedNFTs.toString() : '0'}
-          meta={`${myNFTDeployments.length} collection${myNFTDeployments.length === 1 ? '' : 's'} created`}
           icon={<ImageIcon className="w-4 h-4" />}
           tint="rgb(var(--color-accent-violet) / 0.16)"
           tintSolid="rgb(var(--color-accent-violet))"
@@ -382,7 +374,6 @@ const Dashboard: React.FC = () => {
         <StatTile
           label="Token locks"
           value={isConnected ? String(myLocks.length) : '0'}
-          meta={unlockedLocks > 0 ? `${unlockedLocks} unlockable now` : 'all locked'}
           icon={<Lock className="w-4 h-4" />}
           tint="rgb(var(--color-accent-sky) / 0.16)"
           tintSolid="rgb(var(--color-accent-sky))"
@@ -829,20 +820,18 @@ const Dashboard: React.FC = () => {
 type StatTileProps = {
   label: string;
   value: string;
-  meta: string;
   icon: React.ReactNode;
   tint: string;
   tintSolid: string;
 };
 
-const StatTile: React.FC<StatTileProps> = ({ label, value, meta, icon, tint, tintSolid }) => (
+const StatTile: React.FC<StatTileProps> = ({ label, value, icon, tint, tintSolid }) => (
   <div className="stat-tile" style={{ ['--stat-tint' as unknown as string]: tint }}>
     <div className="stat-tile-icon" style={{ background: tint, color: tintSolid }}>
       {icon}
     </div>
     <div className="stat-tile-label">{label}</div>
     <div className="stat-tile-value">{value}</div>
-    <div className="stat-tile-meta">{meta}</div>
   </div>
 );
 
@@ -861,7 +850,7 @@ const DashboardCarousel: React.FC<{ children: React.ReactNode }> = ({ children }
         </CarouselItem>
       ))}
     </CarouselContent>
-    <div className="mt-4 flex justify-end gap-2">
+    <div className="dashboard-carousel-controls mt-4 flex justify-center sm:justify-end gap-2">
       <CarouselPrevious className="static translate-x-0 translate-y-0" />
       <CarouselNext className="static translate-x-0 translate-y-0" />
     </div>
@@ -879,7 +868,7 @@ type CreationCardProps = {
 };
 
 const CreationCard: React.FC<CreationCardProps> = ({ eyebrow, title, count, accent, empty, cta, children }) => (
-  <div className="relative bg-canvas-alt border border-border rounded-3xl p-5 flex h-full flex-col gap-4 overflow-hidden">
+  <div className="relative bg-canvas-alt border border-border rounded-3xl p-4 sm:p-5 flex h-full flex-col gap-3.5 sm:gap-4 overflow-hidden">
     <div
       aria-hidden
       className="absolute top-0 left-5 h-[3px] w-10 rounded-b-full"
@@ -893,7 +882,7 @@ const CreationCard: React.FC<CreationCardProps> = ({ eyebrow, title, count, acce
         >
           {eyebrow}
         </div>
-        <h3 className="font-display font-bold text-[20px] text-ink leading-tight mt-1.5 tracking-tight">
+        <h3 className="font-display font-bold text-[18px] sm:text-[20px] text-ink leading-tight mt-1.5 tracking-tight">
           {title}
         </h3>
       </div>

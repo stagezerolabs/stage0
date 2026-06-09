@@ -53,6 +53,8 @@ const DEFAULT_SUGGESTIONS = [
 const SENNA_API_URL =
   (import.meta.env.VITE_SENNA_CHAT_API_URL as string | undefined)?.replace(/\/$/, '') ||
   'http://localhost:8788';
+const SENNA_NOTIFICATION_DELAY_MS = 17000;
+const SENNA_NOTIFICATION_POP_DURATION_MS = 5200;
 
 const randomItem = (items: string[]) => items[Math.floor(Math.random() * items.length)];
 
@@ -175,8 +177,37 @@ const AICopilot: React.FC = () => {
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
   const [slashOpen, setSlashOpen] = useState(false);
   const [voiceRecording, setVoiceRecording] = useState(false);
+  const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
+  const [showNotificationPop, setShowNotificationPop] = useState(false);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const hasOpenedChatRef = useRef(false);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    hasOpenedChatRef.current = true;
+    setHasUnreadNotification(false);
+    setShowNotificationPop(false);
+  }, [chatOpen]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (hasOpenedChatRef.current) return;
+      setHasUnreadNotification(true);
+      setShowNotificationPop(true);
+    }, SENNA_NOTIFICATION_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!showNotificationPop) return undefined;
+    const timer = window.setTimeout(() => {
+      setShowNotificationPop(false);
+    }, SENNA_NOTIFICATION_POP_DURATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [showNotificationPop]);
 
   useEffect(() => {
     if (chatOpen && bodyRef.current) {
@@ -194,8 +225,9 @@ const AICopilot: React.FC = () => {
   useEffect(() => {
     const handleScroll = () => {
       const footer = document.querySelector('footer');
+      const baseBottomOffset = window.matchMedia('(max-width: 640px)').matches ? 18 : 24;
       if (!footer) {
-        setBottomOffset(24);
+        setBottomOffset(baseBottomOffset);
         return;
       }
 
@@ -204,9 +236,9 @@ const AICopilot: React.FC = () => {
 
       if (footerRect.top < viewportHeight) {
         const visibleFooterHeight = viewportHeight - footerRect.top;
-        setBottomOffset(visibleFooterHeight + 24);
+        setBottomOffset(visibleFooterHeight + baseBottomOffset);
       } else {
-        setBottomOffset(24);
+        setBottomOffset(baseBottomOffset);
       }
     };
 
@@ -221,6 +253,9 @@ const AICopilot: React.FC = () => {
   }, []);
 
   const openChat = () => {
+    hasOpenedChatRef.current = true;
+    setHasUnreadNotification(false);
+    setShowNotificationPop(false);
     setChatOpen(true);
   };
 
@@ -309,7 +344,7 @@ const AICopilot: React.FC = () => {
   const hasInputText = trimmedInput.length > 0;
 
   return (
-    <div className="ai-bubble-wrap" style={{ bottom: `${bottomOffset}px` }}>
+    <div className="ai-bubble-wrap" style={{ bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px))` }}>
       {chatOpen && (
         <div className="ai-chat" role="dialog" aria-label="Senna assistant">
           <div className="ai-chat-header">
@@ -420,17 +455,42 @@ const AICopilot: React.FC = () => {
         </div>
       )}
 
+      {showNotificationPop && !chatOpen && (
+        <div className="ai-pop" role="status" aria-live="polite">
+          <div className="ai-pop-body">
+            <div className="ai-pop-msg">
+              Need help with a launch, token, NFT, lock, airdrop, or name?
+            </div>
+          </div>
+          <button
+            type="button"
+            className="ai-pop-close"
+            onClick={() => setShowNotificationPop(false)}
+            aria-label="Dismiss Senna notification"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <button
         type="button"
         className="ai-bubble"
         onClick={() => (chatOpen ? setChatOpen(false) : openChat())}
-        aria-label={chatOpen ? 'Close Senna' : 'Open Senna'}
+        aria-label={
+          chatOpen
+            ? 'Close Senna'
+            : hasUnreadNotification
+              ? 'Open Senna. New message available'
+              : 'Open Senna'
+        }
       >
         {chatOpen ? (
           <X className="h-[22px] w-[22px]" />
         ) : (
           <SennaGlyph className="h-[26px] w-[26px]" />
         )}
+        {hasUnreadNotification && !chatOpen && <span className="ai-dot" aria-hidden="true" />}
       </button>
     </div>
   );

@@ -250,11 +250,11 @@ const PresalesPage: React.FC = () => {
                 <CountdownGrid seconds={featured.countdownSeconds} />
               )}
 
-              <div className="flex gap-3 mt-5">
-                <Link to={featured.to} className="btn-primary">
+              <div className="flex flex-col sm:flex-row gap-3 mt-5">
+                <Link to={featured.to} className="btn-primary justify-center">
                   {featured.type === 'token' ? 'Contribute now' : 'Mint now'} <ArrowRight className="w-4 h-4 ml-1" />
                 </Link>
-                <Link to={featured.to} className="btn-secondary">
+                <Link to={featured.to} className="btn-secondary justify-center">
                   View details
                 </Link>
               </div>

@@ -344,155 +344,165 @@ const AICopilot: React.FC = () => {
   const hasInputText = trimmedInput.length > 0;
 
   return (
-    <div className="ai-bubble-wrap" style={{ bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px))` }}>
+    <>
       {chatOpen && (
-        <div className="ai-chat" role="dialog" aria-label="Senna assistant">
-          <div className="ai-chat-header">
-            <div className="ai-chat-avatar">
-              <SennaGlyph className="h-5 w-5" />
+        <button
+          type="button"
+          className="ai-chat-overlay"
+          onClick={() => setChatOpen(false)}
+          aria-label="Close Senna"
+        />
+      )}
+      <div className="ai-bubble-wrap" style={{ bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px))` }}>
+        {chatOpen && (
+          <div className="ai-chat" role="dialog" aria-label="Senna assistant" aria-modal="true">
+            <div className="ai-chat-header">
+              <div className="ai-chat-avatar">
+                <SennaGlyph className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="ai-chat-name">Senna</div>
+                <div className="ai-chat-status">Online, Stage0 assistant</div>
+              </div>
+              <div className="ai-chat-actions">
+                <button
+                  type="button"
+                  className="ai-chat-icon-btn"
+                  title="New chat"
+                  onClick={startNewChat}
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="ai-chat-icon-btn"
+                  title="Close"
+                  onClick={() => setChatOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <div>
-              <div className="ai-chat-name">Senna</div>
-              <div className="ai-chat-status">Online, Stage0 assistant</div>
-            </div>
-            <div className="ai-chat-actions">
-              <button
-                type="button"
-                className="ai-chat-icon-btn"
-                title="New chat"
-                onClick={startNewChat}
-              >
-                <RefreshCcw className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="ai-chat-icon-btn"
-                title="Close"
-                onClick={() => setChatOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
 
-          <div className="ai-chat-body" ref={bodyRef}>
-            {messages.map((m, i) => (
-              <div key={i} className={`ai-msg ${m.role}`}>
-                <div className="ai-msg-row">
-                  <div className="ai-msg-content">
-                    <div className="ai-msg-bubble">
-                      <MessageText text={m.text} />
+            <div className="ai-chat-body" ref={bodyRef}>
+              {messages.map((m, i) => (
+                <div key={i} className={`ai-msg ${m.role}`}>
+                  <div className="ai-msg-row">
+                    <div className="ai-msg-content">
+                      <div className="ai-msg-bubble">
+                        <MessageText text={m.text} />
+                      </div>
+                      {m.actionDraft && <SennaSignCard draft={m.actionDraft} />}
                     </div>
-                    {m.actionDraft && <SennaSignCard draft={m.actionDraft} />}
+                  </div>
+                  <div className="ai-msg-time">{m.time}</div>
+                </div>
+              ))}
+              {typing && (
+                <div className="ai-msg bot">
+                  <div className="ai-msg-row">
+                    <div className="ai-typing">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
                   </div>
                 </div>
-                <div className="ai-msg-time">{m.time}</div>
-              </div>
-            ))}
-            {typing && (
-              <div className="ai-msg bot">
-                <div className="ai-msg-row">
-                  <div className="ai-typing">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <SuggestionStrip
-            suggestions={suggestions}
-            disabled={typing}
-            onPick={(s) => void send(s)}
-          />
-
-          <div className="ai-chat-input" style={{ position: 'relative' }}>
-            <QuickActionMenu
-              open={slashOpen}
-              filter={input}
-              onPick={handleQuickActionPick}
-              onClose={() => setSlashOpen(false)}
+            <SuggestionStrip
+              suggestions={suggestions}
+              disabled={typing}
+              onPick={(s) => void send(s)}
             />
-            <div className="ai-input-wrap">
-              <textarea
-                ref={inputRef}
-                className="ai-input"
-                placeholder="Ask Senna, or type / for quick actions"
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !slashOpen) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                disabled={typing}
-                rows={1}
-              />
-            </div>
-            {hasInputText && !voiceRecording ? (
-              <button
-                type="button"
-                className="ai-send"
-                onClick={() => void send()}
-                disabled={typing}
-                aria-label="Send message"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            ) : (
-              <VoiceMic
-                apiBaseUrl={SENNA_API_URL}
-                onPartial={handleVoicePartial}
-                onFinal={handleVoiceFinal}
-                onRecordingChange={setVoiceRecording}
-                disabled={typing}
-              />
-            )}
-          </div>
-        </div>
-      )}
 
-      {showNotificationPop && !chatOpen && (
-        <div className="ai-pop" role="status" aria-live="polite">
-          <div className="ai-pop-body">
-            <div className="ai-pop-msg">
-              Need help with a launch, token, NFT, lock, airdrop, or name?
+            <div className="ai-chat-input" style={{ position: 'relative' }}>
+              <QuickActionMenu
+                open={slashOpen}
+                filter={input}
+                onPick={handleQuickActionPick}
+                onClose={() => setSlashOpen(false)}
+              />
+              <div className="ai-input-wrap">
+                <textarea
+                  ref={inputRef}
+                  className="ai-input"
+                  placeholder="Ask Senna, or type / for quick actions"
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !slashOpen) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                  disabled={typing}
+                  rows={1}
+                />
+              </div>
+              {hasInputText && !voiceRecording ? (
+                <button
+                  type="button"
+                  className="ai-send"
+                  onClick={() => void send()}
+                  disabled={typing}
+                  aria-label="Send message"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              ) : (
+                <VoiceMic
+                  apiBaseUrl={SENNA_API_URL}
+                  onPartial={handleVoicePartial}
+                  onFinal={handleVoiceFinal}
+                  onRecordingChange={setVoiceRecording}
+                  disabled={typing}
+                />
+              )}
             </div>
           </div>
-          <button
-            type="button"
-            className="ai-pop-close"
-            onClick={() => setShowNotificationPop(false)}
-            aria-label="Dismiss Senna notification"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      <button
-        type="button"
-        className="ai-bubble"
-        onClick={() => (chatOpen ? setChatOpen(false) : openChat())}
-        aria-label={
-          chatOpen
-            ? 'Close Senna'
-            : hasUnreadNotification
-              ? 'Open Senna. New message available'
-              : 'Open Senna'
-        }
-      >
-        {chatOpen ? (
-          <X className="h-[22px] w-[22px]" />
-        ) : (
-          <SennaGlyph className="h-[26px] w-[26px]" />
         )}
-        {hasUnreadNotification && !chatOpen && <span className="ai-dot" aria-hidden="true" />}
-      </button>
-    </div>
+
+        {showNotificationPop && !chatOpen && (
+          <div className="ai-pop" role="status" aria-live="polite">
+            <div className="ai-pop-body">
+              <div className="ai-pop-msg">
+                Need help with a launch, token, NFT, lock, airdrop, or name?
+              </div>
+            </div>
+            <button
+              type="button"
+              className="ai-pop-close"
+              onClick={() => setShowNotificationPop(false)}
+              aria-label="Dismiss Senna notification"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className={`ai-bubble ${chatOpen ? 'is-open' : ''}`}
+          onClick={() => (chatOpen ? setChatOpen(false) : openChat())}
+          aria-label={
+            chatOpen
+              ? 'Close Senna'
+              : hasUnreadNotification
+                ? 'Open Senna. New message available'
+                : 'Open Senna'
+          }
+        >
+          {chatOpen ? (
+            <X className="h-[22px] w-[22px]" />
+          ) : (
+            <SennaGlyph className="h-[26px] w-[26px]" />
+          )}
+          {hasUnreadNotification && !chatOpen && <span className="ai-dot" aria-hidden="true" />}
+        </button>
+      </div>
+    </>
   );
 };
 

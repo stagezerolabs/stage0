@@ -2422,6 +2422,17 @@
 }
 .ai-bubble-wrap > * { pointer-events: auto; }
 
+.ai-chat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: default;
+}
+
 .ai-bubble {
   position: relative;
   width: 60px;
@@ -3134,6 +3145,12 @@
  *  possible so desktop layouts and shared design tokens stay intact.   *
  * ──────────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
+  .ai-chat-overlay {
+    background: rgb(var(--color-ink) / 0.035);
+    backdrop-filter: blur(3px) saturate(108%);
+    -webkit-backdrop-filter: blur(3px) saturate(108%);
+  }
+
   .ds-h1 {
     font-size: clamp(30px, 10vw, 38px);
   }
@@ -3157,6 +3174,10 @@
     height: 52px;
   }
 
+  .ai-bubble.is-open {
+    display: none;
+  }
+
   .ai-pop {
     max-width: min(300px, calc(100vw - 76px));
     padding: 11px 12px;
@@ -3168,9 +3189,10 @@
 
   .ai-chat {
     width: calc(100vw - 24px);
-    height: calc(100dvh - 96px);
-    height: calc(100svh - 96px);
-    max-height: calc(100svh - 96px);
+    height: auto;
+    min-height: min(360px, calc(100svh - 132px));
+    max-height: calc(100dvh - 112px);
+    max-height: calc(100svh - 112px);
     border-radius: 20px;
     transform-origin: bottom right;
   }
@@ -3231,9 +3253,21 @@
   }
 
   .senna-mic {
-    width: 38px;
-    height: 38px;
-    border-radius: 14px;
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+  }
+
+  .ai-send {
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+  }
+
+  .senna-mic svg,
+  .ai-send svg {
+    width: 21px;
+    height: 21px;
   }
 
   .senna-card { padding: 12px; gap: 10px; }

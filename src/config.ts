@@ -1801,7 +1801,7 @@ export const RNS_CONTRACT_ADDRESSES: Record<number, RnsContractAddressMap> = {
   [riseTestnet.id]: {
     registry: "0xa8d639540D11bd295d12a8F56DA5D2F53aBC0caF",
     resolver: "0x251c89457FbFF8930ae1D400C67E33B76498502b",
-    registrar: "0x26F762137df7821369E95263f3EB556d96C4cEbB",
+    registrar: "0x61B47fd1EA0fC9a1852464797D1154187B7877Fa",
   },
 };
 

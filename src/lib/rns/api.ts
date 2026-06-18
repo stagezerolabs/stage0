@@ -222,13 +222,10 @@ export async function rnsGetFee(
   chainId: number,
   duration: bigint = RNS_DEFAULT_REGISTRATION_DURATION,
 ): Promise<bigint> {
-  const { registrar } = getRnsContractAddresses(chainId);
-  return client.readContract({
-    address: registrar,
-    abi: RNSRegistrar,
-    functionName: "feeFor",
-    args: [duration],
-  });
+  void client;
+  void chainId;
+  void duration;
+  return 0n;
 }
 
 export async function rnsGetRegistrationQuote(
@@ -259,7 +256,8 @@ export async function rnsRegister(
   const name = normalizeRnsLabel(params.name);
   const duration = params.duration ?? RNS_DEFAULT_REGISTRATION_DURATION;
   const resolver = params.resolver ?? defaultResolver;
-  const value = params.value ?? (await rnsGetFee(readClient, chainId, duration));
+  void readClient;
+  const value = params.value ?? params.quote.priceWei;
 
   return walletClient.writeContract({
     chain: walletClient.chain,
@@ -267,7 +265,7 @@ export async function rnsRegister(
     address: registrar,
     abi: RNSRegistrar,
     functionName: "register",
-    args: [name, duration, resolver],
+    args: [name, duration, resolver, params.quote, params.signature],
     value,
   });
 }
@@ -281,7 +279,8 @@ export async function rnsRenew(
   const { registrar } = getRnsContractAddresses(chainId);
   const name = normalizeRnsLabel(params.name);
   const duration = params.duration ?? RNS_DEFAULT_REGISTRATION_DURATION;
-  const value = params.value ?? (await rnsGetFee(readClient, chainId, duration));
+  void readClient;
+  const value = params.value ?? params.quote.priceWei;
 
   return walletClient.writeContract({
     chain: walletClient.chain,
@@ -289,7 +288,7 @@ export async function rnsRenew(
     address: registrar,
     abi: RNSRegistrar,
     functionName: "renew",
-    args: [name, duration],
+    args: [name, duration, params.quote, params.signature],
     value,
   });
 }
@@ -399,4 +398,3 @@ export async function rnsSetPrimaryAddr(
 ): Promise<Hash> {
   return rnsSetAddr(walletClient, readClient, chainId, { name: label, addr });
 }
-

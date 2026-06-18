@@ -1,0 +1,43 @@
+export const RNSMarketplaceEscrow = [
+  {
+    inputs: [
+      { internalType: "string", name: "name", type: "string" },
+      { internalType: "uint256", name: "reservePrice", type: "uint256" },
+      { internalType: "uint96", name: "minIncrementBps", type: "uint96" },
+      { internalType: "uint64", name: "startTime", type: "uint64" },
+      { internalType: "uint64", name: "endTime", type: "uint64" },
+    ],
+    name: "createAuction",
+    outputs: [{ internalType: "uint256", name: "auctionId", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "auctionId", type: "uint256" }],
+    name: "bid",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "auctionId", type: "uint256" }],
+    name: "settleAuction",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "withdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "auctionId", type: "uint256" }],
+    name: "minimumNextBid",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;

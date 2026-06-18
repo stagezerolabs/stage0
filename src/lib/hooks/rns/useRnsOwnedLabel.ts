@@ -108,7 +108,7 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
       }));
 
     return [...synthetic, ...fromGraph];
-  }, [subgraphDomains, recentRegistrations, typedAddress]);
+  }, [apiDomains, subgraphDomains, recentRegistrations, typedAddress]);
 
   // Batch-read resolver.text(node, "label") for older names that already have it.
   const { data: resolverTextResults, isLoading: isResolverLoading } = useReadContracts({

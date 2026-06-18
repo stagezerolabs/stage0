@@ -19,6 +19,7 @@ export {
   useRnsRegister,
   useRnsRenew,
   useRnsRelease,
+  useRnsCreateMarketplaceAuction,
   useRnsSetResolver,
   useRnsSetAddr,
   useRnsSetText,

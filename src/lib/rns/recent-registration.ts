@@ -39,8 +39,9 @@ export function saveRecentRegistration(
   address: string,
   label: string,
   node: string,
+  durationSeconds = 365 * 24 * 60 * 60,
 ): void {
-  const expiry = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60;
+  const expiry = Math.floor(Date.now() / 1000) + durationSeconds;
   const entry: RecentRegistration = {
     address: address.toLowerCase(),
     label: label.toLowerCase(),

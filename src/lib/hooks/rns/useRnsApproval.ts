@@ -6,14 +6,15 @@ import { useCallback } from "react";
 import type { Address } from "viem";
 import { useReadContract } from "wagmi";
 
-export function useRnsIsApproved(owner?: string) {
+export function useRnsIsApproved(owner?: string, operatorOverride?: Address) {
   const { registry, registrar } = useRnsContracts();
+  const operator = operatorOverride ?? registrar;
 
   const { data, isLoading, refetch } = useReadContract({
     address: registry,
     abi: RNSRegistry,
     functionName: "isApprovedForAll",
-    args: owner ? [owner as Address, registrar] : undefined,
+    args: owner ? [owner as Address, operator] : undefined,
     query: {
       enabled: Boolean(owner),
       staleTime: RNS_QUERY_STALE_TIME,
@@ -24,8 +25,9 @@ export function useRnsIsApproved(owner?: string) {
   return { isApproved: Boolean(data), isLoading, refetch };
 }
 
-export function useRnsApproveForAll() {
+export function useRnsApproveForAll(operatorOverride?: Address) {
   const { registry, registrar } = useRnsContracts();
+  const operator = operatorOverride ?? registrar;
   const { hash, writeContract, isPending, isConfirming, isSuccess, error, reset } =
     useTrackedWriteContract();
 
@@ -34,9 +36,9 @@ export function useRnsApproveForAll() {
       address: registry,
       abi: RNSRegistry,
       functionName: "setApprovalForAll",
-      args: [registrar, true],
+      args: [operator, true],
     });
-  }, [registry, registrar, writeContract]);
+  }, [registry, operator, writeContract]);
 
   return { hash, approve, isPending, isConfirming, isSuccess, error, reset };
 }

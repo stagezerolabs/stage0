@@ -1,17 +1,19 @@
 import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
 import { RNSRegistrar } from "@/lib/rns/abis";
+import { fetchRnsPriceQuote } from "@/lib/api/rns";
 import {
   RNS_DEFAULT_REGISTRATION_DURATION,
   RNS_QUERY_GC_TIME,
   RNS_QUERY_STALE_TIME,
 } from "@/lib/rns/constants";
-import { computeRnsFee, normalizeRnsLabel } from "@/lib/rns/utils";
-import { useMemo } from "react";
-import { useReadContract, useReadContracts } from "wagmi";
+import { normalizeRnsLabel } from "@/lib/rns/utils";
+import { useQuery } from "@tanstack/react-query";
+import { useAccount, useChainId, useReadContract, useReadContracts } from "wagmi";
 
 type UseRnsRegistrarOptions = {
   enabled?: boolean;
   duration?: bigint;
+  action?: "register" | "renew";
 };
 
 export function useRnsAvailable(label: string, options: UseRnsRegistrarOptions = {}) {
@@ -40,27 +42,14 @@ export function useRnsAvailable(label: string, options: UseRnsRegistrarOptions =
 }
 
 export function useRnsFee(options: UseRnsRegistrarOptions = {}) {
-  const { registrar } = useRnsContracts();
   const duration = options.duration ?? RNS_DEFAULT_REGISTRATION_DURATION;
 
-  const { data, isLoading, error, refetch } = useReadContract({
-    address: registrar,
-    abi: RNSRegistrar,
-    functionName: "feeFor",
-    args: [duration],
-    query: {
-      enabled: options.enabled ?? true,
-      staleTime: RNS_QUERY_STALE_TIME,
-      gcTime: RNS_QUERY_GC_TIME,
-    },
-  });
-
   return {
-    price: data ?? 0n,
+    price: 0n,
     duration,
-    isLoading,
-    error,
-    refetch,
+    isLoading: false,
+    error: null,
+    refetch: async () => ({ data: 0n }),
   };
 }
 
@@ -102,7 +91,7 @@ export function useRnsRegistrarConfig() {
       {
         address: registrar,
         abi: RNSRegistrar,
-        functionName: "MIN_NAME_LENGTH",
+        functionName: "PUBLIC_MIN_NAME_LENGTH",
       },
       {
         address: registrar,
@@ -112,12 +101,12 @@ export function useRnsRegistrarConfig() {
       {
         address: registrar,
         abi: RNSRegistrar,
-        functionName: "MIN_DURATION",
+        functionName: "YEAR",
       },
       {
         address: registrar,
         abi: RNSRegistrar,
-        functionName: "registrationFee",
+        functionName: "priceSigner",
       },
     ],
     query: {
@@ -130,7 +119,8 @@ export function useRnsRegistrarConfig() {
     minNameLength: (data?.[0]?.result as bigint | undefined) ?? 3n,
     maxNameLength: (data?.[1]?.result as bigint | undefined) ?? 32n,
     minDuration: (data?.[2]?.result as bigint | undefined) ?? 0n,
-    registrationFee: (data?.[3]?.result as bigint | undefined) ?? 0n,
+    registrationFee: 0n,
+    priceSigner: data?.[3]?.result as `0x${string}` | undefined,
     isLoading,
     error,
     refetch,
@@ -143,30 +133,23 @@ export function useRnsRegistrationQuote(
   options: UseRnsRegistrarOptions = {},
 ) {
   const { registrar } = useRnsContracts();
+  const { address } = useAccount();
+  const chainId = useChainId();
   const name = normalizeRnsLabel(label);
   const duration = options.duration ?? RNS_DEFAULT_REGISTRATION_DURATION;
+  const action = options.action ?? "register";
   const enabled = (options.enabled ?? true) && Boolean(name);
 
-  const contracts = useMemo(
-    () => [
-      {
-        address: registrar,
-        abi: RNSRegistrar,
-        functionName: "available" as const,
-        args: [name] as const,
-      },
-      {
-        address: registrar,
-        abi: RNSRegistrar,
-        functionName: "feeFor" as const,
-        args: [duration] as const,
-      },
-    ],
-    [duration, name, registrar],
-  );
-
-  const { data, isLoading, error, refetch } = useReadContracts({
-    contracts,
+  const {
+    data: available,
+    isLoading: isAvailabilityLoading,
+    error: availabilityError,
+    refetch: refetchAvailability,
+  } = useReadContract({
+    address: registrar,
+    abi: RNSRegistrar,
+    functionName: "available",
+    args: [name],
     query: {
       enabled,
       staleTime: RNS_QUERY_STALE_TIME,
@@ -174,15 +157,33 @@ export function useRnsRegistrationQuote(
     },
   });
 
-  const contractFee = (data?.[1]?.result as bigint | undefined) ?? 0n;
+  const quote = useQuery({
+    queryKey: ["rns", "quote", action, chainId, address, name, duration.toString()],
+    queryFn: () =>
+      fetchRnsPriceQuote({
+        action,
+        name,
+        beneficiary: address!,
+        chainId,
+        duration,
+      }),
+    enabled: enabled && Boolean(address) && (action === "renew" || available === true),
+    staleTime: 45_000,
+    gcTime: RNS_QUERY_GC_TIME,
+  });
 
   return {
     name,
     duration,
-    available: data?.[0]?.result === true,
-    price: computeRnsFee(name, contractFee),
-    isLoading,
-    error,
-    refetch,
+    available: available === true,
+    price: quote.data?.price ?? 0n,
+    signedQuote: quote.data?.signedQuote,
+    signature: quote.data?.signature,
+    display: quote.data?.display,
+    isLoading: isAvailabilityLoading || quote.isLoading,
+    error: availabilityError ?? quote.error,
+    refetch: async () => {
+      await Promise.all([refetchAvailability(), quote.refetch()]);
+    },
   };
 }

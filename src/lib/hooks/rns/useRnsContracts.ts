@@ -12,5 +12,7 @@ export function useRnsContracts() {
     registry: addresses.registry,
     resolver: addresses.resolver,
     registrar: addresses.registrar,
+    auctionHouse: addresses.auctionHouse,
+    marketplace: addresses.marketplace,
   };
 }

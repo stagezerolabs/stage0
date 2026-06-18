@@ -1,8 +1,9 @@
 import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
 import { useRnsNode } from "@/lib/hooks/rns/useRnsNode";
-import { RNSRegistrar, RNSRegistry, RNSResolver } from "@/lib/rns/abis";
+import { RNSMarketplaceEscrow, RNSRegistrar, RNSRegistry, RNSResolver } from "@/lib/rns/abis";
 import { RNS_DEFAULT_REGISTRATION_DURATION } from "@/lib/rns/constants";
 import type {
+  RnsCreateMarketplaceAuctionParams,
   RnsRegisterParams,
   RnsReleaseParams,
   RnsRenewParams,
@@ -11,7 +12,6 @@ import type {
 } from "@/lib/rns/types";
 import { normalizeRnsLabel } from "@/lib/rns/utils";
 import { useCallback } from "react";
-import { zeroAddress } from "viem";
 import { useTrackedWriteContract } from "@/lib/hooks/useTrackedWriteContract";
 
 function useRnsWrite() {
@@ -29,17 +29,13 @@ export function useRnsRegister() {
     (params: RnsRegisterParams) => {
       const name = normalizeRnsLabel(params.name);
       const duration = params.duration ?? RNS_DEFAULT_REGISTRATION_DURATION;
-      // Pass zeroAddress as resolver so the registrar skips the setAddr call.
-      // The registrar's resolver.setAddr() reverts because msg.sender (registrar)
-      // is not an approved operator for the newly-created node.
-      const resolver = params.resolver ?? zeroAddress;
 
       write.writeContract({
         address: registrar,
         abi: RNSRegistrar,
         functionName: "register",
-        args: [name, duration, resolver],
-        value: params.value,
+        args: [name, duration, params.resolver ?? "0x0000000000000000000000000000000000000000", params.quote, params.signature],
+        value: params.value ?? params.quote.priceWei,
       });
     },
     [registrar, write],
@@ -61,8 +57,8 @@ export function useRnsRenew() {
         address: registrar,
         abi: RNSRegistrar,
         functionName: "renew",
-        args: [name, duration],
-        value: params.value,
+        args: [name, duration, params.quote, params.signature],
+        value: params.value ?? params.quote.priceWei,
       });
     },
     [registrar, write],
@@ -89,6 +85,32 @@ export function useRnsRelease() {
   );
 
   return { ...write, release };
+}
+
+export function useRnsCreateMarketplaceAuction() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const createAuction = useCallback(
+    (params: RnsCreateMarketplaceAuctionParams) => {
+      const name = normalizeRnsLabel(params.name);
+      write.writeContract({
+        address: marketplace,
+        abi: RNSMarketplaceEscrow,
+        functionName: "createAuction",
+        args: [
+          name,
+          params.reservePrice,
+          BigInt(params.minIncrementBps),
+          params.startTime,
+          params.endTime,
+        ],
+      });
+    },
+    [marketplace, write],
+  );
+
+  return { ...write, createAuction };
 }
 
 export function useRnsSetResolver(label: string) {

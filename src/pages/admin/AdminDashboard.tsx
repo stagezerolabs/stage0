@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { useAccount } from 'wagmi';
-import { formatUnits, isAddress, type Address } from 'viem';
+import { useAccount, useBalance, useReadContract } from 'wagmi';
+import { formatEther, formatUnits, isAddress, type Address } from 'viem';
 import { toast } from 'sonner';
 import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from '@/components/ui/icons';
+import { RNSRegistrar } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useSetFeeRecipient, useSetNFTFactoryProceedsFeeBps } from '@/lib/hooks/useAdminActions';
+import { useTrackedWriteContract } from '@/lib/hooks/useTrackedWriteContract';
 import { useFactoryOwner, useFeeRecipient, useProceedsFeeBps } from '@/lib/utils/admin';
 import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
 
@@ -36,7 +38,7 @@ const itemVariants = {
 
 const AdminDashboard: React.FC = () => {
   const { address } = useAccount();
-  const { nftFactory, nftFactoryLens, explorerUrl } = useChainContracts();
+  const { chainId, nftFactory, nftFactoryLens, rnsRegistrar, explorerUrl } = useChainContracts();
   const { totalDeployments, isLoading: isLoadingNFTs } = useUserNFTs();
   const { factoryOwner, isLoading: isLoadingOwner } = useFactoryOwner('nft');
   const {
@@ -53,6 +55,8 @@ const AdminDashboard: React.FC = () => {
 
   const [newFeeRecipient, setNewFeeRecipient] = useState('');
   const [newProceedsFeeBps, setNewProceedsFeeBps] = useState('');
+  const [newRnsTreasury, setNewRnsTreasury] = useState('');
+  const [rnsAdminAction, setRnsAdminAction] = useState<'withdraw' | 'setTreasury' | null>(null);
 
   const {
     setFeeRecipient,
@@ -70,6 +74,48 @@ const AdminDashboard: React.FC = () => {
     error: proceedsFeeUpdateError,
     reset: resetProceedsFeeUpdate,
   } = useSetNFTFactoryProceedsFeeBps();
+  const {
+    writeContract: writeRnsAdmin,
+    isBusy: isUpdatingRnsAdmin,
+    isSuccess: isRnsAdminSuccess,
+    error: rnsAdminError,
+    reset: resetRnsAdmin,
+  } = useTrackedWriteContract();
+
+  const {
+    data: rnsTreasury,
+    isLoading: isLoadingRnsTreasury,
+    refetch: refetchRnsTreasury,
+  } = useReadContract({
+    address: rnsRegistrar,
+    abi: RNSRegistrar,
+    functionName: 'treasury',
+    query: { enabled: Boolean(rnsRegistrar) },
+  });
+
+  const {
+    data: rnsOwner,
+    isLoading: isLoadingRnsOwner,
+  } = useReadContract({
+    address: rnsRegistrar,
+    abi: RNSRegistrar,
+    functionName: 'owner',
+    query: { enabled: Boolean(rnsRegistrar) },
+  });
+
+  const {
+    data: rnsRegistrarBalance,
+    isLoading: isLoadingRnsBalance,
+    refetch: refetchRnsBalance,
+  } = useBalance({
+    address: rnsRegistrar,
+    chainId,
+    query: {
+      enabled: Boolean(rnsRegistrar),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
 
   const totalPresales = presales?.length ?? 0;
   const livePresales = presales?.filter((p) => p.status === 'live').length ?? 0;
@@ -91,6 +137,11 @@ const AdminDashboard: React.FC = () => {
     if (!address || !factoryOwner) return false;
     return address.toLowerCase() === factoryOwner.toLowerCase();
   }, [address, factoryOwner]);
+
+  const isRnsOwner = useMemo(() => {
+    if (!address || !rnsOwner) return false;
+    return address.toLowerCase() === rnsOwner.toLowerCase();
+  }, [address, rnsOwner]);
 
   useEffect(() => {
     if (isFeeRecipientUpdateSuccess) {
@@ -124,6 +175,35 @@ const AdminDashboard: React.FC = () => {
     }
   }, [isProceedsFeeUpdateError, proceedsFeeUpdateError, resetProceedsFeeUpdate]);
 
+  useEffect(() => {
+    if (isRnsAdminSuccess) {
+      toast.success(
+        rnsAdminAction === 'withdraw'
+          ? 'RNS registrar balance withdrawn to treasury.'
+          : 'RNS treasury updated.'
+      );
+      setNewRnsTreasury('');
+      setRnsAdminAction(null);
+      resetRnsAdmin();
+      refetchRnsTreasury();
+      refetchRnsBalance();
+    }
+  }, [
+    isRnsAdminSuccess,
+    refetchRnsBalance,
+    refetchRnsTreasury,
+    resetRnsAdmin,
+    rnsAdminAction,
+  ]);
+
+  useEffect(() => {
+    if (rnsAdminError) {
+      toast.error(rnsAdminError.message ?? 'RNS admin transaction failed.');
+      setRnsAdminAction(null);
+      resetRnsAdmin();
+    }
+  }, [rnsAdminError, resetRnsAdmin]);
+
   const handleCopy = (value: string) => {
     if (!value) return;
     navigator.clipboard?.writeText(value);
@@ -147,7 +227,48 @@ const AdminDashboard: React.FC = () => {
     setProceedsFeeBps(parsed);
   };
 
+  const handleWithdrawRnsBalance = () => {
+    if (!isRnsOwner) {
+      toast.error('Connected wallet is not the RNS registrar owner.');
+      return;
+    }
+
+    const balance = rnsRegistrarBalance?.value ?? 0n;
+    if (balance <= 0n) {
+      toast.error('No RNS registrar ETH balance to withdraw.');
+      return;
+    }
+
+    setRnsAdminAction('withdraw');
+    writeRnsAdmin({
+      address: rnsRegistrar,
+      abi: RNSRegistrar,
+      functionName: 'withdraw',
+    });
+  };
+
+  const handleSetRnsTreasury = () => {
+    if (!isRnsOwner) {
+      toast.error('Connected wallet is not the RNS registrar owner.');
+      return;
+    }
+
+    if (!newRnsTreasury || !isAddress(newRnsTreasury)) {
+      toast.error('Enter a valid RNS treasury address.');
+      return;
+    }
+
+    setRnsAdminAction('setTreasury');
+    writeRnsAdmin({
+      address: rnsRegistrar,
+      abi: RNSRegistrar,
+      functionName: 'setTreasury',
+      args: [newRnsTreasury as Address],
+    });
+  };
+
   const adminStatusLabel = isOnChainOwner ? 'NFT factory owner' : 'Admin access';
+  const rnsStatusLabel = isRnsOwner ? 'RNS owner' : 'Admin access';
   const currentProceedsFeeLabel =
     proceedsFeeBps !== undefined
       ? `${(Number(proceedsFeeBps) / 100).toLocaleString(undefined, {
@@ -155,6 +276,16 @@ const AdminDashboard: React.FC = () => {
           maximumFractionDigits: 2,
         })}%`
       : 'Unknown';
+  const rnsWithdrawableBalance = rnsRegistrarBalance?.value ?? 0n;
+  const rnsWithdrawableLabel = `${Number(formatEther(rnsWithdrawableBalance)).toLocaleString(undefined, {
+    maximumFractionDigits: 6,
+  })} ETH`;
+  const rnsBusyLabel =
+    rnsAdminAction === 'withdraw'
+      ? 'Withdrawing...'
+      : rnsAdminAction === 'setTreasury'
+        ? 'Updating Treasury...'
+        : 'Processing...';
 
   return (
     <motion.div
@@ -281,6 +412,130 @@ const AdminDashboard: React.FC = () => {
             {isLoadingNFTs ? '...' : Number(totalDeployments).toLocaleString()}
           </p>
           <Link to="/create/nft" className="btn-primary inline-flex">Create NFT Collection</Link>
+        </div>
+      </motion.section>
+
+      <motion.section variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-card rounded-3xl p-6 space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-label text-ink-faint uppercase tracking-wider">RNS Treasury</p>
+              <h2 className="font-display text-display-sm text-ink">Registrar Funds</h2>
+            </div>
+            <span className="text-xs text-ink-faint">{rnsStatusLabel}</span>
+          </div>
+
+          <div className="rounded-2xl border border-card-border bg-card-soft p-4">
+            <p className="text-body-sm text-ink-muted">Withdrawable Balance</p>
+            <p className="font-display text-display-md text-ink">
+              {isLoadingRnsBalance ? 'Loading...' : rnsWithdrawableLabel}
+            </p>
+            <p className="text-xs text-ink-faint mt-2">
+              Mint and renewal ETH remains in the registrar until withdrawn to treasury.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-body-sm text-ink-muted">RNS Registrar</p>
+            <div className="flex items-center gap-2">
+              <code className="text-body-sm font-mono text-ink break-all">{rnsRegistrar}</code>
+              <button
+                onClick={() => handleCopy(rnsRegistrar)}
+                className="p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+                aria-label="Copy RNS registrar address"
+              >
+                <Copy className="w-4 h-4 text-ink-muted" />
+              </button>
+            </div>
+            <a
+              href={`${explorerUrl}/address/${rnsRegistrar}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-body-sm text-accent link-underline inline-flex items-center gap-1"
+            >
+              View on explorer
+            </a>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-body-sm text-ink-muted">Registrar Owner</p>
+            <p className="text-body-sm font-mono text-ink break-all">
+              {isLoadingRnsOwner ? 'Loading...' : rnsOwner ?? 'Unknown'}
+            </p>
+            {isRnsOwner && (
+              <p className="text-xs text-status-live mt-1">✓ Connected wallet is owner</p>
+            )}
+          </div>
+
+          <button
+            onClick={handleWithdrawRnsBalance}
+            disabled={!isRnsOwner || isUpdatingRnsAdmin || rnsWithdrawableBalance <= 0n}
+            className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isUpdatingRnsAdmin && rnsAdminAction === 'withdraw'
+              ? rnsBusyLabel
+              : 'Withdraw to Treasury'}
+          </button>
+        </div>
+
+        <div className="glass-card rounded-3xl p-6 space-y-5">
+          <div className="space-y-1">
+            <p className="text-label text-ink-faint uppercase tracking-wider">RNS Settings</p>
+            <h2 className="font-display text-display-sm text-ink">Treasury Address</h2>
+            <p className="text-body-sm text-ink-muted">
+              This address receives registrar ETH when the owner calls withdraw.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-body-sm text-ink-muted">Current Treasury</p>
+            <div className="flex items-center gap-2">
+              <code className="text-body-sm font-mono text-ink break-all">
+                {isLoadingRnsTreasury ? 'Loading...' : rnsTreasury ?? 'Unknown'}
+              </code>
+              {rnsTreasury && (
+                <button
+                  onClick={() => handleCopy(rnsTreasury)}
+                  className="p-1.5 rounded-lg hover:bg-ink/5 transition-colors"
+                  aria-label="Copy current RNS treasury address"
+                >
+                  <Copy className="w-4 h-4 text-ink-muted" />
+                </button>
+              )}
+            </div>
+            {rnsTreasury && (
+              <a
+                href={`${explorerUrl}/address/${rnsTreasury}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-body-sm text-accent link-underline inline-flex items-center gap-1"
+              >
+                View on explorer
+              </a>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-body-sm text-ink-muted">Update Treasury</label>
+            <input
+              value={newRnsTreasury}
+              onChange={(event) => setNewRnsTreasury(event.target.value)}
+              placeholder="0x..."
+              className="input-field font-mono"
+            />
+            <button
+              onClick={handleSetRnsTreasury}
+              disabled={!isRnsOwner || !newRnsTreasury || isUpdatingRnsAdmin}
+              className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isUpdatingRnsAdmin && rnsAdminAction === 'setTreasury'
+                ? rnsBusyLabel
+                : 'Update Treasury'}
+            </button>
+            <p className="text-xs text-ink-faint">
+              Only the RNS registrar owner can update the treasury or withdraw registrar funds.
+            </p>
+          </div>
         </div>
       </motion.section>
 

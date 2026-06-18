@@ -1795,13 +1795,17 @@ export type RnsContractAddressMap = {
   registry: Address;
   resolver: Address;
   registrar: Address;
+  auctionHouse: Address;
+  marketplace: Address;
 };
 
 export const RNS_CONTRACT_ADDRESSES: Record<number, RnsContractAddressMap> = {
   [riseTestnet.id]: {
-    registry: "0xa8d639540D11bd295d12a8F56DA5D2F53aBC0caF",
-    resolver: "0x251c89457FbFF8930ae1D400C67E33B76498502b",
-    registrar: "0x61B47fd1EA0fC9a1852464797D1154187B7877Fa",
+    registry: "0x70b9896Aef2f01b2Ccc05d6127ec5be8390A6860",
+    resolver: "0xAF79d3D6a2dd498c86A2Eff9B42c18D4979f6236",
+    registrar: "0x0ddAfd215E134ab5A397c3EdF2cadB432a80a3CC",
+    auctionHouse: "0x3304Cd2ebEDC81e6313076b332e80a05bF758fdB",
+    marketplace: "0x9C96108c8eB45c4Bd192E73f5A2685d2B3D9bFBe",
   },
 };
 
@@ -2229,14 +2233,14 @@ export const RNSRegistrar = [
   },
   {
     inputs: [],
-    name: "MIN_DURATION",
+    name: "YEAR",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
-    name: "MIN_NAME_LENGTH",
+    name: "PUBLIC_MIN_NAME_LENGTH",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
@@ -2263,13 +2267,6 @@ export const RNSRegistrar = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "duration", type: "uint256" }],
-    name: "feeFor",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [],
     name: "owner",
     outputs: [{ internalType: "address", name: "", type: "address" }],
@@ -2281,6 +2278,21 @@ export const RNSRegistrar = [
       { internalType: "string", name: "name", type: "string" },
       { internalType: "uint256", name: "duration", type: "uint256" },
       { internalType: "address", name: "resolver_", type: "address" },
+      {
+        internalType: "struct RNSRegistrarV2.PriceQuote",
+        name: "quote",
+        type: "tuple",
+        components: [
+          { internalType: "enum RNSRegistrarV2.QuoteAction", name: "action", type: "uint8" },
+          { internalType: "bytes32", name: "labelHash", type: "bytes32" },
+          { internalType: "address", name: "beneficiary", type: "address" },
+          { internalType: "uint256", name: "duration", type: "uint256" },
+          { internalType: "uint256", name: "priceWei", type: "uint256" },
+          { internalType: "uint256", name: "deadline", type: "uint256" },
+          { internalType: "bytes32", name: "nonce", type: "bytes32" },
+        ],
+      },
+      { internalType: "bytes", name: "sig", type: "bytes" },
     ],
     name: "register",
     outputs: [{ internalType: "bytes32", name: "node", type: "bytes32" }],
@@ -2289,8 +2301,8 @@ export const RNSRegistrar = [
   },
   {
     inputs: [],
-    name: "registrationFee",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    name: "priceSigner",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
   },
@@ -2312,6 +2324,21 @@ export const RNSRegistrar = [
     inputs: [
       { internalType: "string", name: "name", type: "string" },
       { internalType: "uint256", name: "duration", type: "uint256" },
+      {
+        internalType: "struct RNSRegistrarV2.PriceQuote",
+        name: "quote",
+        type: "tuple",
+        components: [
+          { internalType: "enum RNSRegistrarV2.QuoteAction", name: "action", type: "uint8" },
+          { internalType: "bytes32", name: "labelHash", type: "bytes32" },
+          { internalType: "address", name: "beneficiary", type: "address" },
+          { internalType: "uint256", name: "duration", type: "uint256" },
+          { internalType: "uint256", name: "priceWei", type: "uint256" },
+          { internalType: "uint256", name: "deadline", type: "uint256" },
+          { internalType: "bytes32", name: "nonce", type: "bytes32" },
+        ],
+      },
+      { internalType: "bytes", name: "sig", type: "bytes" },
     ],
     name: "renew",
     outputs: [],
@@ -2333,8 +2360,22 @@ export const RNSRegistrar = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "treasury",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [{ internalType: "uint256", name: "fee", type: "uint256" }],
     name: "setRegistrationFee",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "treasury_", type: "address" }],
+    name: "setTreasury",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -2347,7 +2388,7 @@ export const RNSRegistrar = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "address payable", name: "to", type: "address" }],
+    inputs: [],
     name: "withdraw",
     outputs: [],
     stateMutability: "nonpayable",

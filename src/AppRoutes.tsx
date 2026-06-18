@@ -26,6 +26,7 @@ import TokensPage from './pages/TokensPage';
 import MyNFTsPage from './pages/MyNFTsPage';
 import MyNFTCollectionPage from './pages/MyNFTCollectionPage';
 import DomainsPage from './pages/DomainsPage';
+import DomainsMarketplacePage from './pages/DomainsMarketplacePage';
 
 type AppRoutesProps = {
   themeMode: 'dark' | 'light';
@@ -55,6 +56,7 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
           <Route path="/my-nfts" element={<MyNFTsPage />} />
           <Route path="/my-nfts/:collectionAddress" element={<MyNFTCollectionPage />} />
           <Route path="/domains" element={<DomainsPage />} />
+          <Route path="/domains/marketplace" element={<DomainsMarketplacePage />} />
           {/* Admin-only tool access */}
           <Route element={<AdminRoute />}>
             <Route path="/create/token" element={<CreateTokenPage />} />

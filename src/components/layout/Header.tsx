@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount, useConnect, useConnectors } from 'wagmi';
-import { AlertTriangle, Menu, Moon, Sun, Wallet, X } from '@/components/ui/icons';
+import { AlertTriangle, ChevronDown, Menu, Moon, Sun, Wallet, X } from '@/components/ui/icons';
 import { RISE_CONNECTOR_ID } from '@/config';
 import { useIsAdmin } from '@/lib/utils/admin';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
@@ -19,6 +19,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpenForPath, setMobileMenuOpenForPath] = useState<string | null>(null);
   const isMobileMenuOpen = mobileMenuOpenForPath === location.pathname;
+  const [namesDrawerOpen, setNamesDrawerOpen] = useState(false);
   const [chainInfo, setChainInfo] = useState<{
     name?: string;
     iconUrl?: string;
@@ -28,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const openChainModalRef = useRef<(() => void) | null>(null);
   const openAccountModalRef = useRef<(() => void) | null>(null);
   const openConnectModalRef = useRef<(() => void) | null>(null);
+  const namesNavRef = useRef<HTMLDivElement>(null);
   const { isConnected, address } = useAccount();
   const { isAdmin: isOwner } = useIsAdmin(address as Address | undefined);
   const { displayName: rnsDomain } = useUserDomain(address);
@@ -43,12 +45,45 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    setNamesDrawerOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!namesDrawerOpen) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!namesNavRef.current?.contains(event.target as Node)) {
+        setNamesDrawerOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setNamesDrawerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [namesDrawerOpen]);
+
   const closeMobileMenu = useCallback(() => {
     setMobileMenuOpenForPath(null);
   }, []);
 
   const publicNavItems = [
     { path: '/presales', label: 'Launchpad' },
+  ];
+
+  const namesNavLinks = [
+    { path: '/domains', label: 'My names', description: 'Search, register, and manage' },
+    { path: '/domains/marketplace', label: 'Marketplace', description: 'Browse domain names' },
   ];
 
   const privateNavItems = [
@@ -116,6 +151,71 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
               item.path === '/'
                 ? location.pathname === '/'
                 : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            const isNamesItem = item.path === '/domains';
+
+            if (isNamesItem) {
+              return (
+                <div key={item.path} ref={namesNavRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setNamesDrawerOpen((open) => !open)}
+                    aria-expanded={namesDrawerOpen}
+                    aria-haspopup="menu"
+                    className="relative inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium tracking-tight transition-colors duration-300"
+                  >
+                    <span className={`relative z-10 ${isActive ? 'text-ink' : 'text-ink-muted hover:text-ink'}`}>
+                      {item.label}
+                    </span>
+                    <ChevronDown className={`relative z-10 h-3.5 w-3.5 transition-transform ${namesDrawerOpen ? 'rotate-180 text-ink' : 'text-ink-muted'}`} />
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.div
+                          layoutId="nav-indicator"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                          className="absolute inset-0 bg-ink/[0.07] rounded-full border border-border/40"
+                        />
+                      )}
+                    </AnimatePresence>
+                  </button>
+
+                  <AnimatePresence>
+                    {namesDrawerOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute left-1/2 top-[calc(100%+10px)] z-50 w-60 -translate-x-1/2 rounded-2xl border border-border bg-canvas-alt/95 p-2 shadow-float backdrop-blur-xl"
+                        role="menu"
+                      >
+                        {namesNavLinks.map((link) => {
+                          const linkActive = location.pathname === link.path;
+                          return (
+                            <Link
+                              key={link.path}
+                              to={link.path}
+                              onClick={() => setNamesDrawerOpen(false)}
+                              className={`block rounded-xl px-3.5 py-3 transition-colors ${linkActive
+                                ? 'bg-accent/10 text-ink'
+                                : 'text-ink-muted hover:bg-canvas/60 hover:text-ink'
+                                }`}
+                              role="menuitem"
+                            >
+                              <span className="block text-[13px] font-semibold">{link.label}</span>
+                              <span className="mt-0.5 block text-[11px] text-ink-faint">{link.description}</span>
+                            </Link>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.path}
@@ -379,18 +479,73 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                   )}
                 </button>
               )}
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`block px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${location.pathname === item.path
-                    ? 'bg-canvas-alt text-ink'
-                    : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
-                    }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const isActive =
+                  item.path === '/'
+                    ? location.pathname === '/'
+                    : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                const isNamesItem = item.path === '/domains';
+
+                if (isNamesItem) {
+                  return (
+                    <div key={item.path} className="rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setNamesDrawerOpen((open) => !open)}
+                        className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${isActive
+                          ? 'bg-canvas-alt text-ink'
+                          : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
+                          }`}
+                        aria-expanded={namesDrawerOpen}
+                      >
+                        <span>{item.label}</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${namesDrawerOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      <AnimatePresence>
+                        {namesDrawerOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                            className="overflow-hidden pl-3"
+                          >
+                            <div className="mt-1 space-y-1 border-l border-border/70 pl-3">
+                              {namesNavLinks.map((link) => (
+                                <Link
+                                  key={link.path}
+                                  to={link.path}
+                                  onClick={closeMobileMenu}
+                                  className={`block rounded-xl px-4 py-2.5 text-body-sm font-medium transition-colors ${location.pathname === link.path
+                                    ? 'bg-canvas-alt text-ink'
+                                    : 'text-ink-muted hover:bg-canvas-alt/50 hover:text-ink'
+                                    }`}
+                                >
+                                  {link.label}
+                                </Link>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`block px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${isActive
+                      ? 'bg-canvas-alt text-ink'
+                      : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'
+                      }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           </motion.div>
         )}

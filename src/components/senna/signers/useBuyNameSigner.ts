@@ -1,10 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { riseTestnet } from '@/config';
 import {
-  useRnsApproveForAll,
-  useRnsIsApproved,
   useRnsNameStatus,
   useRnsRegister,
   useRnsRegistrationQuote,
@@ -29,13 +27,14 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     enabled: Boolean(requestedName) && !reserved,
   });
 
-  const { price: registerPrice = 0n } = useRnsRegistrationQuote(requestedName, {
+  const {
+    price: registerPrice = 0n,
+    signedQuote,
+    signature,
+    isLoading: quoteLoading,
+  } = useRnsRegistrationQuote(requestedName, {
     enabled: Boolean(requestedName) && available && !reserved,
   });
-
-  const { isApproved } = useRnsIsApproved(address);
-  const { approve, hash: approveHash, isPending: approvePending, error: approveError, reset: resetApprove } = useRnsApproveForAll();
-  const { isLoading: approveConfirming, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveHash });
 
   const {
     register,
@@ -46,14 +45,6 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     error: actionError,
     reset: resetAction,
   } = useRnsRegister();
-
-  const chainedRef = useRef(false);
-  useEffect(() => {
-    if (!approveSuccess || chainedRef.current) return;
-    if (!requestedName || !available || reserved) return;
-    chainedRef.current = true;
-    register({ name: requestedName, value: registerPrice });
-  }, [approveSuccess, requestedName, available, reserved, register, registerPrice]);
 
   // Bridge indexer lag: when the register tx confirms, persist a local hint so
   // DomainsPage/MyDomains can show the new name immediately, then invalidate
@@ -75,16 +66,14 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
   const errorMessage =
     reserved ? 'That name is reserved.' :
     requestedName && !statusLoading && available === false ? 'That name is already taken.' :
-    approveError ? getFriendlyTxErrorMessage(approveError, 'Approve') :
     actionError ? getFriendlyTxErrorMessage(actionError, 'Register') :
     '';
 
-  const ready = Boolean(requestedName) && available === true && !reserved;
-  const needsApproval = !isApproved;
+  const ready = Boolean(requestedName) && available === true && !reserved && Boolean(signedQuote && signature);
 
   let phase: SignerState['phase'] = 'idle';
-  let primaryLabel = needsApproval ? 'Sign & Register' : 'Sign & Register';
-  let step: SignerState['step'] | undefined = needsApproval ? 'approve' : undefined;
+  let primaryLabel = 'Sign & Register';
+  let step: SignerState['step'] | undefined;
   let busy = false;
 
   if (!isConnected) {
@@ -94,15 +83,8 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     phase = 'needs_chain';
     primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Testnet';
     busy = switching;
-  } else if (approvePending) {
-    phase = 'awaiting_signature';
-    primaryLabel = 'Sign approval in wallet…';
-    step = 'approve';
-    busy = true;
-  } else if (approveConfirming) {
-    phase = 'approving';
-    primaryLabel = '1/2 Approving registry…';
-    step = 'approve';
+  } else if (quoteLoading) {
+    primaryLabel = 'Preparing quote…';
     busy = true;
   } else if (actionPending) {
     phase = 'awaiting_signature';
@@ -111,7 +93,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     busy = true;
   } else if (actionConfirming) {
     phase = 'confirming';
-    primaryLabel = needsApproval ? `2/2 Registering ${requestedName}…` : `Registering ${requestedName}…`;
+    primaryLabel = `Registering ${requestedName}…`;
     step = 'action';
     busy = true;
   } else if (isSuccess) {
@@ -124,9 +106,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
 
   const primary = () => {
     if (errorMessage) {
-      resetApprove();
       resetAction();
-      chainedRef.current = false;
     }
     if (!isConnected) return;
     if (onWrongChain) {
@@ -135,11 +115,13 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     }
     if (!ready) return;
 
-    if (needsApproval) {
-      approve();
-    } else {
-      register({ name: requestedName, value: registerPrice });
-    }
+    if (!signedQuote || !signature) return;
+    register({
+      name: requestedName,
+      value: registerPrice,
+      quote: signedQuote,
+      signature,
+    });
   };
 
   return {
@@ -147,7 +129,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     step,
     primaryLabel,
     errorMessage,
-    approveHash,
+    approveHash: undefined,
     actionHash,
     ready,
     busy,

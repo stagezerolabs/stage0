@@ -2,16 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { isAddress, maxUint256, parseUnits, type Address } from 'viem';
+import { maxUint256, parseUnits, type Address } from 'viem';
 import { TokenLocker, erc20Abi, getContractAddresses, getExplorerUrl } from '@/config';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
 import {
   Lock,
   Unlock,
   Clock,
   ArrowRightLeft,
   Timer,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from '@/components/ui/icons';
+import { InlineLoading, LoadingState, Spinner } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -88,12 +89,13 @@ const TokenLockerPage: React.FC = () => {
 
   // Create Lock Form - pre-fill token from query param
   const [tokenAddress, setTokenAddress] = useState(queryToken);
+  const [resolvedTokenAddress, setResolvedTokenAddress] = useState<Address | null>(null);
   const [amount, setAmount] = useState('');
   const [durationDays, setDurationDays] = useState('');
   const [lockName, setLockName] = useState('');
   const [lockDescription, setLockDescription] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(true);
-  const validTokenAddress = isAddress(tokenAddress) ? (tokenAddress as Address) : undefined;
+  const validTokenAddress = resolvedTokenAddress ?? undefined;
 
   useEffect(() => {
     if (!queryToken) return;
@@ -174,6 +176,7 @@ const TokenLockerPage: React.FC = () => {
   const [extendDays, setExtendDays] = useState('');
   const [transferLockId, setTransferLockId] = useState<bigint | null>(null);
   const [transferAddress, setTransferAddress] = useState('');
+  const [transferResolvedAddress, setTransferResolvedAddress] = useState<Address | null>(null);
   const parsedAmount = useMemo(() => {
     if (!amount.trim()) return null;
     if (tokenDecimals === undefined) return null;
@@ -335,15 +338,16 @@ const TokenLockerPage: React.FC = () => {
   };
 
   const handleTransfer = (lockId: bigint) => {
-    if (!transferAddress) return;
+    if (!transferResolvedAddress) return;
     actionWrite({
       abi: TokenLocker,
       address: contracts.tokenLocker,
       functionName: 'transferLockOwnership',
-      args: [lockId, transferAddress as Address],
+      args: [lockId, transferResolvedAddress],
     });
     setTransferLockId(null);
     setTransferAddress('');
+    setTransferResolvedAddress(null);
   };
 
   return (
@@ -384,16 +388,14 @@ const TokenLockerPage: React.FC = () => {
 
           {showCreateForm && (
             <div className="px-6 pb-6 space-y-5 border-t border-ink/5 pt-5">
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Token Address</label>
-                <input
-                  type="text"
-                  value={tokenAddress}
-                  onChange={(e) => setTokenAddress(e.target.value)}
-                  placeholder="0x..."
-                  className="input-field w-full font-mono text-sm"
-                />
-              </div>
+              <RnsAddressInput
+                label="Token Address"
+                value={tokenAddress}
+                onChange={setTokenAddress}
+                onResolvedAddressChange={setResolvedTokenAddress}
+                placeholder="0x... or token.rise"
+                required
+              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -464,10 +466,7 @@ const TokenLockerPage: React.FC = () => {
                   className="btn-primary w-full disabled:opacity-60"
                 >
                   {isPrimaryPending ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {primaryButtonLabel}
-                    </span>
+                    <InlineLoading label={primaryButtonLabel} />
                   ) : hasSufficientAllowance ? (
                     <span className="inline-flex items-center gap-2">
                       <Lock className="w-4 h-4" />
@@ -509,10 +508,7 @@ const TokenLockerPage: React.FC = () => {
         )}
 
         {isLoadingLocks ? (
-          <div className="flex flex-col items-center justify-center py-12 space-y-3">
-            <Loader2 className="w-6 h-6 text-accent animate-spin" />
-            <p className="text-body-sm text-ink-muted">Loading your locks...</p>
-          </div>
+          <LoadingState label="Loading your locks" compact variant="dots" />
         ) : !locks || locks.length === 0 ? (
           <div className="glass-card rounded-3xl p-8 text-center space-y-3">
             <Lock className="w-8 h-8 text-ink-muted mx-auto" />
@@ -619,7 +615,7 @@ const TokenLockerPage: React.FC = () => {
                           className="btn-primary text-sm"
                         >
                           {isActionPending || isActionConfirming ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <Spinner size="xs" />
                           ) : (
                             <span className="inline-flex items-center gap-1.5">
                               <Unlock className="w-3.5 h-3.5" />
@@ -667,17 +663,18 @@ const TokenLockerPage: React.FC = () => {
 
                       {/* Transfer */}
                       {transferLockId === lock.id ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                          <RnsAddressInput
+                            label="New Owner"
                             value={transferAddress}
-                            onChange={(e) => setTransferAddress(e.target.value)}
-                            placeholder="0x..."
-                            className="input-field w-40 text-sm font-mono"
+                            onChange={setTransferAddress}
+                            onResolvedAddressChange={setTransferResolvedAddress}
+                            className="min-w-0 sm:w-56"
+                            inputClassName="text-sm"
                           />
                           <button
                             onClick={() => handleTransfer(lock.id)}
-                            disabled={!transferAddress || isActionPending}
+                            disabled={!transferResolvedAddress || isActionPending}
                             className="btn-primary text-sm"
                           >
                             Confirm
@@ -691,7 +688,11 @@ const TokenLockerPage: React.FC = () => {
                         </div>
                       ) : (
                         <button
-                          onClick={() => setTransferLockId(lock.id)}
+                          onClick={() => {
+                            setTransferLockId(lock.id);
+                            setTransferAddress('');
+                            setTransferResolvedAddress(null);
+                          }}
                           className="btn-secondary text-sm"
                         >
                           <span className="inline-flex items-center gap-1.5">

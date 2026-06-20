@@ -21,7 +21,6 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Loader2,
   ExternalLink,
   Coins,
   Target,
@@ -31,6 +30,7 @@ import {
   AlertTriangle,
   Shield,
 } from '@/components/ui/icons';
+import { InlineLoading, LoadingState, Spinner } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -278,10 +278,7 @@ const PresaleDetailPage: React.FC = () => {
 
   if (isLoading || !presale) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4">
-        <Loader2 className="w-8 h-8 text-accent animate-spin" />
-        <p className="text-body text-ink-muted">Loading launch details...</p>
-      </div>
+      <LoadingState label="Loading launch details" />
     );
   }
 
@@ -508,7 +505,7 @@ const PresaleDetailPage: React.FC = () => {
                     className="btn-primary"
                   >
                     {isOwnerActionPending || isOwnerActionConfirming ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Spinner size="sm" />
                     ) : (
                       'Deposit'
                     )}
@@ -640,10 +637,7 @@ const PresaleDetailPage: React.FC = () => {
                     className="btn-primary w-full"
                   >
                     {isApproving ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Approving...
-                      </span>
+                      <InlineLoading label="Approving..." />
                     ) : (
                       'Approve Token'
                     )}
@@ -658,10 +652,7 @@ const PresaleDetailPage: React.FC = () => {
                     className="btn-primary w-full"
                   >
                     {isContributing || isContributeConfirming ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {isContributeConfirming ? 'Confirming...' : 'Contributing...'}
-                      </span>
+                      <InlineLoading label={isContributeConfirming ? 'Confirming...' : 'Contributing...'} />
                     ) : (
                       'Contribute'
                     )}
@@ -683,10 +674,7 @@ const PresaleDetailPage: React.FC = () => {
                     className="btn-primary w-full"
                   >
                     {isClaiming || isClaimConfirming ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Claiming...
-                      </span>
+                      <InlineLoading label="Claiming..." />
                     ) : (
                       'Claim Tokens'
                     )}
@@ -699,10 +687,7 @@ const PresaleDetailPage: React.FC = () => {
                     className="btn-secondary w-full"
                   >
                     {isRefunding || isRefundConfirming ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Processing...
-                      </span>
+                      <InlineLoading label="Processing..." />
                     ) : (
                       'Claim Refund'
                     )}

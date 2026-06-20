@@ -150,13 +150,14 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
   // otherwise fall back to the first domain. Primary preference is stored
   // in localStorage only for UI ordering — it is never used as a data source.
   const subgraphLabel = useMemo(() => {
-    if (!resolvedDomains.length) return null;
+    const walletDomains = resolvedDomains.filter((domain) => (domain.custody ?? "wallet") === "wallet");
+    if (!walletDomains.length) return null;
     const stored = address ? getPrimaryLabel(address) : null;
     if (stored) {
-      const match = resolvedDomains.find((d) => d.label === stored);
+      const match = walletDomains.find((d) => d.label === stored);
       if (match) return match.label;
     }
-    return resolvedDomains[0].label || null;
+    return walletDomains[0].label || null;
   }, [resolvedDomains, address]);
 
   // Fallback: onchain ownership check for hintLabel while subgraph indexes

@@ -4,9 +4,13 @@ import { RNSMarketplaceEscrow, RNSRegistrar, RNSRegistry, RNSResolver } from "@/
 import { RNS_DEFAULT_REGISTRATION_DURATION } from "@/lib/rns/constants";
 import type {
   RnsCreateMarketplaceAuctionParams,
+  RnsCreateMarketplaceListingParams,
+  RnsBuyMarketplaceListingParams,
+  RnsBidMarketplaceAuctionParams,
   RnsRegisterParams,
   RnsReleaseParams,
   RnsRenewParams,
+  RnsSettleMarketplaceAuctionParams,
   RnsSetAddrParams,
   RnsSetResolverParams,
 } from "@/lib/rns/types";
@@ -111,6 +115,101 @@ export function useRnsCreateMarketplaceAuction() {
   );
 
   return { ...write, createAuction };
+}
+
+export function useRnsCreateMarketplaceListing() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const createListing = useCallback(
+    (params: RnsCreateMarketplaceListingParams) => {
+      const name = normalizeRnsLabel(params.name);
+      write.writeContract({
+        address: marketplace,
+        abi: RNSMarketplaceEscrow,
+        functionName: "createListing",
+        args: [name, params.price],
+      });
+    },
+    [marketplace, write],
+  );
+
+  return { ...write, createListing };
+}
+
+export function useRnsBuyMarketplaceListing() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const buyListing = useCallback(
+    (params: RnsBuyMarketplaceListingParams) => {
+      write.writeContract({
+        address: marketplace,
+        abi: RNSMarketplaceEscrow,
+        functionName: "buy",
+        args: [params.listingId],
+        value: params.price,
+      });
+    },
+    [marketplace, write],
+  );
+
+  return { ...write, buyListing };
+}
+
+export function useRnsBidMarketplaceAuction() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const bidAuction = useCallback(
+    (params: RnsBidMarketplaceAuctionParams) => {
+      write.writeContract({
+        address: marketplace,
+        abi: RNSMarketplaceEscrow,
+        functionName: "bid",
+        args: [params.auctionId],
+        value: params.amount,
+      });
+    },
+    [marketplace, write],
+  );
+
+  return { ...write, bidAuction };
+}
+
+export function useRnsSettleMarketplaceAuction() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const settleAuction = useCallback(
+    (params: RnsSettleMarketplaceAuctionParams) => {
+      write.writeContract({
+        address: marketplace,
+        abi: RNSMarketplaceEscrow,
+        functionName: "settleAuction",
+        args: [params.auctionId],
+      });
+    },
+    [marketplace, write],
+  );
+
+  return { ...write, settleAuction };
+}
+
+export function useRnsWithdrawMarketplaceReturns() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const withdrawMarketplaceReturns = useCallback(() => {
+    write.writeContract({
+      address: marketplace,
+      abi: RNSMarketplaceEscrow,
+      functionName: "withdraw",
+      args: [],
+    });
+  }, [marketplace, write]);
+
+  return { ...write, withdrawMarketplaceReturns };
 }
 
 export function useRnsSetResolver(label: string) {

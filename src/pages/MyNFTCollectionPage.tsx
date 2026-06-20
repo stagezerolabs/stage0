@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import FallbackImage from '@/components/ui/fallback-image';
 import { NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { ArrowLeft, ExternalLink, Image as ImageIcon, Settings, Wallet } from '@/components/ui/icons';
+import { InlineLoading, LoadingState } from '@/components/ui/spinner';
 import { useUserOwnedNFTTokens } from '@/lib/hooks/useUserOwnedNFTTokens';
 import React, { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -152,7 +153,11 @@ const MyNFTCollectionPage: React.FC = () => {
             ) : (
               <div className="flex min-h-[260px] items-center">
                 <p className="text-body text-ink-muted">
-                  {isLoading ? 'Loading your NFTs in this collection...' : 'No owned NFTs found in this collection.'}
+                  {isLoading ? (
+                    <InlineLoading label="Loading your NFTs..." variant="dots" />
+                  ) : (
+                    'No owned NFTs found in this collection.'
+                  )}
                 </p>
               </div>
             )}
@@ -182,8 +187,8 @@ const MyNFTCollectionPage: React.FC = () => {
         </div>
 
         {isLoading && tokens.length === 0 ? (
-          <div className="glass-card rounded-3xl p-10 text-center">
-            <p className="text-body text-ink-muted">Loading owned token metadata...</p>
+          <div className="glass-card rounded-3xl p-10">
+            <LoadingState label="Loading owned NFT metadata" compact variant="ring" />
           </div>
         ) : tokens.length === 0 ? (
           <div className="glass-card rounded-3xl p-10 text-center">

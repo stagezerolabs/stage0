@@ -4,6 +4,7 @@ import { useAccount, useReadContract } from 'wagmi';
 import { formatUnits, type Address } from 'viem';
 import { toast } from 'sonner';
 import { ArrowLeft, ExternalLink, RefreshCcw } from '@/components/ui/icons';
+import { InlineLoading, LoadingState, Spinner } from '@/components/ui/spinner';
 import { LaunchpadPresaleContract } from '@/config';
 import { useLaunchpadPresales, type PresaleWithStatus } from '@/lib/hooks/useLaunchpadPresales';
 import { useUpdatePresaleFees } from '@/lib/hooks/useAdminActions';
@@ -124,13 +125,13 @@ function PresaleCard({ presale, isFeeRecipient }: { presale: PresaleWithStatus; 
             <div>
               <p className="text-xs text-ink-faint">Token Fee</p>
               <p className="text-body font-medium text-ink">
-                {tokenFeeBps !== undefined ? `${Number(tokenFeeBps) / 100}%` : '...'}
+                {tokenFeeBps !== undefined ? `${Number(tokenFeeBps) / 100}%` : <Spinner size="xs" variant="dots" />}
               </p>
             </div>
             <div>
               <p className="text-xs text-ink-faint">Proceeds Fee</p>
               <p className="text-body font-medium text-ink">
-                {proceedsFeeBps !== undefined ? `${Number(proceedsFeeBps) / 100}%` : '...'}
+                {proceedsFeeBps !== undefined ? `${Number(proceedsFeeBps) / 100}%` : <Spinner size="xs" variant="dots" />}
               </p>
             </div>
             {isFeeRecipient && (
@@ -177,7 +178,7 @@ function PresaleCard({ presale, isFeeRecipient }: { presale: PresaleWithStatus; 
             disabled={isBusy || !newTokenFeeBps || !newProceedsFeeBps}
             className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isBusy ? 'Updating...' : 'Confirm Update'}
+            {isBusy ? <InlineLoading label="Updating..." /> : 'Confirm Update'}
           </button>
         </div>
       )}
@@ -240,10 +241,7 @@ const AdminPresalesPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-16 space-y-3">
-          <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-          <p className="text-body-sm text-ink-muted">Loading launches...</p>
-        </div>
+        <LoadingState label="Loading launches" compact variant="ring" />
       ) : filteredPresales.length === 0 ? (
         <div className="glass-card rounded-3xl p-10 text-center">
           <p className="text-body text-ink-muted">No launches found for this filter.</p>

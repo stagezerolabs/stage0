@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { formatUnits, isAddress, type Abi, type Address } from 'viem';
+import { formatUnits, type Abi, type Address } from 'viem';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -11,11 +11,12 @@ import {
   Unlock,
   Timer,
   ArrowRightLeft,
-  Loader2,
   User,
 } from '@/components/ui/icons';
 import { TokenLocker, erc20Abi } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
+import { InlineLoading, LoadingState } from '@/components/ui/spinner';
 
 interface LockInfo {
   token: Address;
@@ -135,6 +136,7 @@ const LockDetailPage: React.FC = () => {
 
   const [extendDays, setExtendDays] = useState('');
   const [transferAddress, setTransferAddress] = useState('');
+  const [transferResolvedAddress, setTransferResolvedAddress] = useState<Address | null>(null);
 
   useEffect(() => {
     if (isSuccess) {
@@ -172,17 +174,18 @@ const LockDetailPage: React.FC = () => {
   };
 
   const handleTransfer = () => {
-    if (!lockId || !transferAddress || !isAddress(transferAddress)) {
-      toast.error('Enter a valid address.');
+    if (!lockId || !transferResolvedAddress) {
+      toast.error('Enter a valid address or .rise name.');
       return;
     }
     writeContract({
       abi: TokenLocker as Abi,
       address: tokenLocker,
       functionName: 'transferLockOwnership',
-      args: [lockId, transferAddress as Address],
+      args: [lockId, transferResolvedAddress],
     });
     setTransferAddress('');
+    setTransferResolvedAddress(null);
   };
 
   if (!lockId) {
@@ -199,10 +202,7 @@ const LockDetailPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 space-y-3">
-        <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-        <p className="text-body-sm text-ink-muted">Loading lock #{id}...</p>
-      </div>
+      <LoadingState label={`Loading lock #${id}`} compact />
     );
   }
 
@@ -352,10 +352,7 @@ const LockDetailPage: React.FC = () => {
               className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending || isConfirming ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Processing...
-                </span>
+                <InlineLoading label="Processing..." />
               ) : (
                 <span className="inline-flex items-center gap-2">
                   <Unlock className="w-4 h-4" />
@@ -407,15 +404,17 @@ const LockDetailPage: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <input
+              <RnsAddressInput
+                label="Recipient"
                 value={transferAddress}
-                onChange={(event) => setTransferAddress(event.target.value)}
-                placeholder="Recipient address (0x...)"
-                className="input-field font-mono flex-1"
+                onChange={setTransferAddress}
+                onResolvedAddressChange={setTransferResolvedAddress}
+                placeholder="0x... or name.rise"
+                className="flex-1"
               />
               <button
                 onClick={handleTransfer}
-                disabled={!transferAddress || isPending || isConfirming}
+                disabled={!transferResolvedAddress || isPending || isConfirming}
                 className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               >
                 <ArrowRightLeft className="w-4 h-4" />

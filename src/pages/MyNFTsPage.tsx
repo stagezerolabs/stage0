@@ -11,6 +11,7 @@ import { NFT_COLLECTION_IMAGES, getExplorerUrl, getNativeTokenLabel } from '@/co
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { ArrowRight, ExternalLink, Image as ImageIcon, Settings, Wallet } from '@/components/ui/icons';
+import { LoadingState } from '@/components/ui/spinner';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, type Address } from 'viem';
@@ -107,8 +108,8 @@ const MyNFTsPage: React.FC = () => {
       </section>
 
       {isPortfolioLoading && !hasAnyNFTPortfolio ? (
-        <div className="glass-card rounded-3xl p-10 text-center">
-          <p className="text-body text-ink-muted">Loading your NFT portfolio...</p>
+        <div className="glass-card rounded-3xl p-10">
+          <LoadingState label="Loading collectibles" compact variant="ring" />
         </div>
       ) : !hasAnyNFTPortfolio ? (
         <div className="glass-card rounded-3xl p-10 text-center space-y-4">

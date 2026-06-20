@@ -12,13 +12,16 @@ import {
 } from 'wagmi';
 import { formatEther, isAddress, parseEther, type Address } from 'viem';
 import { toast } from 'sonner';
-import { ArrowLeft, ExternalLink, Loader2, Wallet } from '@/components/ui/icons';
+import { ArrowLeft, ExternalLink, Wallet } from '@/components/ui/icons';
 import { NFT_COLLECTION_IMAGES, NFTCollectionContract, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
 import { isWhitelistLocked } from '@/lib/utils/nft-sales';
 import { normalizeBaseURI, normalizeContractURI } from '@/lib/utils/ipfs';
 import FallbackImage from '@/components/ui/fallback-image';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
+import { resolveRnsAddressInput } from '@/lib/api/rns';
+import { InlineLoading, LoadingState } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -37,19 +40,11 @@ const itemVariants = {
   },
 };
 
-function parseWalletList(value: string): Address[] {
-  const addresses = value
+function parseWalletInputs(value: string): string[] {
+  return value
     .split(/[\s,]+/)
     .map((entry) => entry.trim())
     .filter(Boolean);
-
-  const deduped = Array.from(new Set(addresses.map((entry) => entry.toLowerCase())));
-  const invalid = deduped.find((entry) => !isAddress(entry));
-  if (invalid) {
-    throw new Error(`Invalid wallet address: ${invalid}`);
-  }
-
-  return deduped as Address[];
 }
 
 const ManageNFTPage: React.FC = () => {
@@ -65,6 +60,7 @@ const ManageNFTPage: React.FC = () => {
     : undefined;
 
   const [payoutWalletInput, setPayoutWalletInput] = useState('');
+  const [payoutResolvedAddress, setPayoutResolvedAddress] = useState<Address | null>(null);
   const [baseURIInput, setBaseURIInput] = useState('');
   const [contractURIInput, setContractURIInput] = useState('');
   const [withdrawInput, setWithdrawInput] = useState('');
@@ -227,29 +223,36 @@ const ManageNFTPage: React.FC = () => {
     ? isWhitelistLocked(collection.whitelistEnabled, collection.whitelistStart)
     : false;
 
-  const handleWhitelistUpdate = (mode: 'add' | 'remove') => {
+  const handleWhitelistUpdate = async (mode: 'add' | 'remove') => {
     if (!collectionAddress) return;
     if (whitelistLocked) {
       toast.error('Whitelist wallets can no longer be edited because the whitelist phase has started.');
       return;
     }
 
-    let wallets: Address[];
-    try {
-      wallets = parseWalletList(whitelistWalletsInput);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Whitelist contains an invalid address.');
-      return;
-    }
+    const entries = parseWalletInputs(whitelistWalletsInput);
 
-    if (wallets.length === 0) {
-      toast.error('Enter at least one wallet address.');
+    if (entries.length === 0) {
+      toast.error('Enter at least one wallet address or .rise name.');
       return;
     }
-    if (wallets.length > 500) {
+    if (entries.length > 500) {
       toast.error('Whitelist batch size cannot exceed 500 wallets per transaction.');
       return;
     }
+
+    const resolved = await Promise.all(
+      entries.map((entry) => resolveRnsAddressInput({ value: entry, chainId })),
+    );
+    const invalidIndex = resolved.findIndex((addr) => !addr);
+    if (invalidIndex >= 0) {
+      toast.error(`Could not resolve wallet: ${entries[invalidIndex]}`);
+      return;
+    }
+
+    const wallets = Array.from(
+      new Map(resolved.map((addr) => [addr!.toLowerCase(), addr!])).values(),
+    );
 
     const isSingle = wallets.length === 1;
     const functionName =
@@ -300,8 +303,8 @@ const ManageNFTPage: React.FC = () => {
 
   const handleSetPayoutWallet = () => {
     if (!collectionAddress) return;
-    if (!isAddress(payoutWalletInput.trim())) {
-      toast.error('Enter a valid payout wallet address.');
+    if (!payoutResolvedAddress) {
+      toast.error('Enter a valid payout wallet address or .rise name.');
       return;
     }
     setPendingAction('setPayoutWallet');
@@ -309,7 +312,7 @@ const ManageNFTPage: React.FC = () => {
       abi: NFTCollectionContract,
       address: collectionAddress,
       functionName: 'setPayoutWallet',
-      args: [payoutWalletInput.trim() as Address],
+      args: [payoutResolvedAddress],
     });
   };
 
@@ -348,9 +351,8 @@ const ManageNFTPage: React.FC = () => {
   if (isCollectionLoading) {
     return (
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
-        <motion.div variants={itemVariants} className="glass-card rounded-3xl p-8 text-center space-y-4">
-          <Loader2 className="w-6 h-6 mx-auto animate-spin text-accent" />
-          <p className="text-body text-ink-muted">Loading collection details...</p>
+        <motion.div variants={itemVariants} className="glass-card rounded-3xl p-8">
+          <LoadingState label="Loading collection details" compact />
         </motion.div>
       </motion.div>
     );
@@ -519,7 +521,7 @@ const ManageNFTPage: React.FC = () => {
             <div className="space-y-1">
               <h2 className="font-display text-display-sm text-ink">Whitelist Wallets</h2>
               <p className="text-body-sm text-ink-muted">
-                Paste one wallet per line, or separate addresses with commas or spaces. Batch limit is 500 per transaction.
+                Paste one wallet or .rise name per line, or separate entries with commas or spaces. Batch limit is 500 per transaction.
               </p>
             </div>
             <textarea
@@ -527,7 +529,7 @@ const ManageNFTPage: React.FC = () => {
               onChange={(e) => setWhitelistWalletsInput(e.target.value)}
               rows={8}
               disabled={whitelistLocked}
-              placeholder="0x1234...\n0xabcd..."
+              placeholder="0x1234...\nalice.rise"
               className="input-field w-full min-h-[180px] resize-y font-mono text-sm disabled:cursor-not-allowed disabled:opacity-60"
             />
             <div className="flex flex-wrap gap-3">
@@ -537,7 +539,7 @@ const ManageNFTPage: React.FC = () => {
                 className="btn-primary inline-flex items-center gap-2 disabled:opacity-60"
               >
                 {pendingAction === 'whitelistAdd' && isBusy ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Adding...</>
+                  <InlineLoading label="Adding..." />
                 ) : (
                   'Add Wallets'
                 )}
@@ -548,7 +550,7 @@ const ManageNFTPage: React.FC = () => {
                 className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
               >
                 {pendingAction === 'whitelistRemove' && isBusy ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Removing...</>
+                  <InlineLoading label="Removing..." />
                 ) : (
                   'Remove Wallets'
                 )}
@@ -568,7 +570,7 @@ const ManageNFTPage: React.FC = () => {
                 className="input-field w-full"
               />
               <button onClick={handleSetBaseURI} disabled={isBusy} className="btn-secondary inline-flex disabled:opacity-60">
-                {pendingAction === 'setBaseURI' && isBusy ? 'Updating...' : 'Update Base URI'}
+                {pendingAction === 'setBaseURI' && isBusy ? <InlineLoading label="Updating..." /> : 'Update Base URI'}
               </button>
             </div>
 
@@ -584,20 +586,20 @@ const ManageNFTPage: React.FC = () => {
                 Accepts collection metadata URIs or direct image URIs. CIDs and gateway links are normalized automatically.
               </p>
               <button onClick={handleSetContractURI} disabled={isBusy} className="btn-secondary inline-flex disabled:opacity-60">
-                {pendingAction === 'setContractURI' && isBusy ? 'Updating...' : 'Update Contract URI'}
+                {pendingAction === 'setContractURI' && isBusy ? <InlineLoading label="Updating..." /> : 'Update Contract URI'}
               </button>
             </div>
 
             <div className="space-y-2">
-              <label className="text-body-sm text-ink-muted font-medium">Payout Wallet</label>
-              <input
+              <RnsAddressInput
+                label="Payout Wallet"
                 value={payoutWalletInput}
-                onChange={(e) => setPayoutWalletInput(e.target.value)}
-                placeholder="0x..."
-                className="input-field w-full font-mono text-sm"
+                onChange={setPayoutWalletInput}
+                onResolvedAddressChange={setPayoutResolvedAddress}
+                placeholder="0x... or name.rise"
               />
               <button onClick={handleSetPayoutWallet} disabled={isBusy} className="btn-secondary inline-flex disabled:opacity-60">
-                {pendingAction === 'setPayoutWallet' && isBusy ? 'Updating...' : 'Update Payout Wallet'}
+                {pendingAction === 'setPayoutWallet' && isBusy ? <InlineLoading label="Updating..." /> : 'Update Payout Wallet'}
               </button>
             </div>
           </motion.section>
@@ -621,7 +623,7 @@ const ManageNFTPage: React.FC = () => {
                 className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
               >
                 {pendingAction === 'withdrawRaised' && isBusy ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Withdrawing...</>
+                  <InlineLoading label="Withdrawing..." />
                 ) : (
                   <><Wallet className="w-4 h-4" />Withdraw</>
                 )}

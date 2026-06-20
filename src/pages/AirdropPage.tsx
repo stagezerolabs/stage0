@@ -10,7 +10,6 @@ import {
 } from 'wagmi';
 import {
   formatUnits,
-  isAddress,
   parseUnits,
   type Address,
 } from 'viem';
@@ -22,7 +21,6 @@ import {
 } from '@/config';
 import {
   Send,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
   ToggleLeft,
@@ -32,6 +30,10 @@ import {
   FileText,
   Trash2,
 } from '@/components/ui/icons';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
+import { resolveRnsAddressInput } from '@/lib/api/rns';
+import { coerceAddress, shortAddress } from '@/lib/rns/address-resolution';
+import { InlineLoading } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -58,7 +60,13 @@ const itemVariants = {
 };
 
 interface Recipient {
-  address: string;
+  input: string;
+  address: Address;
+  amount: string;
+}
+
+interface RawRecipient {
+  input: string;
   amount: string;
 }
 
@@ -78,8 +86,12 @@ const AirdropPage: React.FC = () => {
 
   const [isNativeToken, setIsNativeToken] = useState(false);
   const [tokenAddress, setTokenAddress] = useState(queryToken);
+  const [resolvedTokenAddress, setResolvedTokenAddress] = useState<Address | null>(null);
   const [recipientsText, setRecipientsText] = useState('');
-  const validTokenAddress = isAddress(tokenAddress) ? (tokenAddress as Address) : undefined;
+  const [resolvedRecipients, setResolvedRecipients] = useState<Recipient[]>([]);
+  const [isResolvingRecipients, setIsResolvingRecipients] = useState(false);
+  const [recipientResolutionError, setRecipientResolutionError] = useState('');
+  const validTokenAddress = resolvedTokenAddress ?? undefined;
 
   useEffect(() => {
     if (queryToken) {
@@ -154,7 +166,7 @@ const AirdropPage: React.FC = () => {
     ? tokenSymbolValue
     : `$${tokenSymbolValue}`;
 
-  const parsedRecipients = useMemo((): Recipient[] => {
+  const rawRecipients = useMemo((): RawRecipient[] => {
     if (!recipientsText.trim()) return [];
     return recipientsText
       .split('\n')
@@ -163,12 +175,72 @@ const AirdropPage: React.FC = () => {
       .map((line) => {
         const parts = line.split(',').map((p) => p.trim());
         return {
-          address: parts[0] || '',
+          input: parts[0] || '',
           amount: parts[1] || '0',
         };
       })
-      .filter((r) => r.address.startsWith('0x') && r.address.length === 42);
+      .filter((r) => r.input && r.amount);
   }, [recipientsText]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (rawRecipients.length === 0) {
+      setResolvedRecipients([]);
+      setRecipientResolutionError('');
+      setIsResolvingRecipients(false);
+      return;
+    }
+
+    setIsResolvingRecipients(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const rows = await Promise.all(
+            rawRecipients.map(async (recipient) => ({
+              ...recipient,
+              address: await resolveRnsAddressInput({
+                value: recipient.input,
+                chainId,
+              }),
+            })),
+          );
+
+          if (cancelled) return;
+
+          const invalid = rows.find((row) => !row.address);
+          if (invalid) {
+            setResolvedRecipients([]);
+            setRecipientResolutionError(`Could not resolve ${invalid.input}. Use an address or active .rise name.`);
+            return;
+          }
+
+          setResolvedRecipients(
+            rows.map((row) => ({
+              input: row.input,
+              address: row.address!,
+              amount: row.amount,
+            })),
+          );
+          setRecipientResolutionError('');
+        } catch {
+          if (!cancelled) {
+            setResolvedRecipients([]);
+            setRecipientResolutionError('Could not resolve recipients right now.');
+          }
+        } finally {
+          if (!cancelled) setIsResolvingRecipients(false);
+        }
+      })();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [rawRecipients, chainId]);
+
+  const parsedRecipients = resolvedRecipients;
 
   const totalAmount = useMemo(() => {
     if (!isNativeToken && tokenDecimals === undefined) return 0n;
@@ -249,7 +321,7 @@ const AirdropPage: React.FC = () => {
   const handleSend = () => {
     if (parsedRecipients.length === 0 || totalAmount === 0n) return;
 
-    const addresses = parsedRecipients.map((r) => r.address as Address);
+    const addresses = parsedRecipients.map((r) => r.address);
     const amounts = parsedRecipients.map((r) => parseUnits(r.amount, amountDecimals));
 
     if (isNativeToken) {
@@ -287,6 +359,8 @@ const AirdropPage: React.FC = () => {
 
   const primaryButtonLabel = (() => {
     if (!isConnected) return 'Connect Wallet First';
+    if (isResolvingRecipients) return 'Resolving Recipients...';
+    if (recipientResolutionError) return 'Fix Recipients';
     if (parsedRecipients.length === 0) return 'Add Recipients';
     if (!isNativeToken && !validTokenAddress) return 'Enter Token Address';
     if (!isNativeToken && tokenDecimalsError) return 'Unsupported Token';
@@ -310,6 +384,8 @@ const AirdropPage: React.FC = () => {
   const isPrimaryDisabled = Boolean(
     !isConnected
     || parsedRecipients.length === 0
+    || isResolvingRecipients
+    || Boolean(recipientResolutionError)
     || (!isNativeToken && !validTokenAddress)
     || (!isNativeToken && isTokenStateLoading)
     || totalAmount === 0n
@@ -399,13 +475,13 @@ const AirdropPage: React.FC = () => {
         {/* Token Address (ERC20 only) */}
         {!isNativeToken && (
           <div className="space-y-1.5">
-            <label className="text-body-sm text-ink-muted font-medium">Token Address</label>
-            <input
-              type="text"
+            <RnsAddressInput
+              label="Token Address"
               value={tokenAddress}
-              onChange={(e) => setTokenAddress(e.target.value)}
-              placeholder="0x..."
-              className="input-field w-full font-mono text-sm"
+              onChange={setTokenAddress}
+              onResolvedAddressChange={setResolvedTokenAddress}
+              placeholder="0x... or token.rise"
+              required
             />
 
             {validTokenAddress && (
@@ -419,7 +495,7 @@ const AirdropPage: React.FC = () => {
                   <p className="text-body-sm text-ink font-mono">
                     {tokenBalanceValue !== undefined
                       ? `${formatTokenAmount(tokenBalanceValue, tokenDecimalsValue)} ${tokenSymbolDisplay}`
-                      : 'Loading...'}
+                      : <InlineLoading label="Loading..." size="xs" variant="dots" />}
                   </p>
                 </div>
               </div>
@@ -431,7 +507,7 @@ const AirdropPage: React.FC = () => {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="text-body-sm text-ink-muted font-medium">
-              Recipients (one per line: address,amount)
+              Recipients (one per line: address or .rise name, amount)
             </label>
             {recipientsText && (
               <button
@@ -446,10 +522,18 @@ const AirdropPage: React.FC = () => {
           <textarea
             value={recipientsText}
             onChange={(e) => setRecipientsText(e.target.value)}
-            placeholder={'0x1234...abcd,100\\n0x5678...efgh,200\\n0x9abc...ijkl,300'}
+            placeholder={'0x1234...abcd,100\\nalice.rise,200\\nbuilder,300'}
             rows={8}
             className="input-field w-full font-mono text-sm resize-y"
           />
+          {isResolvingRecipients && (
+            <p className="text-xs text-ink-faint">
+              <InlineLoading label="Resolving recipient names..." size="xs" variant="dots" />
+            </p>
+          )}
+          {recipientResolutionError && (
+            <p className="text-xs text-status-error">{recipientResolutionError}</p>
+          )}
         </div>
 
         {/* Preview */}
@@ -475,7 +559,9 @@ const AirdropPage: React.FC = () => {
                     <tr key={i} className="border-t border-ink/5">
                       <td className="px-4 py-2 text-ink-faint">{i + 1}</td>
                       <td className="px-4 py-2 font-mono text-ink truncate max-w-[200px]">
-                        {r.address.slice(0, 6)}...{r.address.slice(-4)}
+                        {coerceAddress(r.input)
+                          ? shortAddress(r.address)
+                          : `${r.input} -> ${shortAddress(r.address)}`}
                       </td>
                       <td className="px-4 py-2 text-right text-ink font-medium">{r.amount}</td>
                     </tr>
@@ -512,10 +598,7 @@ const AirdropPage: React.FC = () => {
             className="btn-primary flex-1"
           >
             {isApprovePending || isApproveConfirming || isSendPending || isSendConfirming ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {primaryButtonLabel}
-              </span>
+              <InlineLoading label={primaryButtonLabel} />
             ) : primaryButtonLabel === 'Send Airdrop' ? (
               <span className="inline-flex items-center gap-2">
                 <Send className="w-4 h-4" />

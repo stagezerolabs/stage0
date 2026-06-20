@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { isAddress, type Address } from 'viem';
 import { toast } from 'sonner';
 import { ArrowLeft, ShieldCheck, ShieldX, UserPlus, UserMinus } from '@/components/ui/icons';
+import { InlineLoading, Spinner } from '@/components/ui/spinner';
 import { useWhitelistedCreator } from '@/lib/hooks/useWhitelistedCreator';
 import { useRemoveWhitelistedCreator, useSetWhitelistedCreator } from '@/lib/hooks/useAdminActions';
 
@@ -101,7 +102,7 @@ const AdminWhitelistPage: React.FC = () => {
             isWhitelisted ? 'bg-status-live/15 text-status-live' : 'bg-status-error/10 text-status-error'
           }`}>
             {isLoading ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <Spinner size="sm" />
             ) : isWhitelisted ? (
               <ShieldCheck className="w-4 h-4" />
             ) : (
@@ -137,7 +138,7 @@ const AdminWhitelistPage: React.FC = () => {
             disabled={addAction.isBusy || !addInput}
             className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {addAction.isBusy ? 'Adding...' : 'Add to Whitelist'}
+            {addAction.isBusy ? <InlineLoading label="Adding..." /> : 'Add to Whitelist'}
           </button>
         </div>
 
@@ -160,7 +161,7 @@ const AdminWhitelistPage: React.FC = () => {
             disabled={removeAction.isBusy || !removeInput}
             className="btn-secondary w-full disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {removeAction.isBusy ? 'Removing...' : 'Remove from Whitelist'}
+            {removeAction.isBusy ? <InlineLoading label="Removing..." /> : 'Remove from Whitelist'}
           </button>
         </div>
       </div>

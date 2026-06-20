@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAccount, useChainId, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { decodeEventLog, isAddress, parseEther, type Address } from 'viem';
+import { decodeEventLog, parseEther, type Address } from 'viem';
 import { NFTFactory, getContractAddresses, getExplorerUrl } from '@/config';
 import {
   AlertTriangle,
@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Image,
   Layers,
-  Loader2,
   Upload,
 } from '@/components/ui/icons';
 import { format, isSameDay, setHours, setMinutes, startOfDay } from 'date-fns';
@@ -29,6 +28,8 @@ import { validateNFTMetadata } from '@/lib/api/nft';
 import FallbackImage from '@/components/ui/fallback-image';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
+import { InlineLoading } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -245,6 +246,7 @@ const CreateNFTPage: React.FC = () => {
   const [maxSupply, setMaxSupply] = useState('');
   const [walletLimit, setWalletLimit] = useState('');
   const [payoutWallet, setPayoutWallet] = useState('');
+  const [payoutResolvedAddress, setPayoutResolvedAddress] = useState<Address | null>(null);
   const [saleStart, setSaleStart] = useState('');
   const [saleEnd, setSaleEnd] = useState('');
   const [mintPrice, setMintPrice] = useState('');
@@ -411,8 +413,8 @@ const CreateNFTPage: React.FC = () => {
       }
     }
 
-    if (payoutWallet.trim() && !isAddress(payoutWallet.trim())) {
-      return { valid: false, message: 'Payout wallet must be a valid address.' };
+    if (payoutWallet.trim() && !payoutResolvedAddress) {
+      return { valid: false, message: 'Payout wallet must be a valid address or active .rise name.' };
     }
 
     const saleStartTs = parseDateTimeInput(saleStart);
@@ -459,6 +461,7 @@ const CreateNFTPage: React.FC = () => {
     mintPrice,
     walletLimit,
     payoutWallet,
+    payoutResolvedAddress,
     saleStart,
     saleEnd,
     whitelistEnabled,
@@ -556,7 +559,7 @@ const CreateNFTPage: React.FC = () => {
               whitelistPrice: whitelistEnabled ? parseEther(whitelistPrice.trim()) : 0n,
             },
             maxSupply: BigInt(maxSupply),
-            payoutWallet: payoutWallet.trim() ? (payoutWallet.trim() as Address) : ZERO_ADDRESS,
+            payoutWallet: payoutWallet.trim() ? (payoutResolvedAddress ?? ZERO_ADDRESS) : ZERO_ADDRESS,
             mintConfig: {
               saleStart: BigInt(saleStartTs),
               saleEnd: BigInt(saleEndTs),
@@ -961,16 +964,14 @@ const CreateNFTPage: React.FC = () => {
                   className="input-field w-full"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-body-sm text-ink-muted font-medium">Payout Wallet (optional)</label>
-                <input
-                  type="text"
-                  value={payoutWallet}
-                  onChange={(e) => setPayoutWallet(e.target.value)}
-                  placeholder="0x... (defaults to your wallet)"
-                  className="input-field w-full font-mono text-sm"
-                />
-              </div>
+              <RnsAddressInput
+                label="Payout Wallet (optional)"
+                value={payoutWallet}
+                onChange={setPayoutWallet}
+                onResolvedAddressChange={setPayoutResolvedAddress}
+                placeholder="0x... or name.rise"
+                hint="Leave empty to use the default payout wallet."
+              />
             </div>
           </motion.section>
 
@@ -1132,15 +1133,9 @@ const CreateNFTPage: React.FC = () => {
               className="btn-primary w-full"
             >
               {isMetadataValidating ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Validating Metadata...
-                </span>
+                <InlineLoading label="Validating metadata..." />
               ) : isPending || isConfirming ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {isConfirming ? 'Confirming...' : 'Deploying Collection...'}
-                </span>
+                <InlineLoading label={isConfirming ? 'Confirming...' : 'Deploying Collection...'} />
               ) : !isConnected ? (
                 'Connect Wallet First'
               ) : (

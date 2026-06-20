@@ -45,7 +45,37 @@ export type IndexedRnsDomain = {
   renewedAt: bigint | null;
   releasedAt: bigint | null;
   createdAtBlock: bigint;
+  custody?: "wallet" | "marketplace_listing" | "marketplace_auction";
+  seller?: Address | null;
+  marketplace?: IndexedRnsMarketplaceSummary | null;
 };
+
+export type IndexedRnsMarketplaceSummary =
+  | {
+      kind: "listing";
+      listingId: string;
+      status: string;
+      seller: Address;
+      price: string;
+      buyer: Address | null;
+      purchasedPrice: string | null;
+    }
+  | {
+      kind: "auction";
+      auctionId: string;
+      status: string;
+      rawStatus?: string;
+      seller: Address;
+      reservePrice: string;
+      startTime: string;
+      endTime: string;
+      currentExtensionWindow: string | null;
+      bidCount: number;
+      highestBidder: Address | null;
+      highestBid: string;
+      winner: Address | null;
+      settledAmount: string | null;
+    };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

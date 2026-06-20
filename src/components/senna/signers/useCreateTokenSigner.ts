@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { decodeEventLog, parseUnits, type Address } from 'viem';
 import { TokenFactory, getContractAddresses, riseTestnet } from '@/config';
+import { useRnsAddressInput } from '@/lib/hooks/rns';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import type { SennaActionDraft, SignerState } from '../types';
 
@@ -33,7 +34,9 @@ export function useCreateTokenSigner(draft: SennaActionDraft): SignerState {
 
   const tokenType = normalizeType(draft.prefill.tokenType);
   const decimals = Number.parseInt(draft.prefill.decimals || '18', 10);
-  const recipient = (draft.prefill.initialRecipient || address || '') as Address;
+  const recipientInput = draft.prefill.initialRecipient || address || '';
+  const recipientResolution = useRnsAddressInput(recipientInput, riseTestnet.id);
+  const recipient = recipientResolution.address;
 
   const supplyValid = useMemo(() => {
     if (!draft.prefill.initialSupply) return false;
@@ -94,7 +97,7 @@ export function useCreateTokenSigner(draft: SennaActionDraft): SignerState {
     }
     if (!supplyValid) return;
     const supply = parseUnits(draft.prefill.initialSupply!, decimals);
-    if (!recipient || recipient.length !== 42) return;
+    if (!recipient) return;
 
     if (tokenType === 'taxable') {
       // Senna does not collect tax-wallet/bps; fall back to creator + 100 bps.
@@ -143,6 +146,12 @@ export function useCreateTokenSigner(draft: SennaActionDraft): SignerState {
     phase = 'success';
     primaryLabel = 'Token created';
     busy = false;
+  } else if (recipientInput && !recipient && recipientResolution.isLoading) {
+    primaryLabel = 'Resolving .rise name...';
+    ready = false;
+  } else if (recipientInput && !recipient) {
+    primaryLabel = 'Resolve recipient first';
+    ready = false;
   } else if (errorMessage) {
     phase = 'error';
     primaryLabel = 'Try again';

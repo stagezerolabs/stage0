@@ -17,10 +17,10 @@ import {
   CheckCircle2,
   ExternalLink,
   Image,
-  Loader2,
   Shield,
   Users,
 } from '@/components/ui/icons';
+import { InlineLoading, LoadingState } from '@/components/ui/spinner';
 import { NFTCollectionContract, NFT_COLLECTION_IMAGES, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import {
@@ -497,10 +497,7 @@ const NFTDetailPage: React.FC = () => {
 
   if (isCollectionLoading || !collection) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4">
-        <Loader2 className="w-8 h-8 text-accent animate-spin" />
-        <p className="text-body text-ink-muted">Loading collection...</p>
-      </div>
+      <LoadingState label="Loading collection" />
     );
   }
 
@@ -862,10 +859,7 @@ const NFTDetailPage: React.FC = () => {
                   className="btn-primary w-full"
                 >
                   {isBusy ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {isConfirming ? 'Confirming...' : 'Minting...'}
-                    </span>
+                    <InlineLoading label={isConfirming ? 'Confirming...' : 'Minting...'} />
                   ) : (
                     `Mint ${mintQty} NFT${mintQty > 1 ? 's' : ''} →`
                   )}
@@ -1003,7 +997,9 @@ const NFTDetailPage: React.FC = () => {
                   </p>
                 </div>
                 {isSampleTraitsLoading && (
-                  <span className="text-body-sm text-ink-faint">Loading traits...</span>
+                  <span className="text-body-sm text-ink-faint">
+                    <InlineLoading label="Loading traits..." size="xs" variant="dots" />
+                  </span>
                 )}
               </div>
 

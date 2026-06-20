@@ -34,6 +34,7 @@ import {
   Star,
   Wallet,
 } from '@/components/ui/icons';
+import { InlineLoading, Spinner } from '@/components/ui/spinner';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
@@ -79,6 +80,18 @@ function formatLockAmount(amount: string): string {
 function shortenAddress(addr?: string): string {
   if (!addr) return '—';
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function getRnsMarketplaceLabel(domain: {
+  custody?: string;
+  marketplace?: { kind?: string; status?: string } | null;
+}) {
+  if ((domain.custody ?? 'wallet') === 'wallet') return null;
+  if (domain.marketplace?.kind === 'listing') return 'Listed';
+  if (domain.marketplace?.status === 'ended') return 'Auction ended';
+  if (domain.marketplace?.status === 'scheduled') return 'Auction scheduled';
+  if (domain.marketplace?.kind === 'auction') return 'In auction';
+  return 'In marketplace';
 }
 
 interface DashboardLockItem {
@@ -154,7 +167,8 @@ const Dashboard: React.FC = () => {
 
   // ownedDomains already has labels resolved from resolver text records (on-chain).
   // No localStorage or pending-registration merging needed.
-  const domainsToDisplay = ownedDomains;
+  const domainsToDisplay = ownedDomains.filter((domain) => Boolean(domain.label));
+  const walletDomainsToDisplay = domainsToDisplay.filter((domain) => (domain.custody ?? 'wallet') === 'wallet');
 
   const { data: stakingTokenData } = useReadContracts({
     contracts: [
@@ -396,11 +410,11 @@ const Dashboard: React.FC = () => {
             <CreationCard
               eyebrow="ERC-20"
               title="Created tokens"
-              count={isTokensLoading ? '…' : String(createdTokenList.length)}
+              count={isTokensLoading ? <Spinner size="xs" variant="dots" /> : String(createdTokenList.length)}
               accent="rgb(var(--color-accent))"
               empty={
                 isTokensLoading && createdTokenList.length === 0
-                  ? 'Loading tokens…'
+                  ? <InlineLoading label="Loading tokens..." size="xs" variant="dots" />
                   : createdTokenList.length === 0
                     ? "You haven't deployed a token yet."
                     : null
@@ -441,11 +455,11 @@ const Dashboard: React.FC = () => {
             <CreationCard
               eyebrow="Presales"
               title="Created launches"
-              count={isPresalesLoading ? '…' : String(createdPresales.length)}
+              count={isPresalesLoading ? <Spinner size="xs" variant="dots" /> : String(createdPresales.length)}
               accent="rgb(var(--color-accent-secondary))"
               empty={
                 isPresalesLoading && createdPresales.length === 0
-                  ? 'Loading launches…'
+                  ? <InlineLoading label="Loading launches..." size="xs" variant="dots" />
                   : createdPresales.length === 0
                     ? 'Launch your next presale or manage existing ones.'
                     : null
@@ -490,11 +504,11 @@ const Dashboard: React.FC = () => {
             <CreationCard
               eyebrow="Timelock"
               title="Token locks"
-              count={isLocksLoading ? '…' : String(myLocks.length)}
+              count={isLocksLoading ? <Spinner size="xs" variant="dots" /> : String(myLocks.length)}
               accent="rgb(var(--color-accent-violet))"
               empty={
                 isLocksLoading && myLocks.length === 0
-                  ? 'Loading locks…'
+                  ? <InlineLoading label="Loading locks..." size="xs" variant="dots" />
                   : myLocks.length === 0
                     ? 'No token locks yet.'
                     : null
@@ -545,11 +559,11 @@ const Dashboard: React.FC = () => {
             <CreationCard
               eyebrow="Identity"
               title="My Names"
-              count={isDomainsLoading ? '…' : String(domainsToDisplay.length)}
+              count={isDomainsLoading ? <Spinner size="xs" variant="dots" /> : String(domainsToDisplay.length)}
               accent="rgb(var(--color-accent-sky))"
               empty={
                 isDomainsLoading && domainsToDisplay.length === 0
-                  ? 'Loading names…'
+                  ? <InlineLoading label="Loading names..." size="xs" variant="dots" />
                   : domainsToDisplay.length === 0
                     ? "You don't own any .rise names yet."
                     : null
@@ -561,8 +575,9 @@ const Dashboard: React.FC = () => {
             >
               {domainsToDisplay.slice(0, 5).map((domain) => {
                 const label = domain.label || '';
-                const effectivePrimary = primaryLabel ?? (domainsToDisplay[0].label || '');
+                const effectivePrimary = primaryLabel ?? (walletDomainsToDisplay[0]?.label || '');
                 const isPrimary = label !== '' && label === effectivePrimary;
+                const marketplaceLabel = getRnsMarketplaceLabel(domain);
                 const expiryDate = domain.expiry
                   ? new Date(Number(domain.expiry) * 1000).toLocaleDateString(undefined, {
                     year: 'numeric',
@@ -592,11 +607,18 @@ const Dashboard: React.FC = () => {
                           {label && <span className="text-ink-muted">.rise</span>}
                         </span>
                         <span className="block font-mono text-[11px] text-ink-muted mt-0.5">
-                          Expires {expiryDate}
+                          {marketplaceLabel ?? `Expires ${expiryDate}`}
                         </span>
                       </span>
                     </Link>
-                    {!isPrimary && label ? (
+                    {marketplaceLabel ? (
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0"
+                        style={{ background: 'rgb(var(--color-accent-secondary) / 0.14)', color: 'rgb(var(--color-accent-secondary))' }}
+                      >
+                        {marketplaceLabel}
+                      </span>
+                    ) : !isPrimary && label ? (
                       <button
                         type="button"
                         onClick={() => handleSetPrimary(label)}
@@ -860,9 +882,9 @@ const DashboardCarousel: React.FC<{ children: React.ReactNode }> = ({ children }
 type CreationCardProps = {
   eyebrow: string;
   title: string;
-  count: string;
+  count: React.ReactNode;
   accent: string;
-  empty: string | null;
+  empty: React.ReactNode | null;
   cta: { label: string; to: string };
   children?: React.ReactNode;
 };

@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAccount, useReadContract } from 'wagmi';
 import { PresaleFactory } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
+import { LoadingState } from '@/components/ui/spinner';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -37,7 +38,7 @@ const AdminRoute: React.FC = () => {
   }
 
   if (isLoading) {
-    return null;
+    return <LoadingState label="Checking admin access" compact />;
   }
 
   if (!isOnChainOwner) {

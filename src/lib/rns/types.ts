@@ -85,6 +85,25 @@ export type RnsCreateMarketplaceAuctionParams = {
   endTime: bigint;
 };
 
+export type RnsCreateMarketplaceListingParams = {
+  name: string;
+  price: bigint;
+};
+
+export type RnsBuyMarketplaceListingParams = {
+  listingId: bigint;
+  price: bigint;
+};
+
+export type RnsBidMarketplaceAuctionParams = {
+  auctionId: bigint;
+  amount: bigint;
+};
+
+export type RnsSettleMarketplaceAuctionParams = {
+  auctionId: bigint;
+};
+
 export type RnsSetResolverParams = {
   name: string;
   resolver: Address;

@@ -10,12 +10,13 @@ import {
   Printer,
   Percent,
   Ban,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
 } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { useBlockchainStore } from '@/lib/store/blockchain-store';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
+import { InlineLoading } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -105,7 +106,9 @@ const CreateTokenPage: React.FC = () => {
   const [initialSupply, setInitialSupply] = useState('');
   const [recipientInput, setRecipientInput] = useState('');
   const [hasEditedRecipient, setHasEditedRecipient] = useState(false);
+  const [recipientResolvedAddress, setRecipientResolvedAddress] = useState<Address | null>(null);
   const [taxWallet, setTaxWallet] = useState('');
+  const [taxWalletResolvedAddress, setTaxWalletResolvedAddress] = useState<Address | null>(null);
   const [taxBps, setTaxBps] = useState('');
   const [dismissedSuccessHash, setDismissedSuccessHash] = useState<string | null>(null);
   const lastToastHash = useRef<string | null>(null);
@@ -155,6 +158,8 @@ const CreateTokenPage: React.FC = () => {
   };
 
   const recipient = hasEditedRecipient ? recipientInput : userAddress ?? '';
+  const recipientAddress = recipientResolvedAddress;
+  const taxWalletAddress = taxWalletResolvedAddress;
 
   // Extract created token address from receipt logs.
   const createdTokenAddress = useMemo(() => {
@@ -246,17 +251,17 @@ const CreateTokenPage: React.FC = () => {
   }, [isSuccess, createdTokenAddress, userAddress, getUserTokens, setUserTokens]);
 
   const handleSubmit = () => {
-    if (!name || !symbol || !initialSupply || !recipient) return;
+    if (!name || !symbol || !initialSupply || !recipientAddress) return;
 
     const dec = parseInt(decimals) || 18;
     const supply = parseUnits(initialSupply, dec);
-    const recipientAddr = recipient as Address;
+    const recipientAddr = recipientAddress;
 
     const tokenTypeConfig = tokenTypes.find((t) => t.type === selectedType);
     if (!tokenTypeConfig) return;
 
     if (selectedType === 'taxable') {
-      if (!taxWallet || !taxBps) return;
+      if (!taxWalletAddress || !taxBps) return;
       writeContract({
         abi: TokenFactory,
         address: contracts.tokenFactory,
@@ -270,7 +275,7 @@ const CreateTokenPage: React.FC = () => {
             initialRecipient: recipientAddr,
           },
           {
-            taxWallet: taxWallet as Address,
+            taxWallet: taxWalletAddress,
             taxBps: BigInt(taxBps),
           },
         ],
@@ -388,34 +393,28 @@ const CreateTokenPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-body-sm text-ink-muted font-medium">Recipient Address</label>
-          <input
-            type="text"
-            value={recipient}
-            onChange={(e) => {
-              setHasEditedRecipient(true);
-              setRecipientInput(e.target.value);
-            }}
-            placeholder="0x..."
-            className="input-field w-full font-mono text-sm"
-          />
-          <p className="text-xs text-ink-faint">Defaults to your connected wallet.</p>
-        </div>
+        <RnsAddressInput
+          label="Recipient Address"
+          value={recipient}
+          onChange={(value) => {
+            setHasEditedRecipient(true);
+            setRecipientInput(value);
+          }}
+          onResolvedAddressChange={setRecipientResolvedAddress}
+          hint="Defaults to your connected wallet. You can also use a .rise name."
+          required
+        />
 
         {/* Taxable Fields */}
         {selectedType === 'taxable' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-ink/5">
-            <div className="space-y-1.5">
-              <label className="text-body-sm text-ink-muted font-medium">Tax Wallet</label>
-              <input
-                type="text"
-                value={taxWallet}
-                onChange={(e) => setTaxWallet(e.target.value)}
-                placeholder="0x..."
-                className="input-field w-full font-mono text-sm"
-              />
-            </div>
+            <RnsAddressInput
+              label="Tax Wallet"
+              value={taxWallet}
+              onChange={setTaxWallet}
+              onResolvedAddressChange={setTaxWalletResolvedAddress}
+              required
+            />
             <div className="space-y-1.5">
               <label className="text-body-sm text-ink-muted font-medium">
                 Tax (BPS, e.g. 100 = 1%)
@@ -449,15 +448,13 @@ const CreateTokenPage: React.FC = () => {
             !name ||
             !symbol ||
             !initialSupply ||
-            !recipient
+            !recipientAddress ||
+            (selectedType === 'taxable' && (!taxWalletAddress || !taxBps))
           }
           className="btn-primary w-full"
         >
           {isPending || isConfirming ? (
-            <span className="inline-flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {isConfirming ? 'Confirming...' : 'Creating Token...'}
-            </span>
+            <InlineLoading label={isConfirming ? 'Confirming...' : 'Creating Token...'} />
           ) : !isConnected ? (
             'Connect Wallet First'
           ) : (

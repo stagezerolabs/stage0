@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useAccount, useChainId, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { isAddress, maxUint256, parseUnits, type Address } from 'viem';
+import { maxUint256, parseUnits } from 'viem';
 import { TokenLocker, erc20Abi, getContractAddresses, riseTestnet } from '@/config';
+import { useRnsAddressInput } from '@/lib/hooks/rns';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import type { SennaActionDraft, SignerState } from '../types';
 
@@ -12,7 +13,8 @@ export function useLockTokenSigner(draft: SennaActionDraft): SignerState {
   const onWrongChain = chainId !== riseTestnet.id;
   const contracts = getContractAddresses(chainId);
 
-  const tokenAddress = isAddress(draft.prefill.token || '') ? (draft.prefill.token as Address) : undefined;
+  const tokenResolution = useRnsAddressInput(draft.prefill.token || '', riseTestnet.id);
+  const tokenAddress = tokenResolution.address ?? undefined;
   const durationDays = Number.parseInt(draft.prefill.duration || '0', 10);
   const lockName = draft.prefill.name || 'Token Lock';
   const lockDescription = draft.prefill.description || lockName;
@@ -165,6 +167,12 @@ export function useLockTokenSigner(draft: SennaActionDraft): SignerState {
   } else if (isSuccess) {
     phase = 'success';
     primaryLabel = 'Lock complete';
+  } else if (draft.prefill.token && !tokenAddress && tokenResolution.isLoading) {
+    primaryLabel = 'Resolving token name...';
+    ready = false;
+  } else if (draft.prefill.token && !tokenAddress) {
+    primaryLabel = 'Resolve token first';
+    ready = false;
   } else if (errorMessage) {
     phase = 'error';
     primaryLabel = 'Try again';

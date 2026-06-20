@@ -1,4 +1,5 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
+import { fetchRnsPricing, type RnsPricingSummary } from "@/lib/api/rns";
 import {
   AlertTriangle,
   ArrowRight,
@@ -9,6 +10,7 @@ import {
   Trash2,
   Wallet,
 } from "@/components/ui/icons";
+import { InlineLoading, Spinner } from "@/components/ui/spinner";
 import { getExplorerUrl, riseTestnet } from "@/config";
 import {
   formatDomainDisplay,
@@ -125,6 +127,208 @@ function buildSearchSuggestions(input: string) {
     .slice(0, 5);
 }
 
+function tierLabelFor(length: number) {
+  if (length <= 3) return "Rare";
+  if (length === 4) return "Short";
+  return "Standard";
+}
+
+const RENEWAL_WINDOW_SECONDS = 60 * 24 * 60 * 60;
+
+// Filled verified seal — primary-name marker (replaces the hollow star).
+function PrimarySeal({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={{ flexShrink: 0 }}
+      aria-hidden
+    >
+      <path
+        d="M12 1.6l2.6 1.7 3.1.2.9 3 2.2 2.2-1.3 2.8.6 3.1-2.8 1.4-1.4 2.8-3.1-.3L12 22.4l-2.5-1.9-3.1.3-1.4-2.8L2.2 16.6l.6-3.1L1.5 10.7l2.2-2.2.9-3 3.1-.2z"
+        fill="currentColor"
+      />
+      <path
+        d="M8.4 12.3l2.4 2.4 4.8-5"
+        stroke="rgb(var(--color-accent-foreground))"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+type OwnedDomainSummary = {
+  node: string;
+  label: string;
+  expiry: bigint | number;
+  custody?: "wallet" | "marketplace_listing" | "marketplace_auction";
+  marketplace?: {
+    kind: "listing" | "auction";
+    status: string;
+  } | null;
+};
+
+function getDomainCustody(domain: Pick<OwnedDomainSummary, "custody">) {
+  return domain.custody ?? "wallet";
+}
+
+function isMarketplaceCustody(domain: Pick<OwnedDomainSummary, "custody">) {
+  return getDomainCustody(domain) !== "wallet";
+}
+
+function getMarketplaceStatusLabel(domain: OwnedDomainSummary) {
+  if (domain.marketplace?.kind === "listing") return "Listed";
+  if (domain.marketplace?.status === "ended") return "Auction ended";
+  if (domain.marketplace?.status === "scheduled") return "Auction scheduled";
+  if (domain.marketplace?.kind === "auction") return "In auction";
+  return "In marketplace";
+}
+
+/**
+ * One card in the "Your names" portfolio grid.
+ *
+ * Each card owns its own renew quote + write so any name can be renewed (the
+ * page-level renew flow only ever covered the primary). The quote is only
+ * fetched when the name is in its renewal window or the user explicitly arms a
+ * renewal, so the grid doesn't fan out N quote requests on load.
+ */
+const OwnedNameCard: React.FC<{
+  domain: OwnedDomainSummary;
+  isPrimary: boolean;
+  onSetPrimary: (label: string) => void;
+  onRenewed: () => void;
+}> = ({ domain, isPrimary, onSetPrimary, onRenewed }) => {
+  const { isConnected } = useAccount();
+  const [renewArmed, setRenewArmed] = useState(false);
+  const firedRef = useRef(false);
+  const isEscrowed = isMarketplaceCustody(domain);
+  const marketplaceLabel = getMarketplaceStatusLabel(domain);
+
+  const expirySec = Number(domain.expiry);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const isExpired = expirySec > 0 && expirySec < nowSec;
+  const isSoon =
+    expirySec > 0 && !isExpired && expirySec - nowSec <= RENEWAL_WINDOW_SECONDS;
+
+  const {
+    price: renewPrice = 0n,
+    signedQuote,
+    signature,
+    isLoading: isQuoteLoading,
+  } = useRnsRegistrationQuote(domain.label, {
+    action: "renew",
+    enabled: !isEscrowed && isConnected && Boolean(domain.label) && (isSoon || renewArmed),
+  });
+
+  const { renew, isPending, isConfirming, isSuccess, error } = useRnsRenew();
+  const isBusy = isPending || isConfirming;
+
+  // Once armed, fire the renewal as soon as the signed quote lands.
+  useEffect(() => {
+    if (!renewArmed || isBusy || firedRef.current) return;
+    if (!signedQuote || !signature) return;
+    firedRef.current = true;
+    renew({ name: domain.label, value: renewPrice, quote: signedQuote, signature });
+  }, [renewArmed, isBusy, signedQuote, signature, renewPrice, renew, domain.label]);
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    toast.success(`Renewed ${formatDomainDisplay(domain.label)}`);
+    setRenewArmed(false);
+    firedRef.current = false;
+    onRenewed();
+  }, [isSuccess, domain.label, onRenewed]);
+
+  useEffect(() => {
+    if (!error) return;
+    toast.error(error.message.split("\n")[0] ?? "Renewal failed.");
+    setRenewArmed(false);
+    firedRef.current = false;
+  }, [error]);
+
+  const handleRenew = () => {
+    if (!isConnected) {
+      toast.error("Connect your wallet to renew a name.");
+      return;
+    }
+    if (signedQuote && signature) {
+      firedRef.current = true;
+      renew({ name: domain.label, value: renewPrice, quote: signedQuote, signature });
+      return;
+    }
+    setRenewArmed(true);
+  };
+
+  const renewLabel = isBusy
+    ? <InlineLoading label="Renewing..." size="xs" />
+    : renewArmed && isQuoteLoading
+      ? <InlineLoading label="Loading..." size="xs" variant="dots" />
+      : isSoon && renewPrice > 0n
+        ? `Renew · ${formatEthValue(renewPrice)}`
+        : "Renew";
+
+  const expiryText = (() => {
+    if (expirySec <= 0) return "Registered";
+    const date = formatExpiry(expirySec);
+    if (isExpired) return `Expired · ${date}`;
+    if (isSoon) return `Expires soon · ${date}`;
+    return `Expires ${date}`;
+  })();
+
+  return (
+    <div className={`own-card ${isPrimary ? "is-primary" : ""} ${isEscrowed ? "is-marketplace" : ""}`}>
+      <div className="own-card-head">
+        <div className="own-name">
+          {domain.label}
+          <span className="tld">.rise</span>
+        </div>
+        {isEscrowed ? (
+          <span className="nm-tag nm-tag-auction">{marketplaceLabel}</span>
+        ) : isPrimary ? (
+          <span className="nm-primary-seal">
+            <PrimarySeal size={20} />
+          </span>
+        ) : null}
+      </div>
+      <div className={`own-exp ${isSoon || isExpired ? "soon" : ""}`}>{expiryText}</div>
+      <div className={`own-actions ${isEscrowed ? "single" : ""}`}>
+        {isEscrowed ? (
+          <Link to="/domains/marketplace" className="own-btn primary">
+            View marketplace
+          </Link>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`own-btn ${isSoon || isExpired ? "primary" : ""}`}
+              onClick={handleRenew}
+              disabled={isBusy}
+            >
+              {renewLabel}
+            </button>
+            <Link to="/domains/marketplace" className="own-btn">
+              List
+            </Link>
+          </>
+        )}
+      </div>
+      {!isEscrowed && !isPrimary ? (
+        <button
+          type="button"
+          className="own-make"
+          onClick={() => onSetPrimary(domain.label)}
+        >
+          Make primary
+        </button>
+      ) : null}
+    </div>
+  );
+};
+
 const DomainsPage: React.FC = () => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -157,6 +361,7 @@ const DomainsPage: React.FC = () => {
   } = useRnsOwnedLabel(address, hintLabel ?? undefined);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const [pricing, setPricing] = useState<RnsPricingSummary | null>(null);
   const initialQueryName = useMemo(() => {
     const raw =
       (searchParams.get("name") ?? searchParams.get("q"))
@@ -242,10 +447,13 @@ const DomainsPage: React.FC = () => {
     [ownedDomains],
   );
 
-  const isOwnedByMe = useMemo(() => {
-    if (!normalized || !address || !isTaken) return false;
-    return ownedDomainsWithLabels.some((domain) => domain.label === normalized);
+  const matchedOwnedDomain = useMemo(() => {
+    if (!normalized || !address || !isTaken) return null;
+    return ownedDomainsWithLabels.find((domain) => domain.label === normalized) ?? null;
   }, [normalized, address, isTaken, ownedDomainsWithLabels]);
+  const isOwnedByMe = Boolean(matchedOwnedDomain);
+  const isSearchedNameEscrowed = matchedOwnedDomain ? isMarketplaceCustody(matchedOwnedDomain) : false;
+  const searchedNameMarketStatus = matchedOwnedDomain ? getMarketplaceStatusLabel(matchedOwnedDomain) : null;
 
   const {
     price: registerPrice = 0n,
@@ -310,6 +518,21 @@ const DomainsPage: React.FC = () => {
   const registerUsdSubtotal = formatUsdValue(registerDisplay?.subtotalUsd);
   const registerUsdDiscount = formatUsdValue(registerDisplay?.discountUsd);
   const renewUsdTotal = formatUsdValue(renewDisplay?.totalUsd);
+  const ethUsd = pricing?.ethUsd ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRnsPricing({ chainId: riseTestnet.id })
+      .then((next) => {
+        if (!cancelled) setPricing(next);
+      })
+      .catch(() => {
+        if (!cancelled) setPricing(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const nowSec = Math.floor(Date.now() / 1000);
   const ownedExpirySec = Number(ownedExpiry);
@@ -507,7 +730,7 @@ const DomainsPage: React.FC = () => {
           className="btn-secondary names-action-btn text-status-error border-status-error disabled:opacity-60"
         >
           <AlertTriangle className="w-4 h-4" />
-          {isSwitchingChain ? "Switching..." : "Switch Network"}
+          {isSwitchingChain ? <InlineLoading label="Switching..." /> : "Switch Network"}
         </button>
       );
     }
@@ -539,12 +762,9 @@ const DomainsPage: React.FC = () => {
           className="btn-primary names-action-btn disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isRegistering ? (
-            <>
-              <span className="names-spinner" />
-              Confirming...
-            </>
+            <InlineLoading label="Confirming..." />
           ) : isRegisterQuoteLoading ? (
-            "Loading quote..."
+            <InlineLoading label="Loading quote..." variant="dots" />
           ) : (
             "Register name"
           )}
@@ -598,9 +818,9 @@ const DomainsPage: React.FC = () => {
             >
               <div className="names-card-heading">
                 <div>
-                  <div className="nm-suggest-label">Find a name</div>
+                  <div className="nm-suggest-label">Search</div>
                   <h2 className="font-display text-2xl text-ink mt-1">
-                    Search RNS
+                    Find a name
                   </h2>
                 </div>
                 <span className="nm-tier">RISE Testnet</span>
@@ -749,8 +969,10 @@ const DomainsPage: React.FC = () => {
 
                   {isStatusLoading ? (
                     <div className="names-loading-state">
-                      <span className="names-spinner" />
-                      Checking {formatDomainDisplay(normalized)}...
+                      <InlineLoading
+                        label={`Checking ${formatDomainDisplay(normalized)}...`}
+                        variant="dots"
+                      />
                     </div>
                   ) : validation.valid ? (
                     available ? (
@@ -761,8 +983,9 @@ const DomainsPage: React.FC = () => {
                               <span className="nm-tag nm-tag-avail">
                                 Available
                               </span>
-                              <span className="nm-tier">
-                                {normalized.length} chars
+                              <span className="nm-config-sub">
+                                {tierLabelFor(normalized.length)} ·{" "}
+                                {normalized.length} characters
                               </span>
                             </div>
                             <div className="nm-config-name">
@@ -824,7 +1047,7 @@ const DomainsPage: React.FC = () => {
                             <span>{selectedYears} year registration</span>
                             <b>
                               {isRegisterQuoteLoading
-                                ? "Loading..."
+                                ? <Spinner size="xs" variant="dots" />
                                 : registerUsdSubtotal ?? formatEthValue(registerPrice)}
                             </b>
                           </div>
@@ -859,7 +1082,7 @@ const DomainsPage: React.FC = () => {
                             <div className="text-right">
                               <div className="nm-bd-total-eth">
                                 {isRegisterQuoteLoading
-                                  ? "..."
+                                  ? <Spinner size="xs" variant="dots" />
                                   : formatEthValue(registerPrice).replace(
                                       " ETH",
                                       "",
@@ -891,15 +1114,15 @@ const DomainsPage: React.FC = () => {
                         </div>
                       </div>
                     ) : isOwnedByMe ? (
-                      <div className="names-result-card is-owned">
+                      <div className={`names-result-card is-owned ${isSearchedNameEscrowed ? "is-marketplace" : ""}`}>
                         <div>
                           <div className="names-result-tags">
-                            <span className="nm-tag nm-tag-avail">
-                              You own this
+                            <span className={`nm-tag ${isSearchedNameEscrowed ? "nm-tag-auction" : "nm-tag-avail"}`}>
+                              {isSearchedNameEscrowed ? searchedNameMarketStatus : "You own this"}
                             </span>
-                            {normalized === ownedLabel ? (
+                            {!isSearchedNameEscrowed && normalized === ownedLabel ? (
                               <span className="nm-primary-pill">
-                                <Star className="w-3 h-3" />
+                                <PrimarySeal size={12} />
                                 Primary
                               </span>
                             ) : null}
@@ -914,7 +1137,14 @@ const DomainsPage: React.FC = () => {
                             </p>
                           ) : null}
                         </div>
-                        {normalized !== ownedLabel ? (
+                        {isSearchedNameEscrowed ? (
+                          <Link
+                            to="/domains/marketplace"
+                            className="btn-secondary names-action-btn"
+                          >
+                            View marketplace <ArrowRight className="w-4 h-4" />
+                          </Link>
+                        ) : normalized !== ownedLabel ? (
                           <button
                             type="button"
                             onClick={() => handleSetPrimary(normalized)}
@@ -974,51 +1204,35 @@ const DomainsPage: React.FC = () => {
               ) : null}
             </AnimatePresence>
 
-            <motion.section
-              variants={itemVariants}
-              className="names-premium-section"
-            >
-              <div className="section-head">
-                <div>
-                  <div className="eyebrow">Marketplace preview</div>
-                  <h2 className="font-display text-2xl text-ink mt-1">
-                    Premium short names
-                  </h2>
+            {ownedDomainsWithLabels.length > 0 ? (
+              <motion.section variants={itemVariants}>
+                <div className="own-head">
+                  <div>
+                    <div className="eyebrow">Your portfolio</div>
+                    <h2 className="font-display text-2xl text-ink mt-1">
+                      Your names
+                    </h2>
+                  </div>
+                  <span className="nm-tier">
+                    {ownedDomainsWithLabels.length} names
+                  </span>
                 </div>
-                <Link
-                  to="/domains/marketplace"
-                  className="text-body-sm text-accent hover:underline"
-                >
-                  Browse marketplace
-                </Link>
-              </div>
-              <div className="hot-grid">
-                {PREMIUM_NAMES.map((item) => (
-                  <Link
-                    key={item.label}
-                    to="/domains/marketplace"
-                    className="hot-card"
-                  >
-                    <div className="hot-top">
-                      <span className="nm-tag nm-tag-auction">Preview</span>
-                      <span className="nm-tier">2-char</span>
-                    </div>
-                    <div className="hot-name">
-                      {item.label}
-                      <span className="tld">.rise</span>
-                    </div>
-                    <div className="hot-meta">
-                      <div className="hot-bid-lbl">Top bid</div>
-                      <div className="hot-bid">{item.bid} ETH</div>
-                    </div>
-                    <div className="hot-foot">
-                      <span>{item.bids} bids</span>
-                      <span className="hot-timer">{item.ends}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </motion.section>
+                <div className="own-grid">
+                  {ownedDomainsWithLabels.map((domain) => (
+                    <OwnedNameCard
+                      key={domain.node}
+                      domain={domain}
+                      isPrimary={domain.label === ownedLabel}
+                      onSetPrimary={handleSetPrimary}
+                      onRenewed={() => {
+                        void refetchOwned();
+                        void refetchStatus();
+                      }}
+                    />
+                  ))}
+                </div>
+              </motion.section>
+            ) : null}
           </div>
 
           <aside className="names-side-column">
@@ -1029,7 +1243,7 @@ const DomainsPage: React.FC = () => {
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="nm-primary-pill">
-                    <Star className="w-3 h-3" />
+                    <PrimarySeal size={13} />
                     Primary
                   </span>
                   <span className="font-mono text-xs text-ink-faint">
@@ -1038,6 +1252,9 @@ const DomainsPage: React.FC = () => {
                 </div>
 
                 <div className="nm-primary-name">{ownedDisplayName}</div>
+                <p className="nm-primary-cap">
+                  This name resolves your wallet across RISE apps.
+                </p>
                 {ownedExpirySec > 0 ? (
                   <p
                     className={`names-primary-expiry ${isOwnedExpired ? "is-expired" : ""}`}
@@ -1057,7 +1274,7 @@ const DomainsPage: React.FC = () => {
                       className="btn-primary names-action-btn disabled:opacity-60"
                     >
                       {isRenewing
-                        ? "Renewing..."
+                        ? <InlineLoading label="Renewing..." />
                         : `Renew ${formatEthValue(renewPrice)}${renewUsdTotal ? ` · ${renewUsdTotal}` : ""}`}
                     </button>
                   ) : null}
@@ -1067,7 +1284,7 @@ const DomainsPage: React.FC = () => {
                     disabled={isReleasing}
                     className="nm-release disabled:opacity-60"
                   >
-                    {isReleasing ? "Releasing..." : "Release"}
+                    {isReleasing ? <InlineLoading label="Releasing..." /> : "Release"}
                   </button>
                 </div>
               </motion.section>
@@ -1086,59 +1303,46 @@ const DomainsPage: React.FC = () => {
               </motion.section>
             )}
 
-            {ownedDomainsWithLabels.length > 0 ? (
-              <motion.section
-                variants={itemVariants}
-                className="rns-card rns-card-pad"
-              >
-                <div className="names-card-heading compact">
-                  <div className="nm-suggest-label">All your names</div>
-                  <span className="nm-tier">
-                    {ownedDomainsWithLabels.length} total
-                  </span>
+            <motion.section
+              variants={itemVariants}
+              className="rns-card rns-card-pad"
+            >
+              <div className="names-card-heading compact">
+                <div>
+                  <div className="nm-suggest-label">Marketplace</div>
+                  <h3 className="font-display text-xl text-ink mt-1">
+                    Hot short names
+                  </h3>
                 </div>
-                <div className="nm-list">
-                  {ownedDomainsWithLabels.map((domain) => {
-                    const isPrimary = domain.label === ownedLabel;
-                    const expiry = formatExpiry(domain.expiry);
-                    return (
-                      <div
-                        key={domain.node}
-                        className={`nm-row ${isPrimary ? "is-primary" : ""}`}
-                      >
-                        <button
-                          type="button"
-                          className="nm-row-main"
-                          onClick={() => handleSearchHistoryClick(domain.label)}
-                        >
-                          <span className="nm-row-name">
-                            <b>{domain.label}</b>
-                            <span className="tld">.rise</span>
-                          </span>
-                          {expiry ? (
-                            <span className="nm-row-exp">exp {expiry}</span>
-                          ) : null}
-                        </button>
-                        {isPrimary ? (
-                          <span className="nm-primary-pill">
-                            <Star className="w-2.5 h-2.5" />
-                            Primary
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleSetPrimary(domain.label)}
-                            className="nm-setprimary"
-                          >
-                            Set primary
-                          </button>
-                        )}
+                <Link to="/domains/marketplace" className="nm-link">
+                  Browse →
+                </Link>
+              </div>
+              <p className="nm-primary-cap" style={{ marginTop: 6 }}>
+                Live 2-character auctions.
+              </p>
+              <div className="hot-mini">
+                {PREMIUM_NAMES.map((item) => (
+                  <Link
+                    key={item.label}
+                    to="/domains/marketplace"
+                    className="hot-mini-row"
+                  >
+                    <div className="hot-mini-name">
+                      {item.label}
+                      <span className="tld">.rise</span>
+                    </div>
+                    <div className="hot-mini-right">
+                      <div className="hot-mini-bid">{item.bid} ETH</div>
+                      <div className="hot-mini-usd">
+                        ≈ {formatUsdValue(ethUsd ? Number(item.bid) * ethUsd : null) ?? "USD loading"}
                       </div>
-                    );
-                  })}
-                </div>
-              </motion.section>
-            ) : null}
+                      <div className="hot-mini-time">{item.ends} left</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </motion.section>
           </aside>
         </div>
       )}

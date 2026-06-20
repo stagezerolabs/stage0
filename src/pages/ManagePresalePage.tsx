@@ -17,7 +17,6 @@ import { LaunchpadPresaleContract, PresaleContract, erc20Abi, getExplorerUrl } f
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import {
   ArrowLeft,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
   Shield,
@@ -29,6 +28,9 @@ import {
   Settings,
   ShieldAlert,
 } from '@/components/ui/icons';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
+import { resolveRnsAddressInput } from '@/lib/api/rns';
+import { InlineLoading, LoadingState } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -184,8 +186,10 @@ const ManagePresalePage: React.FC = () => {
   const [activeOwnerAction, setActiveOwnerAction] = useState<string | null>(null);
   const [activeWhitelistAction, setActiveWhitelistAction] = useState<string | null>(null);
   const [singleWhitelist, setSingleWhitelist] = useState('');
+  const [singleWhitelistAddress, setSingleWhitelistAddress] = useState<Address | null>(null);
   const [bulkWhitelist, setBulkWhitelist] = useState('');
   const [removeWhitelist, setRemoveWhitelist] = useState('');
+  const [removeWhitelistAddress, setRemoveWhitelistAddress] = useState<Address | null>(null);
 
   useEffect(() => {
     if (approveError) {
@@ -383,8 +387,8 @@ const ManagePresalePage: React.FC = () => {
   };
 
   const handleAddSingle = () => {
-    if (!singleWhitelist || !isAddress(singleWhitelist)) {
-      toast.error('Enter a valid address to whitelist.');
+    if (!singleWhitelistAddress) {
+      toast.error('Enter a valid address or .rise name to whitelist.');
       return;
     }
     if (!presaleAddress) return;
@@ -392,11 +396,11 @@ const ManagePresalePage: React.FC = () => {
       abi: PresaleContract,
       address: presaleAddress,
       functionName: 'addToWhitelist',
-      args: [singleWhitelist as Address],
+      args: [singleWhitelistAddress],
     });
   };
 
-  const handleBulkWhitelist = () => {
+  const handleBulkWhitelist = async () => {
     if (!bulkWhitelist.trim()) {
       toast.error('Paste one or more addresses.');
       return;
@@ -407,23 +411,30 @@ const ManagePresalePage: React.FC = () => {
       .filter(Boolean);
 
     if (entries.length === 0) return;
-    const invalid = entries.find((addr) => !isAddress(addr));
-    if (invalid) {
-      toast.error(`Invalid wallet: ${invalid}`);
+
+    const resolved = await Promise.all(
+      entries.map((entry) => resolveRnsAddressInput({ value: entry, chainId })),
+    );
+    const invalidIndex = resolved.findIndex((addr) => !addr);
+    if (invalidIndex >= 0) {
+      toast.error(`Could not resolve wallet: ${entries[invalidIndex]}`);
       return;
     }
+    const deduped = Array.from(
+      new Map(resolved.map((addr) => [addr!.toLowerCase(), addr!])).values(),
+    );
     if (!presaleAddress) return;
     runWhitelistAction('bulkAdd', {
       abi: PresaleContract,
       address: presaleAddress,
       functionName: 'addManyToWhitelist',
-      args: [entries as Address[]],
+      args: [deduped],
     });
   };
 
   const handleRemoveWhitelist = () => {
-    if (!removeWhitelist || !isAddress(removeWhitelist)) {
-      toast.error('Enter a valid address to remove.');
+    if (!removeWhitelistAddress) {
+      toast.error('Enter a valid address or .rise name to remove.');
       return;
     }
     if (!presaleAddress) return;
@@ -431,7 +442,7 @@ const ManagePresalePage: React.FC = () => {
       abi: PresaleContract,
       address: presaleAddress,
       functionName: 'removeFromWhitelist',
-      args: [removeWhitelist as Address],
+      args: [removeWhitelistAddress],
     });
   };
 
@@ -449,10 +460,7 @@ const ManagePresalePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4">
-        <Loader2 className="w-8 h-8 text-accent animate-spin" />
-        <p className="text-body text-ink-muted">Loading launch data...</p>
-      </div>
+      <LoadingState label="Loading launch data" />
     );
   }
 
@@ -609,10 +617,7 @@ const ManagePresalePage: React.FC = () => {
             className="btn-secondary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isApprovePending || isApproveConfirming ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Approving...
-              </span>
+              <InlineLoading label="Approving..." />
             ) : hasSufficientAllowance || hasDeposited ? (
               'Approved'
             ) : (
@@ -632,10 +637,7 @@ const ManagePresalePage: React.FC = () => {
             className="btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isDepositPending || isDepositConfirming ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Depositing...
-              </span>
+              <InlineLoading label="Depositing..." />
             ) : hasDeposited ? (
               'Deposited'
             ) : (
@@ -721,16 +723,16 @@ const ManagePresalePage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-body-sm text-ink-muted">Add Single Wallet</label>
-              <input
+              <RnsAddressInput
+                label="Add Single Wallet"
                 value={singleWhitelist}
-                onChange={(event) => setSingleWhitelist(event.target.value)}
-                placeholder="0x..."
-                className="input-field font-mono"
+                onChange={setSingleWhitelist}
+                onResolvedAddressChange={setSingleWhitelistAddress}
+                placeholder="0x... or name.rise"
               />
               <button
                 onClick={handleAddSingle}
-                disabled={isWhitelistPending || isWhitelistConfirming || !singleWhitelist}
+                disabled={isWhitelistPending || isWhitelistConfirming || !singleWhitelistAddress}
                 className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Add Wallet
@@ -741,7 +743,7 @@ const ManagePresalePage: React.FC = () => {
               <textarea
                 value={bulkWhitelist}
                 onChange={(event) => setBulkWhitelist(event.target.value)}
-                placeholder="Paste addresses separated by commas or line breaks"
+                placeholder="Paste addresses or .rise names separated by commas or line breaks"
                 rows={5}
                 className="input-field w-full font-mono text-sm resize-y"
               />
@@ -754,16 +756,16 @@ const ManagePresalePage: React.FC = () => {
               </button>
             </div>
             <div className="space-y-2">
-              <label className="text-body-sm text-ink-muted">Remove Wallet</label>
-              <input
+              <RnsAddressInput
+                label="Remove Wallet"
                 value={removeWhitelist}
-                onChange={(event) => setRemoveWhitelist(event.target.value)}
-                placeholder="0x..."
-                className="input-field font-mono"
+                onChange={setRemoveWhitelist}
+                onResolvedAddressChange={setRemoveWhitelistAddress}
+                placeholder="0x... or name.rise"
               />
               <button
                 onClick={handleRemoveWhitelist}
-                disabled={isWhitelistPending || isWhitelistConfirming || !removeWhitelist}
+                disabled={isWhitelistPending || isWhitelistConfirming || !removeWhitelistAddress}
                 className="btn-secondary w-full text-status-error border-status-error hover:bg-status-error/10 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Remove Wallet

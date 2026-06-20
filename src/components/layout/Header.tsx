@@ -4,6 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount, useConnect, useConnectors } from 'wagmi';
 import { AlertTriangle, ChevronDown, Menu, Moon, Sun, Wallet, X } from '@/components/ui/icons';
+import { InlineLoading } from '@/components/ui/spinner';
 import { RISE_CONNECTOR_ID } from '@/config';
 import { useIsAdmin } from '@/lib/utils/admin';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
@@ -451,7 +452,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                   disabled={isRiseConnectPending}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-body font-medium text-accent-secondary border border-accent-secondary/40 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isRiseConnectPending ? 'Connecting...' : 'Connect RISE Passkey'}
+                  {isRiseConnectPending ? <InlineLoading label="Connecting..." /> : 'Connect RISE Passkey'}
                 </button>
               )}
 

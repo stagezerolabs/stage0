@@ -20,6 +20,11 @@ export {
   useRnsRenew,
   useRnsRelease,
   useRnsCreateMarketplaceAuction,
+  useRnsCreateMarketplaceListing,
+  useRnsBuyMarketplaceListing,
+  useRnsBidMarketplaceAuction,
+  useRnsSettleMarketplaceAuction,
+  useRnsWithdrawMarketplaceReturns,
   useRnsSetResolver,
   useRnsSetAddr,
   useRnsSetText,
@@ -28,6 +33,13 @@ export {
 export { useRnsDomain, useRnsIsOwner, useRnsNameStatus } from "./useRnsDomain";
 export { useRnsIsApproved, useRnsApproveForAll } from "./useRnsApproval";
 export { useRnsOwnedLabel } from "./useRnsOwnedLabel";
+export {
+  getRnsAddressDisplay,
+  getRnsAddressInputPlaceholder,
+  resolveRnsAddressValues,
+  useRnsAddressInput,
+  type RnsAddressInputStatus,
+} from "./useRnsAddressInput";
 export { useRnsLabelRecovery } from "./useRnsLabelRecovery";
 export {
   useRnsSubgraphDomainByNode,

@@ -9,7 +9,8 @@ import { NFT_COLLECTION_IMAGES } from '@/config';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import FallbackImage from '@/components/ui/fallback-image';
 import { resolveNFTSaleCountdown } from '@/lib/utils/nft-sales';
-import { ArrowRight, Loader2, Search } from '@/components/ui/icons';
+import { ArrowRight, Search } from '@/components/ui/icons';
+import { LoadingState } from '@/components/ui/spinner';
 
 type StatusFilter = 'all' | 'live' | 'upcoming' | 'ended';
 type TypeFilter = 'all' | 'token' | 'nft';
@@ -351,10 +352,7 @@ const PresalesPage: React.FC = () => {
       {/* Launch grid */}
       <section>
         {isLoading && !hasAnyResult ? (
-          <div className="flex flex-col items-center justify-center py-20 space-y-4">
-            <Loader2 className="w-7 h-7 text-accent animate-spin" />
-            <p className="text-body text-ink-muted">Loading launches…</p>
-          </div>
+          <LoadingState label="Loading launches" compact variant="dots" />
         ) : !hasAnyResult ? (
           <div className="bg-canvas-alt border border-border rounded-3xl p-12 text-center">
             <div className="w-14 h-14 rounded-2xl bg-accent/10 text-accent mx-auto flex items-center justify-center">

@@ -2,10 +2,19 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAccount, useBalance, useReadContract } from 'wagmi';
-import { formatEther, formatUnits, isAddress, type Address } from 'viem';
+import { formatEther, formatUnits, isAddress, parseEther, type Address } from 'viem';
 import { toast } from 'sonner';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
+import { InlineLoading, Spinner } from '@/components/ui/spinner';
 import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from '@/components/ui/icons';
 import { RNSRegistrar } from '@/config';
+import {
+  fetchRnsAdminReservedNames,
+  fetchRnsPricing,
+  type RnsPricingSummary,
+  type RnsReservedNameSummary,
+  upsertRnsAdminReservedName,
+} from '@/lib/api/rns';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useSetFeeRecipient, useSetNFTFactoryProceedsFeeBps } from '@/lib/hooks/useAdminActions';
@@ -36,6 +45,26 @@ const itemVariants = {
   },
 };
 
+type ReservedNameDraft = {
+  enabled: boolean;
+  saleMode: 'auction' | 'buy_now';
+  priceEth: string;
+  displayOrder: string;
+};
+
+function formatUsdValue(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return 'USD loading';
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatEditableEth(value: bigint | null | undefined) {
+  if (!value || value <= 0n) return '';
+  const numeric = Number(formatEther(value));
+  if (!Number.isFinite(numeric)) return '';
+  if (numeric >= 1) return numeric.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return numeric.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 const AdminDashboard: React.FC = () => {
   const { address } = useAccount();
   const { chainId, nftFactory, nftFactoryLens, rnsRegistrar, explorerUrl } = useChainContracts();
@@ -57,6 +86,14 @@ const AdminDashboard: React.FC = () => {
   const [newProceedsFeeBps, setNewProceedsFeeBps] = useState('');
   const [newRnsTreasury, setNewRnsTreasury] = useState('');
   const [rnsAdminAction, setRnsAdminAction] = useState<'withdraw' | 'setTreasury' | null>(null);
+  const [rnsPricing, setRnsPricing] = useState<RnsPricingSummary | null>(null);
+  const [reservedNames, setReservedNames] = useState<RnsReservedNameSummary[]>([]);
+  const [reservedDrafts, setReservedDrafts] = useState<Record<number, ReservedNameDraft>>({});
+  const [reservedSearch, setReservedSearch] = useState('');
+  const [isLoadingReserved, setIsLoadingReserved] = useState(false);
+  const [reservedError, setReservedError] = useState<string | null>(null);
+  const [savingReservedIds, setSavingReservedIds] = useState<number[]>([]);
+  const [isReservedInventoryOpen, setIsReservedInventoryOpen] = useState(false);
 
   const {
     setFeeRecipient,
@@ -204,10 +241,149 @@ const AdminDashboard: React.FC = () => {
     }
   }, [rnsAdminError, resetRnsAdmin]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchRnsPricing({ chainId })
+      .then((next) => {
+        if (!cancelled) setRnsPricing(next);
+      })
+      .catch(() => {
+        if (!cancelled) setRnsPricing(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chainId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingReserved(true);
+    fetchRnsAdminReservedNames({ chainId })
+      .then((next) => {
+        if (cancelled) return;
+        setReservedNames(next);
+        setReservedDrafts(
+          Object.fromEntries(
+            next.map((name) => {
+              const activePrice =
+                name.saleMode === 'buy_now' ? name.fixedPriceWei : name.reservePriceWei;
+              return [
+                name.id,
+                {
+                  enabled: name.enabled,
+                  saleMode: name.saleMode,
+                  priceEth: formatEditableEth(activePrice),
+                  displayOrder: String(name.displayOrder),
+                },
+              ];
+            }),
+          ) as Record<number, ReservedNameDraft>,
+        );
+        setReservedError(null);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setReservedError(error instanceof Error ? error.message : 'Could not load reserved names.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingReserved(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chainId]);
+
+  const enabledReservedCount = reservedNames.filter((name) => name.enabled).length;
+  const filteredReservedNames = reservedNames.filter((name) => {
+    if (!reservedSearch.trim()) return true;
+    const needle = reservedSearch.trim().toLowerCase();
+    return (
+      name.label.toLowerCase().includes(needle) ||
+      name.category.toLowerCase().includes(needle) ||
+      name.fqdn.toLowerCase().includes(needle)
+    );
+  });
+
   const handleCopy = (value: string) => {
     if (!value) return;
     navigator.clipboard?.writeText(value);
     toast.success('Copied to clipboard.');
+  };
+
+  const handleReservedDraftChange = (
+    id: number,
+    field: keyof ReservedNameDraft,
+    value: string | boolean,
+  ) => {
+    setReservedDrafts((current) => ({
+      ...current,
+      [id]: {
+        ...current[id],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSaveReservedName = async (name: RnsReservedNameSummary) => {
+    if (!isRnsOwner) {
+      toast.error('Connected wallet is not the RNS owner.');
+      return;
+    }
+
+    const draft = reservedDrafts[name.id];
+    if (!draft) return;
+
+    let parsedPrice: bigint | null = null;
+    if (draft.priceEth.trim()) {
+      try {
+        parsedPrice = parseEther(draft.priceEth.trim());
+      } catch {
+        toast.error(`Enter a valid ETH price for ${name.fqdn}.`);
+        return;
+      }
+    }
+
+    const displayOrder = Number.parseInt(draft.displayOrder, 10);
+    if (!Number.isInteger(displayOrder) || displayOrder < 0) {
+      toast.error(`Display order must be zero or greater for ${name.fqdn}.`);
+      return;
+    }
+
+    setSavingReservedIds((current) => [...current, name.id]);
+    try {
+      const updated = await upsertRnsAdminReservedName({
+        chainId,
+        label: name.label,
+        category: name.category,
+        enabled: draft.enabled,
+        saleMode: draft.saleMode,
+        reservePriceWei: draft.saleMode === 'auction' ? parsedPrice : null,
+        fixedPriceWei: draft.saleMode === 'buy_now' ? parsedPrice : null,
+        displayOrder,
+      });
+
+      setReservedNames((current) =>
+        current.map((entry) => (entry.id === updated.id ? updated : entry)),
+      );
+      setReservedDrafts((current) => ({
+        ...current,
+        [updated.id]: {
+          enabled: updated.enabled,
+          saleMode: updated.saleMode,
+          priceEth: formatEditableEth(
+            updated.saleMode === 'buy_now' ? updated.fixedPriceWei : updated.reservePriceWei,
+          ),
+          displayOrder: String(updated.displayOrder),
+        },
+      }));
+      toast.success(`${updated.fqdn} updated.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update reserved name.');
+    } finally {
+      setSavingReservedIds((current) => current.filter((id) => id !== name.id));
+    }
   };
 
   const handleSetFeeRecipient = () => {
@@ -280,6 +456,9 @@ const AdminDashboard: React.FC = () => {
   const rnsWithdrawableLabel = `${Number(formatEther(rnsWithdrawableBalance)).toLocaleString(undefined, {
     maximumFractionDigits: 6,
   })} ETH`;
+  const rnsWithdrawableUsd = rnsPricing?.ethUsd
+    ? Number(formatEther(rnsWithdrawableBalance)) * rnsPricing.ethUsd
+    : null;
   const rnsBusyLabel =
     rnsAdminAction === 'withdraw'
       ? 'Withdrawing...'
@@ -306,31 +485,31 @@ const AdminDashboard: React.FC = () => {
         <div className="stat-card">
           <p className="text-body-sm text-ink-muted">Total Launches</p>
           <p className="font-display text-display-sm text-ink">
-            {isLoadingPresales ? '...' : totalPresales}
+            {isLoadingPresales ? <Spinner size="xs" variant="dots" /> : totalPresales}
           </p>
         </div>
         <div className="stat-card">
           <p className="text-body-sm text-ink-muted">Live</p>
           <p className="font-display text-display-sm text-ink">
-            {isLoadingPresales ? '...' : livePresales}
+            {isLoadingPresales ? <Spinner size="xs" variant="dots" /> : livePresales}
           </p>
         </div>
         <div className="stat-card">
           <p className="text-body-sm text-ink-muted">Upcoming</p>
           <p className="font-display text-display-sm text-ink">
-            {isLoadingPresales ? '...' : upcomingPresales}
+            {isLoadingPresales ? <Spinner size="xs" variant="dots" /> : upcomingPresales}
           </p>
         </div>
         <div className="stat-card">
           <p className="text-body-sm text-ink-muted">Ended</p>
           <p className="font-display text-display-sm text-ink">
-            {isLoadingPresales ? '...' : endedPresales}
+            {isLoadingPresales ? <Spinner size="xs" variant="dots" /> : endedPresales}
           </p>
         </div>
         <div className="stat-card">
           <p className="text-body-sm text-ink-muted">Total Raised</p>
           <p className="font-display text-display-sm text-ink">
-            {isLoadingPresales ? '...' : totalRaised}
+            {isLoadingPresales ? <Spinner size="xs" variant="dots" /> : totalRaised}
           </p>
         </div>
       </motion.section>
@@ -366,17 +545,29 @@ const AdminDashboard: React.FC = () => {
           </div>
         </Link>
 
-        <div className="glass-card rounded-3xl p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-ink/10 text-ink flex items-center justify-center">
-              <Settings className="w-5 h-5" />
+        <button
+          type="button"
+          onClick={() => setIsReservedInventoryOpen(true)}
+          className="glass-card rounded-3xl p-6 text-left transition hover:-translate-y-0.5 hover:border-border-strong"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-ink/10 text-ink flex items-center justify-center">
+                <Settings className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-body font-medium text-ink">Domain Marketplace</p>
+                <p className="text-body-sm text-ink-muted">
+                  {enabledReservedCount} enabled of {reservedNames.length} curated names
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-body font-medium text-ink">Platform Settings</p>
-              <p className="text-body-sm text-ink-muted">NFT factory fee defaults</p>
-            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-muted" />
           </div>
-        </div>
+          <p className="mt-4 text-body-sm text-ink-muted">
+            Curate reserved names, preview order, and opening prices.
+          </p>
+        </button>
       </motion.section>
 
       <motion.section variants={itemVariants} className="space-y-6">
@@ -409,7 +600,7 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <p className="font-display text-display-md text-ink font-mono">
-            {isLoadingNFTs ? '...' : Number(totalDeployments).toLocaleString()}
+            {isLoadingNFTs ? <Spinner size="xs" variant="dots" /> : Number(totalDeployments).toLocaleString()}
           </p>
           <Link to="/create/nft" className="btn-primary inline-flex">Create NFT Collection</Link>
         </div>
@@ -428,7 +619,10 @@ const AdminDashboard: React.FC = () => {
           <div className="rounded-2xl border border-card-border bg-card-soft p-4">
             <p className="text-body-sm text-ink-muted">Withdrawable Balance</p>
             <p className="font-display text-display-md text-ink">
-              {isLoadingRnsBalance ? 'Loading...' : rnsWithdrawableLabel}
+              {isLoadingRnsBalance ? <Spinner size="sm" variant="dots" /> : rnsWithdrawableLabel}
+            </p>
+            <p className="mt-1 text-body font-semibold text-ink">
+              ≈ {formatUsdValue(rnsWithdrawableUsd)}
             </p>
             <p className="text-xs text-ink-faint mt-2">
               Mint and renewal ETH remains in the registrar until withdrawn to treasury.
@@ -460,7 +654,7 @@ const AdminDashboard: React.FC = () => {
           <div className="space-y-2">
             <p className="text-body-sm text-ink-muted">Registrar Owner</p>
             <p className="text-body-sm font-mono text-ink break-all">
-              {isLoadingRnsOwner ? 'Loading...' : rnsOwner ?? 'Unknown'}
+              {isLoadingRnsOwner ? <InlineLoading label="Loading..." size="xs" variant="dots" /> : rnsOwner ?? 'Unknown'}
             </p>
             {isRnsOwner && (
               <p className="text-xs text-status-live mt-1">✓ Connected wallet is owner</p>
@@ -473,7 +667,7 @@ const AdminDashboard: React.FC = () => {
             className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isUpdatingRnsAdmin && rnsAdminAction === 'withdraw'
-              ? rnsBusyLabel
+              ? <InlineLoading label={rnsBusyLabel} />
               : 'Withdraw to Treasury'}
           </button>
         </div>
@@ -491,7 +685,7 @@ const AdminDashboard: React.FC = () => {
             <p className="text-body-sm text-ink-muted">Current Treasury</p>
             <div className="flex items-center gap-2">
               <code className="text-body-sm font-mono text-ink break-all">
-                {isLoadingRnsTreasury ? 'Loading...' : rnsTreasury ?? 'Unknown'}
+                {isLoadingRnsTreasury ? <InlineLoading label="Loading..." size="xs" variant="dots" /> : rnsTreasury ?? 'Unknown'}
               </code>
               {rnsTreasury && (
                 <button
@@ -529,7 +723,7 @@ const AdminDashboard: React.FC = () => {
               className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isUpdatingRnsAdmin && rnsAdminAction === 'setTreasury'
-                ? rnsBusyLabel
+                ? <InlineLoading label={rnsBusyLabel} />
                 : 'Update Treasury'}
             </button>
             <p className="text-xs text-ink-faint">
@@ -538,6 +732,131 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </motion.section>
+
+      <ResponsiveDialog
+        open={isReservedInventoryOpen}
+        onOpenChange={setIsReservedInventoryOpen}
+        title="Reserved Inventory"
+        description="Manage which curated names surface in the marketplace and in what order."
+        className="max-w-[1120px]"
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+            <input
+              value={reservedSearch}
+              onChange={(event) => setReservedSearch(event.target.value)}
+              placeholder="Search reserved names or categories"
+              className="input-field"
+            />
+            <div className="rounded-2xl border border-card-border bg-card-soft px-4 py-3 text-body-sm text-ink-muted">
+              Lower numbers show first.
+            </div>
+          </div>
+
+          {reservedError ? (
+            <div className="rounded-2xl border border-status-error/30 bg-status-error/5 px-4 py-3 text-body-sm text-status-error">
+              {reservedError}
+            </div>
+          ) : null}
+
+          <div className="max-h-[34rem] overflow-auto rounded-3xl border border-card-border">
+            <div className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_150px_110px_110px] gap-3 border-b border-card-border bg-canvas-alt px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-faint sticky top-0 z-10">
+              <span>Name</span>
+              <span>Category</span>
+              <span>Enabled</span>
+              <span>Sale Mode</span>
+              <span>Price (ETH)</span>
+              <span>
+                Priority{" "}
+                <span className="normal-case font-semibold tracking-normal text-[10px] text-ink-faint/90">
+                  (lower first)
+                </span>
+              </span>
+            </div>
+
+            {isLoadingReserved ? (
+              <div className="px-4 py-6 text-body-sm text-ink-muted">
+                <InlineLoading label="Loading reserved names..." variant="dots" />
+              </div>
+            ) : filteredReservedNames.length === 0 ? (
+              <div className="px-4 py-6 text-body-sm text-ink-muted">No reserved names match this search.</div>
+            ) : (
+              filteredReservedNames.map((name) => {
+                const draft = reservedDrafts[name.id];
+                const activePriceWei =
+                  draft?.saleMode === 'buy_now' ? name.fixedPriceWei : name.reservePriceWei;
+                const activePriceUsd =
+                  draft?.priceEth && rnsPricing?.ethUsd
+                    ? Number(draft.priceEth) * rnsPricing.ethUsd
+                    : activePriceWei && rnsPricing?.ethUsd
+                      ? Number(formatEther(activePriceWei)) * rnsPricing.ethUsd
+                      : null;
+                const isSaving = savingReservedIds.includes(name.id);
+
+                return (
+                  <div
+                    key={name.id}
+                    className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_150px_110px_110px] gap-3 border-b border-card-border/70 px-4 py-4 last:border-b-0 items-start"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-display text-body text-ink break-all">{name.fqdn}</p>
+                      <p className="mt-1 text-xs text-ink-muted">≈ {formatUsdValue(activePriceUsd)}</p>
+                    </div>
+                    <div className="break-words text-body-sm text-ink-muted">{name.category.replace(/_/g, ' ')}</div>
+                    <label className="inline-flex items-center gap-2 text-body-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={draft?.enabled ?? name.enabled}
+                        onChange={(event) =>
+                          handleReservedDraftChange(name.id, 'enabled', event.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      <span>{draft?.enabled ?? name.enabled ? 'Live' : 'Off'}</span>
+                    </label>
+                    <select
+                      value={draft?.saleMode ?? name.saleMode}
+                      onChange={(event) =>
+                        handleReservedDraftChange(name.id, 'saleMode', event.target.value as ReservedNameDraft['saleMode'])
+                      }
+                      className="input-field"
+                    >
+                      <option value="auction">Auction</option>
+                      <option value="buy_now">Fixed price</option>
+                    </select>
+                    <input
+                      value={draft?.priceEth ?? ''}
+                      onChange={(event) =>
+                        handleReservedDraftChange(name.id, 'priceEth', event.target.value)
+                      }
+                      placeholder="0.05"
+                      className="input-field font-mono"
+                    />
+                    <div className="space-y-2">
+                      <input
+                        value={draft?.displayOrder ?? String(name.displayOrder)}
+                        onChange={(event) =>
+                          handleReservedDraftChange(name.id, 'displayOrder', event.target.value)
+                        }
+                        placeholder="0"
+                        className="input-field font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveReservedName(name)}
+                        disabled={!isRnsOwner || isSaving}
+                        className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {isSaving ? <InlineLoading label="Saving..." /> : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </ResponsiveDialog>
 
       <motion.section variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="glass-card rounded-3xl p-6 space-y-4">
@@ -593,7 +912,7 @@ const AdminDashboard: React.FC = () => {
             <div>
               <p className="text-body-sm text-ink-muted">On-chain Owner</p>
               <p className="text-body-sm font-mono text-ink break-all">
-                {isLoadingOwner ? 'Loading...' : factoryOwner ?? 'Unknown'}
+                {isLoadingOwner ? <InlineLoading label="Loading..." size="xs" variant="dots" /> : factoryOwner ?? 'Unknown'}
               </p>
               {isOnChainOwner && (
                 <p className="text-xs text-status-live mt-1">✓ Connected wallet is owner</p>
@@ -614,13 +933,13 @@ const AdminDashboard: React.FC = () => {
             <div>
               <p className="text-body-sm text-ink-muted">Current Fee Recipient</p>
               <p className="text-body-sm font-mono text-ink break-all">
-                {isLoadingFeeRecipient ? 'Loading...' : feeRecipient ?? 'Unknown'}
+                {isLoadingFeeRecipient ? <InlineLoading label="Loading..." size="xs" variant="dots" /> : feeRecipient ?? 'Unknown'}
               </p>
             </div>
             <div>
               <p className="text-body-sm text-ink-muted">Current Proceeds Fee</p>
               <p className="text-body text-ink">
-                {isLoadingProceedsFeeBps ? 'Loading...' : `${currentProceedsFeeLabel} (${proceedsFeeBps?.toString() ?? '0'} bps)`}
+                {isLoadingProceedsFeeBps ? <InlineLoading label="Loading..." size="xs" variant="dots" /> : `${currentProceedsFeeLabel} (${proceedsFeeBps?.toString() ?? '0'} bps)`}
               </p>
             </div>
           </div>
@@ -638,7 +957,7 @@ const AdminDashboard: React.FC = () => {
               disabled={!newFeeRecipient || isUpdatingFeeRecipient}
               className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isUpdatingFeeRecipient ? 'Updating Recipient...' : 'Update Recipient'}
+              {isUpdatingFeeRecipient ? <InlineLoading label="Updating recipient..." /> : 'Update Recipient'}
             </button>
           </div>
 
@@ -658,7 +977,7 @@ const AdminDashboard: React.FC = () => {
               disabled={!newProceedsFeeBps || isUpdatingProceedsFee}
               className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isUpdatingProceedsFee ? 'Updating Fee...' : 'Update Proceeds Fee'}
+              {isUpdatingProceedsFee ? <InlineLoading label="Updating fee..." /> : 'Update Proceeds Fee'}
             </button>
             <p className="text-xs text-ink-faint">
               Basis points: 100 = 1%. Only the NFT factory owner can update these settings.

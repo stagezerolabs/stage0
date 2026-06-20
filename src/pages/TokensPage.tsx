@@ -4,12 +4,14 @@ import { Link } from 'react-router-dom';
 import { useAccount, useChainId, useReadContracts } from 'wagmi';
 import { Copy, ExternalLink, Image as ImageIcon, Package, Plus, Trash2, X } from '@/components/ui/icons';
 import { erc20Abi, getExplorerUrl } from '@/config';
-import { formatUnits, isAddress, type Address } from 'viem';
+import { formatUnits, type Address } from 'viem';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useOffchainTokenImages } from '@/lib/hooks/useOffchainProjectImages';
 import { useBlockchainStore } from '@/lib/store/blockchain-store';
 import FallbackImage from '@/components/ui/fallback-image';
 import { toast } from 'sonner';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
+import { LoadingState } from '@/components/ui/spinner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -44,6 +46,7 @@ const TokensPage: React.FC = () => {
 
   const [showImportModal, setShowImportModal] = useState(false);
   const [importAddress, setImportAddress] = useState('');
+  const [resolvedImportAddress, setResolvedImportAddress] = useState<Address | null>(null);
 
   // Build a set of factory token addresses for labeling
   const factorySet = useMemo(() => {
@@ -101,15 +104,15 @@ const TokensPage: React.FC = () => {
   };
 
   const handleImport = () => {
-    const trimmed = importAddress.trim();
-    if (!isAddress(trimmed)) {
-      toast.error('Invalid ERC20 address.');
+    if (!resolvedImportAddress) {
+      toast.error('Enter a valid ERC20 address or .rise name.');
       return;
     }
     if (!userAddress) return;
-    addImportedToken(userAddress, chainId, trimmed as Address);
+    addImportedToken(userAddress, chainId, resolvedImportAddress);
     toast.success('Token imported.');
     setImportAddress('');
+    setResolvedImportAddress(null);
     setShowImportModal(false);
   };
 
@@ -174,16 +177,16 @@ const TokensPage: React.FC = () => {
               <p className="text-body-sm text-ink-muted">
                 Paste any ERC20 token contract address to add it to your management dashboard.
               </p>
-              <input
-                type="text"
+              <RnsAddressInput
+                label="Token Contract"
                 value={importAddress}
-                onChange={(e) => setImportAddress(e.target.value)}
-                placeholder="0x..."
-                className="input-field font-mono text-body-sm"
+                onChange={setImportAddress}
+                onResolvedAddressChange={setResolvedImportAddress}
+                placeholder="0x... or token.rise"
               />
               <button
                 onClick={handleImport}
-                disabled={!importAddress.trim()}
+                disabled={!resolvedImportAddress}
                 className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Import
@@ -198,8 +201,8 @@ const TokensPage: React.FC = () => {
           <p className="text-body text-ink-muted">Connect your wallet to view tokens.</p>
         </motion.div>
       ) : isLoading ? (
-        <motion.div variants={itemVariants} className="glass-card rounded-3xl p-8 text-center">
-          <p className="text-body text-ink-muted">Loading tokens...</p>
+        <motion.div variants={itemVariants} className="glass-card rounded-3xl p-8">
+          <LoadingState label="Loading tokens" compact variant="dots" />
         </motion.div>
       ) : tokenList.length === 0 ? (
         <motion.div variants={itemVariants} className="glass-card rounded-3xl p-8 text-center space-y-4">

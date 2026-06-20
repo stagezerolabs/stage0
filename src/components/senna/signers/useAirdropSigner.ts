@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useChainId, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { isAddress, parseUnits, type Address } from 'viem';
+import { parseUnits, type Address } from 'viem';
 import { AirdropMultiSender, erc20Abi, getContractAddresses, riseTestnet } from '@/config';
+import { resolveRnsAddressInput } from '@/lib/api/rns';
+import { useRnsAddressInput } from '@/lib/hooks/rns';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import type { SennaActionDraft, SignerState } from '../types';
 
@@ -10,16 +12,20 @@ interface Recipient {
   rawAmount: string;
 }
 
-function parseRecipientCsv(raw: string): Recipient[] {
+interface RawRecipient {
+  input: string;
+  rawAmount: string;
+}
+
+function parseRecipientCsv(raw: string): RawRecipient[] {
   return raw
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
       const [addr, amount] = line.split(/[,\s]+/);
-      return { address: addr as Address, rawAmount: amount ?? '0' };
-    })
-    .filter((r) => isAddress(r.address));
+      return { input: addr, rawAmount: amount ?? '0' };
+    });
 }
 
 export function useAirdropSigner(draft: SennaActionDraft): SignerState {
@@ -30,9 +36,67 @@ export function useAirdropSigner(draft: SennaActionDraft): SignerState {
   const contracts = getContractAddresses(chainId);
 
   const isNative = (draft.prefill.nativeToken || 'false') === 'true';
-  const tokenAddress = !isNative && isAddress(draft.prefill.token || '') ? (draft.prefill.token as Address) : undefined;
+  const tokenResolution = useRnsAddressInput(draft.prefill.token || '', riseTestnet.id, {
+    enabled: !isNative,
+  });
+  const tokenAddress = !isNative ? tokenResolution.address ?? undefined : undefined;
 
-  const recipients = useMemo(() => parseRecipientCsv(draft.prefill.recipientsData || ''), [draft.prefill.recipientsData]);
+  const rawRecipients = useMemo(
+    () => parseRecipientCsv(draft.prefill.recipientsData || ''),
+    [draft.prefill.recipientsData],
+  );
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [isResolvingRecipients, setIsResolvingRecipients] = useState(false);
+  const [recipientResolutionError, setRecipientResolutionError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (rawRecipients.length === 0) {
+      setRecipients([]);
+      setRecipientResolutionError('');
+      setIsResolvingRecipients(false);
+      return;
+    }
+
+    setIsResolvingRecipients(true);
+    void (async () => {
+      try {
+        const rows = await Promise.all(
+          rawRecipients.map(async (recipient) => ({
+            ...recipient,
+            address: await resolveRnsAddressInput({
+              value: recipient.input,
+              chainId: riseTestnet.id,
+            }),
+          })),
+        );
+
+        if (cancelled) return;
+
+        const invalid = rows.find((row) => !row.address);
+        if (invalid) {
+          setRecipients([]);
+          setRecipientResolutionError(`Could not resolve ${invalid.input}.`);
+          return;
+        }
+
+        setRecipients(rows.map((row) => ({ address: row.address!, rawAmount: row.rawAmount })));
+        setRecipientResolutionError('');
+      } catch {
+        if (!cancelled) {
+          setRecipients([]);
+          setRecipientResolutionError('Could not resolve airdrop recipients.');
+        }
+      } finally {
+        if (!cancelled) setIsResolvingRecipients(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawRecipients]);
 
   const { data: tokenDecimals } = useReadContract({
     abi: erc20Abi,
@@ -159,7 +223,12 @@ export function useAirdropSigner(draft: SennaActionDraft): SignerState {
   let primaryLabel = isNative ? 'Sign & Airdrop' : 'Sign & Airdrop';
   let step: SignerState['step'] | undefined;
   let busy = false;
-  let ready = (isNative || Boolean(tokenAddress)) && recipients.length > 0 && totalAmount > 0n;
+  let ready =
+    (isNative || Boolean(tokenAddress)) &&
+    recipients.length > 0 &&
+    totalAmount > 0n &&
+    !isResolvingRecipients &&
+    !recipientResolutionError;
 
   if (!isConnected) {
     phase = 'needs_wallet';
@@ -192,6 +261,15 @@ export function useAirdropSigner(draft: SennaActionDraft): SignerState {
   } else if (isSuccess) {
     phase = 'success';
     primaryLabel = 'Airdrop sent';
+  } else if (!isNative && draft.prefill.token && !tokenAddress && tokenResolution.isLoading) {
+    primaryLabel = 'Resolving token name...';
+    ready = false;
+  } else if (isResolvingRecipients) {
+    primaryLabel = 'Resolving recipients...';
+    ready = false;
+  } else if ((!isNative && draft.prefill.token && !tokenAddress) || recipientResolutionError) {
+    primaryLabel = 'Resolve names first';
+    ready = false;
   } else if (errorMessage) {
     phase = 'error';
     primaryLabel = 'Try again';

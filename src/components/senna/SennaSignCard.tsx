@@ -2,7 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useChainId } from 'wagmi';
 import { getExplorerUrl } from '@/config';
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from '@/components/ui/icons';
+import { AlertTriangle, CheckCircle2, ExternalLink } from '@/components/ui/icons';
+import { Spinner } from '@/components/ui/spinner';
 import { useCreateTokenSigner } from './signers/useCreateTokenSigner';
 import { useLockTokenSigner } from './signers/useLockTokenSigner';
 import { useAirdropSigner } from './signers/useAirdropSigner';
@@ -160,7 +161,7 @@ export const SennaSignCard: React.FC<{ draft: SennaActionDraft }> = ({ draft }) 
             onClick={signer.primary}
             disabled={signer.busy || (!signer.ready && phase !== 'needs_wallet' && phase !== 'needs_chain' && phase !== 'error')}
           >
-            {signer.busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            {signer.busy && <Spinner size="sm" />}
             {phase === 'success' && <CheckCircle2 className="h-4 w-4" />}
             <span>{signer.primaryLabel}</span>
           </button>

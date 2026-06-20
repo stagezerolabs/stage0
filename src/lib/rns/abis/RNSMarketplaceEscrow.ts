@@ -2,6 +2,30 @@ export const RNSMarketplaceEscrow = [
   {
     inputs: [
       { internalType: "string", name: "name", type: "string" },
+      { internalType: "uint256", name: "price", type: "uint256" },
+    ],
+    name: "createListing",
+    outputs: [{ internalType: "uint256", name: "listingId", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "listingId", type: "uint256" }],
+    name: "buy",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "listingId", type: "uint256" }],
+    name: "cancelListing",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "string", name: "name", type: "string" },
       { internalType: "uint256", name: "reservePrice", type: "uint256" },
       { internalType: "uint96", name: "minIncrementBps", type: "uint96" },
       { internalType: "uint64", name: "startTime", type: "uint64" },
@@ -27,6 +51,13 @@ export const RNSMarketplaceEscrow = [
     type: "function",
   },
   {
+    inputs: [{ internalType: "uint256", name: "auctionId", type: "uint256" }],
+    name: "cancelAuction",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "withdraw",
     outputs: [],
@@ -36,6 +67,13 @@ export const RNSMarketplaceEscrow = [
   {
     inputs: [{ internalType: "uint256", name: "auctionId", type: "uint256" }],
     name: "minimumNextBid",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "", type: "address" }],
+    name: "pendingReturns",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",

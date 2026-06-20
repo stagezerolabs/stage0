@@ -6,7 +6,6 @@ import { PresaleFactory, erc20Abi, getContractAddresses } from '@/config';
 import { useWhitelistedCreator } from '@/lib/hooks/useWhitelistedCreator';
 import {
   Rocket,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
   ShieldAlert,
@@ -17,6 +16,7 @@ import {
   Image as ImageIcon,
   Upload,
 } from '@/components/ui/icons';
+import { InlineLoading } from '@/components/ui/spinner';
 import { Link, useSearchParams } from 'react-router-dom';
 import FallbackImage from '@/components/ui/fallback-image';
 import { toast } from 'sonner';
@@ -25,6 +25,7 @@ import {
   getStage0ImageValidationError,
   uploadTokenImage,
 } from '@/lib/api/media';
+import RnsAddressInput from '@/components/rns/RnsAddressInput';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -78,6 +79,7 @@ const CreatePresalePage: React.FC = () => {
   const queryTokenName = useMemo(() => searchParams.get('name')?.trim() ?? '', [searchParams]);
 
   const [saleToken, setSaleToken] = useState(querySaleToken);
+  const [resolvedSaleToken, setResolvedSaleToken] = useState<Address | null>(null);
   const [projectImageFile, setProjectImageFile] = useState<File | null>(null);
   const [projectImagePreview, setProjectImagePreview] = useState('');
   const [projectImageMeta, setProjectImageMeta] = useState('');
@@ -87,6 +89,7 @@ const CreatePresalePage: React.FC = () => {
   const [projectTelegramUrl, setProjectTelegramUrl] = useState('');
   const [projectDiscordUrl, setProjectDiscordUrl] = useState('');
   const [paymentToken, setPaymentToken] = useState('');
+  const [resolvedPaymentToken, setResolvedPaymentToken] = useState<Address | null>(null);
   const [useNativeToken, setUseNativeToken] = useState(true);
   const [hardCap, setHardCap] = useState('');
   const [softCap, setSoftCap] = useState('');
@@ -107,19 +110,19 @@ const CreatePresalePage: React.FC = () => {
   }, [projectImagePreview]);
 
   const tokenMetadataContracts = useMemo(() => {
-    if (!saleToken || !isAddress(saleToken)) return undefined;
+    if (!resolvedSaleToken) return undefined;
     return [
-      { abi: erc20Abi, address: saleToken as Address, functionName: 'name' },
-      { abi: erc20Abi, address: saleToken as Address, functionName: 'symbol' },
+      { abi: erc20Abi, address: resolvedSaleToken, functionName: 'name' },
+      { abi: erc20Abi, address: resolvedSaleToken, functionName: 'symbol' },
     ] as const;
-  }, [saleToken]);
+  }, [resolvedSaleToken]);
 
   const paymentTokenMetadataContracts = useMemo(() => {
-    if (useNativeToken || !paymentToken || !isAddress(paymentToken)) return undefined;
+    if (useNativeToken || !resolvedPaymentToken) return undefined;
     return [
-      { abi: erc20Abi, address: paymentToken as Address, functionName: 'symbol' },
+      { abi: erc20Abi, address: resolvedPaymentToken, functionName: 'symbol' },
     ] as const;
-  }, [paymentToken, useNativeToken]);
+  }, [resolvedPaymentToken, useNativeToken]);
 
   const { data: tokenMetadataResults } = useReadContracts({
     contracts: tokenMetadataContracts,
@@ -179,7 +182,7 @@ const CreatePresalePage: React.FC = () => {
   }, [isSuccess, receipt]);
 
   useEffect(() => {
-    if (!isSuccess || !isAddress(saleToken)) return;
+    if (!isSuccess || !resolvedSaleToken) return;
 
     const profile = {
       description: projectDescription.trim(),
@@ -193,7 +196,7 @@ const CreatePresalePage: React.FC = () => {
 
     const uploadKey = [
       chainId,
-      saleToken.toLowerCase(),
+      resolvedSaleToken.toLowerCase(),
       projectImageFile?.name ?? '',
       projectImageFile?.size ?? 0,
       projectImageFile?.lastModified ?? 0,
@@ -209,7 +212,7 @@ const CreatePresalePage: React.FC = () => {
 
     uploadTokenImage({
       chainId,
-      address: saleToken as Address,
+      address: resolvedSaleToken,
       file: projectImageFile,
       profile,
     })
@@ -224,7 +227,7 @@ const CreatePresalePage: React.FC = () => {
   }, [
     chainId,
     isSuccess,
-    saleToken,
+    resolvedSaleToken,
     projectDescription,
     projectDiscordUrl,
     projectImageFile,
@@ -234,7 +237,7 @@ const CreatePresalePage: React.FC = () => {
   ]);
 
   const handleSubmit = () => {
-    if (!saleToken || !hardCap || !softCap || !minContribution || !maxContribution || !startDate || !endDate || !saleAmount) return;
+    if (!resolvedSaleToken || !hardCap || !softCap || !minContribution || !maxContribution || !startDate || !endDate || !saleAmount) return;
 
     const startTimestamp = BigInt(Math.floor(new Date(startDate).getTime() / 1000));
     const endTimestamp = BigInt(Math.floor(new Date(endDate).getTime() / 1000));
@@ -250,7 +253,9 @@ const CreatePresalePage: React.FC = () => {
 
     const paymentAddr = useNativeToken
       ? '0x0000000000000000000000000000000000000000' as Address
-      : paymentToken as Address;
+      : resolvedPaymentToken;
+
+    if (!paymentAddr) return;
 
     writeContract({
       abi: PresaleFactory,
@@ -258,7 +263,7 @@ const CreatePresalePage: React.FC = () => {
       functionName: 'createPresale',
       args: [
         {
-          saleToken: saleToken as Address,
+          saleToken: resolvedSaleToken,
           paymentToken: paymentAddr,
           config: {
             startTime: startTimestamp,
@@ -395,8 +400,7 @@ const CreatePresalePage: React.FC = () => {
 
       {isCheckingWhitelist && (
         <motion.div variants={itemVariants} className="flex items-center gap-2 text-ink-muted">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-body-sm">Checking whitelist status...</span>
+          <InlineLoading label="Checking whitelist status..." variant="dots" />
         </motion.div>
       )}
 
@@ -405,13 +409,13 @@ const CreatePresalePage: React.FC = () => {
         <h2 className="font-display text-display-sm text-ink">Token Configuration</h2>
 
         <div className="space-y-1.5">
-          <label className="text-body-sm text-ink-muted font-medium">Sale Token Address</label>
-          <input
-            type="text"
+          <RnsAddressInput
+            label="Sale Token Address"
             value={saleToken}
-            onChange={(e) => setSaleToken(e.target.value)}
-            placeholder="0x..."
-            className="input-field w-full font-mono text-sm"
+            onChange={setSaleToken}
+            onResolvedAddressChange={setResolvedSaleToken}
+            placeholder="0x... or token.rise"
+            required
           />
           {showResolvedTokenInfo && (
             <p className="text-body-sm text-ink-muted">
@@ -536,12 +540,13 @@ const CreatePresalePage: React.FC = () => {
             </button>
           </div>
           {!useNativeToken && (
-            <input
-              type="text"
+            <RnsAddressInput
+              label="Payment Token Address"
               value={paymentToken}
-              onChange={(e) => setPaymentToken(e.target.value)}
-              placeholder="Payment token address (0x...)"
-              className="input-field w-full font-mono text-sm"
+              onChange={setPaymentToken}
+              onResolvedAddressChange={setResolvedPaymentToken}
+              placeholder="0x... or token.rise"
+              required
             />
           )}
         </div>
@@ -668,7 +673,8 @@ const CreatePresalePage: React.FC = () => {
             isPending ||
             isConfirming ||
             !isConnected ||
-            !saleToken ||
+            !resolvedSaleToken ||
+            (!useNativeToken && !resolvedPaymentToken) ||
             !hardCap ||
             !softCap ||
             !startDate ||
@@ -678,10 +684,7 @@ const CreatePresalePage: React.FC = () => {
           className="btn-primary w-full"
         >
           {isPending || isConfirming ? (
-            <span className="inline-flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {isConfirming ? 'Confirming...' : 'Creating Launch...'}
-            </span>
+            <InlineLoading label={isConfirming ? 'Confirming...' : 'Creating Launch...'} />
           ) : !isConnected ? (
             'Connect Wallet First'
           ) : (

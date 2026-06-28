@@ -63,7 +63,7 @@ const REGISTRATION_PERIODS = [
   { years: 1, label: "Starter" },
   { years: 2, label: "Steady" },
   { years: 3, label: "Builder" },
-  { years: 5, label: "Long hold" },
+  { years: 5, label: "Diamond hand" },
 ] as const;
 
 const PREMIUM_NAMES = [
@@ -72,6 +72,9 @@ const PREMIUM_NAMES = [
   { label: "ok", bid: "6.2", bids: 17, ends: "11h 40m" },
   { label: "vc", bid: "5.0", bids: 9, ends: "2d 06h" },
 ];
+
+const WEI_PER_ETH = 1_000_000_000_000_000_000n;
+const MICROS_PER_USD = 1_000_000n;
 
 function formatEthValue(value: bigint) {
   const numeric = Number(formatEther(value));
@@ -95,6 +98,48 @@ function formatUsdValue(value?: string | number | null) {
 function discountLabel(display?: { discountBps?: number; discountPercent?: string }) {
   if (!display?.discountBps) return "No loyalty discount";
   return `${display.discountPercent ?? display.discountBps / 100}% loyalty discount`;
+}
+
+function getUsdCentsPerYearForLength(pricing: RnsPricingSummary | null, length: number) {
+  if (!pricing || length <= 0) return null;
+  const tier = pricing.tiers.find((item) => length >= item.minLength && length <= item.maxLength);
+  return tier ? BigInt(tier.usdCentsPerYear) : null;
+}
+
+function getPriceMultiplierBps(pricing: RnsPricingSummary | null, years: number) {
+  if (!pricing) return 10_000;
+  const schedule = pricing.multiYearPolicy.schedule ?? [];
+  const exact = schedule.find((item) => item.years === years);
+  if (exact) return exact.priceMultiplierBps;
+
+  const eligible = [...schedule]
+    .sort((a, b) => a.years - b.years)
+    .filter((item) => years >= item.years);
+  const fallback = eligible[eligible.length - 1];
+
+  return fallback?.priceMultiplierBps ?? 10_000;
+}
+
+function estimateRegistrationTotals(
+  pricing: RnsPricingSummary | null,
+  labelLength: number,
+  years: number,
+) {
+  const usdCentsPerYear = getUsdCentsPerYearForLength(pricing, labelLength);
+  if (!pricing || !usdCentsPerYear || years <= 0) return null;
+
+  const subtotalUsdCents = usdCentsPerYear * BigInt(years);
+  const priceMultiplierBps = getPriceMultiplierBps(pricing, years);
+  const totalUsdCents = (subtotalUsdCents * BigInt(priceMultiplierBps)) / 10_000n;
+  const ethPriceMicros = BigInt(Math.round(pricing.ethUsd * Number(MICROS_PER_USD)));
+  if (ethPriceMicros <= 0n) return null;
+
+  const priceWei = ((totalUsdCents * 10_000n) * WEI_PER_ETH) / ethPriceMicros;
+
+  return {
+    priceWei,
+    totalUsd: Number(totalUsdCents) / 100,
+  };
 }
 
 function formatAddress(address: string) {
@@ -227,6 +272,15 @@ const OwnedNameCard: React.FC<{
   const { renew, isPending, isConfirming, isSuccess, error } = useRnsRenew();
   const isBusy = isPending || isConfirming;
 
+  const {
+    release,
+    isPending: isReleasePending,
+    isConfirming: isReleaseConfirming,
+    isSuccess: isReleaseSuccess,
+    error: releaseError,
+  } = useRnsRelease();
+  const isReleasing = isReleasePending || isReleaseConfirming;
+
   // Once armed, fire the renewal as soon as the signed quote lands.
   useEffect(() => {
     if (!renewArmed || isBusy || firedRef.current) return;
@@ -249,6 +303,29 @@ const OwnedNameCard: React.FC<{
     setRenewArmed(false);
     firedRef.current = false;
   }, [error]);
+
+  useEffect(() => {
+    if (isReleaseSuccess) {
+      toast.success(`${formatDomainDisplay(domain.label)} released.`);
+      onRenewed();
+    }
+  }, [isReleaseSuccess, domain.label, onRenewed]);
+
+  useEffect(() => {
+    if (releaseError) {
+      toast.error(releaseError.message.split("\n")[0] ?? "Release failed.");
+    }
+  }, [releaseError]);
+
+  const handleRelease = () => {
+    if (!isConnected) {
+      toast.error("Connect your wallet to release a name.");
+      return;
+    }
+    if (!window.confirm(`Release ${formatDomainDisplay(domain.label)}? This cannot be undone.`))
+      return;
+    release({ name: domain.label });
+  };
 
   const handleRenew = () => {
     if (!isConnected) {
@@ -289,10 +366,16 @@ const OwnedNameCard: React.FC<{
         {isEscrowed ? (
           <span className="nm-tag nm-tag-auction">{marketplaceLabel}</span>
         ) : isPrimary ? (
-          <span className="nm-primary-seal">
-            <PrimarySeal size={20} />
-          </span>
-        ) : null}
+          <span className="nm-dur-badge nm-dur-primary-badge">Primary</span>
+        ) : (
+          <button
+            type="button"
+            className="own-make-pill"
+            onClick={() => onSetPrimary(domain.label)}
+          >
+            Make primary
+          </button>
+        )}
       </div>
       <div className={`own-exp ${isSoon || isExpired ? "soon" : ""}`}>{expiryText}</div>
       <div className={`own-actions ${isEscrowed ? "single" : ""}`}>
@@ -313,18 +396,17 @@ const OwnedNameCard: React.FC<{
             <Link to="/domains/marketplace" className="own-btn">
               List
             </Link>
+            <button
+              type="button"
+              className="own-btn own-btn-release"
+              onClick={handleRelease}
+              disabled={isReleasing}
+            >
+              {isReleasing ? <InlineLoading label="Releasing..." size="xs" /> : "Release"}
+            </button>
           </>
         )}
       </div>
-      {!isEscrowed && !isPrimary ? (
-        <button
-          type="button"
-          className="own-make"
-          onClick={() => onSetPrimary(domain.label)}
-        >
-          Make primary
-        </button>
-      ) : null}
     </div>
   );
 };
@@ -443,9 +525,23 @@ const DomainsPage: React.FC = () => {
   }, [isReserved, onChainIsTaken]);
 
   const ownedDomainsWithLabels = useMemo(
-    () => ownedDomains.filter((domain) => Boolean(domain.label)),
-    [ownedDomains],
+    () =>
+      ownedDomains
+        .filter((domain) => Boolean(domain.label))
+        .sort((a, b) => {
+          if (a.label === ownedLabel) return -1;
+          if (b.label === ownedLabel) return 1;
+          return 0;
+        }),
+    [ownedDomains, ownedLabel],
   );
+  const registrationPeriodEstimates = useMemo(() => {
+    const length = normalized.length;
+    return REGISTRATION_PERIODS.reduce<Record<number, ReturnType<typeof estimateRegistrationTotals>>>((acc, period) => {
+      acc[period.years] = estimateRegistrationTotals(pricing, length, period.years);
+      return acc;
+    }, {});
+  }, [normalized.length, pricing]);
 
   const matchedOwnedDomain = useMemo(() => {
     if (!normalized || !address || !isTaken) return null;
@@ -495,21 +591,12 @@ const DomainsPage: React.FC = () => {
     error: renewError,
   } = useRnsRenew();
 
-  const {
-    release,
-    isPending: isReleasePending,
-    isConfirming: isReleaseConfirming,
-    isSuccess: isReleaseSuccess,
-    error: releaseError,
-  } = useRnsRelease();
-
   const { expiry: searchExpiry = 0n } = useRnsExpiry(normalized, {
     enabled: validation.valid && Boolean(normalized) && isTaken && !available,
   });
 
   const isRegistering = isRegisterPending || isRegisterConfirming;
   const isRenewing = isRenewPending || isRenewConfirming;
-  const isReleasing = isReleasePending || isReleaseConfirming;
 
   const userBalance = balanceData?.value ?? 0n;
   const hasSufficientBalance =
@@ -654,20 +741,6 @@ const DomainsPage: React.FC = () => {
     }
   }, [renewError]);
 
-  useEffect(() => {
-    if (isReleaseSuccess) {
-      toast.success("Name released.");
-      setHintLabel(null);
-      void refetchOwned();
-    }
-  }, [isReleaseSuccess, refetchOwned]);
-
-  useEffect(() => {
-    if (releaseError) {
-      toast.error(releaseError.message.split("\n")[0] ?? "Release failed.");
-    }
-  }, [releaseError]);
-
   const handleRegister = () => {
     if (!isConnected || !address) {
       toast.error("Connect your wallet to register a name.");
@@ -704,13 +777,6 @@ const DomainsPage: React.FC = () => {
       quote: renewSignedQuote,
       signature: renewSignature,
     });
-  };
-
-  const handleRelease = () => {
-    if (!ownedLabel) return;
-    if (!window.confirm(`Release ${ownedDisplayName}? This cannot be undone.`))
-      return;
-    release({ name: ownedLabel });
   };
 
   const handleSetPrimary = (label: string) => {
@@ -823,7 +889,6 @@ const DomainsPage: React.FC = () => {
                     Find a name
                   </h2>
                 </div>
-                <span className="nm-tier">RISE Testnet</span>
               </div>
 
               <div className="nm-search-box">
@@ -862,7 +927,7 @@ const DomainsPage: React.FC = () => {
                 <div className="nm-validation">
                   <AlertTriangle className="w-3.5 h-3.5" />
                   One and two-character names are premium. Browse the
-                  marketplace route for the upcoming short-name flow.
+                  marketplace to find short names.
                 </div>
               ) : null}
 
@@ -1020,6 +1085,15 @@ const DomainsPage: React.FC = () => {
                                 {period.years === 3 ? (
                                   <span className="nm-dur-badge">Popular</span>
                                 ) : null}
+                                {(() => {
+                                  const discountBps = pricing?.multiYearPolicy.schedule?.find(s => s.years === period.years)?.discountBps;
+                                  if (!discountBps) return null;
+                                  return (
+                                    <span className="nm-dur-badge nm-dur-discount-badge">
+                                      {discountBps / 100}% off
+                                    </span>
+                                  );
+                                })()}
                                 <div className="nm-dur-years">
                                   {period.years}
                                   <span>yr</span>
@@ -1028,14 +1102,24 @@ const DomainsPage: React.FC = () => {
                                   {period.label}
                                 </div>
                                 <div className="nm-dur-price">
-                                  {period.years === selectedYears ? (
-                                    <>
-                                      <span>{formatEthValue(registerPrice)}</span>
-                                      {registerUsdTotal ? <small>≈ {registerUsdTotal}</small> : null}
-                                    </>
-                                  ) : (
-                                    "Select to quote"
-                                  )}
+                                  {(() => {
+                                    const isSelected = period.years === selectedYears;
+                                    if (isSelected) {
+                                      return (
+                                        <>
+                                          <span>{formatEthValue(registerPrice)}</span>
+                                          {registerUsdTotal ? <small>≈ {registerUsdTotal}</small> : null}
+                                        </>
+                                      );
+                                    }
+                                    const estimate = registrationPeriodEstimates[period.years];
+                                    return (
+                                      <>
+                                        <span>{estimate ? formatEthValue(estimate.priceWei) : "..."}</span>
+                                        {estimate ? <small>≈ {formatUsdValue(estimate.totalUsd)}</small> : null}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </button>
                             ))}
@@ -1059,19 +1143,6 @@ const DomainsPage: React.FC = () => {
                               </b>
                             </div>
                           ) : null}
-                          {registerDisplay ? (
-                            <div className="nm-bd-row">
-                              <span>
-                                Rate · {registerDisplay.years} yr
-                                {registerDisplay.usdCentsPerYear
-                                  ? ` at $${(registerDisplay.usdCentsPerYear / 100).toFixed(2)}/yr`
-                                  : ""}
-                              </span>
-                              <b className="text-ink-muted">
-                                ETH/USD ${registerDisplay.ethUsd.toLocaleString()}
-                              </b>
-                            </div>
-                          ) : null}
                           <div className="nm-bd-row">
                             <span>Network gas</span>
                             <b className="text-ink-muted">Shown in wallet</b>
@@ -1091,7 +1162,7 @@ const DomainsPage: React.FC = () => {
                               </div>
                               <div className="nm-bd-total-usd">
                                 {registerUsdTotal
-                                  ? `≈ ${registerUsdTotal} after discount`
+                                  ? `≈ ${registerUsdTotal}${registerDisplay?.discountBps ? ' after discount' : ''}`
                                   : "Paid on RISE Testnet"}
                               </div>
                             </div>
@@ -1246,15 +1317,9 @@ const DomainsPage: React.FC = () => {
                     <PrimarySeal size={13} />
                     Primary
                   </span>
-                  <span className="font-mono text-xs text-ink-faint">
-                    {ownedDomainsWithLabels.length} names
-                  </span>
                 </div>
 
                 <div className="nm-primary-name">{ownedDisplayName}</div>
-                <p className="nm-primary-cap">
-                  This name resolves your wallet across RISE apps.
-                </p>
                 {ownedExpirySec > 0 ? (
                   <p
                     className={`names-primary-expiry ${isOwnedExpired ? "is-expired" : ""}`}
@@ -1278,14 +1343,12 @@ const DomainsPage: React.FC = () => {
                         : `Renew ${formatEthValue(renewPrice)}${renewUsdTotal ? ` · ${renewUsdTotal}` : ""}`}
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    onClick={handleRelease}
-                    disabled={isReleasing}
-                    className="nm-release disabled:opacity-60"
+                  <Link
+                    to="/domains/marketplace"
+                    className="nm-release"
                   >
-                    {isReleasing ? <InlineLoading label="Releasing..." /> : "Release"}
-                  </button>
+                    List
+                  </Link>
                 </div>
               </motion.section>
             ) : (
@@ -1311,7 +1374,7 @@ const DomainsPage: React.FC = () => {
                 <div>
                   <div className="nm-suggest-label">Marketplace</div>
                   <h3 className="font-display text-xl text-ink mt-1">
-                    Hot short names
+                    Short names
                   </h3>
                 </div>
                 <Link to="/domains/marketplace" className="nm-link">
@@ -1319,7 +1382,7 @@ const DomainsPage: React.FC = () => {
                 </Link>
               </div>
               <p className="nm-primary-cap" style={{ marginTop: 6 }}>
-                Live 2-character auctions.
+                Premium 1-2 character auctions.
               </p>
               <div className="hot-mini">
                 {PREMIUM_NAMES.map((item) => (

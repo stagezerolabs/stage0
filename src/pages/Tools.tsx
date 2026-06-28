@@ -144,7 +144,7 @@ const Tools: React.FC = () => {
               <motion.div
                 key={tool.href}
                 className={`relative overflow-hidden rounded-2xl sm:rounded-3xl group border border-border/70 bg-canvas-alt ${mobileSizeClass} transition-all duration-500 ${layoutClasses[idx]} ${offsetClasses[idx]} ${
-                  themeMode === 'light' ? 'hover:border-purple-500' : 'hover:border-amber-700'
+                  themeMode === 'light' ? 'hover:border-emerald-500' : 'hover:border-accent'
                 }`}
                 whileHover={shouldDisableAnimations ? {} : { scale: 0.99 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}

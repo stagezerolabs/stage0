@@ -8,6 +8,7 @@ import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
 import { useRnsLabelRecovery } from "@/lib/hooks/rns/useRnsLabelRecovery";
 import { RNSResolver } from "@/lib/rns/abis";
 import { getPrimaryLabel } from "@/lib/rns/primary-label";
+import { RNS_PRIMARY_LABEL_EVENT } from "@/lib/rns/primary-label";
 import {
   getRecentRegistrations,
   removeRecentRegistration,
@@ -54,12 +55,20 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
   // Recent registrations from localStorage bridge the 30s–few-minute Goldsky lag.
   // Stored on tx success by Senna's buy-name signer and the legacy DomainsPage flow.
   const [recentTick, setRecentTick] = useState(0);
+  const [primaryTick, setPrimaryTick] = useState(0);
   const recentRegistrations = useMemo<RecentRegistration[]>(() => {
     if (!address) return [];
     return getRecentRegistrations(address);
     // recentTick lets the merge re-evaluate after a fresh save without remounting.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, recentTick]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const bump = () => setPrimaryTick((t) => t + 1);
+    window.addEventListener(RNS_PRIMARY_LABEL_EVENT, bump);
+    return () => window.removeEventListener(RNS_PRIMARY_LABEL_EVENT, bump);
+  }, []);
 
   // Re-read localStorage when the tab regains focus or another component
   // dispatches the recent-registration event (Senna's buy-name signer fires
@@ -158,7 +167,7 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
       if (match) return match.label;
     }
     return walletDomains[0].label || null;
-  }, [resolvedDomains, address]);
+  }, [resolvedDomains, address, primaryTick]);
 
   // Fallback: onchain ownership check for hintLabel while subgraph indexes
   const hintNormalized = hintLabel ? normalizeRnsLabel(hintLabel) : "";

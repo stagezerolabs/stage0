@@ -234,7 +234,7 @@ const PresalesPage: React.FC = () => {
           <div className="featured-hero">
             <div>
               <div className="featured-tag-row">
-                <span className="pill pill-live">Featured · Live now</span>
+                <span className="pill pill-live">Featured</span>
                 <span className={`pill ${featured.type === 'token' ? 'pill-token' : 'pill-nft'}`}>
                   {featured.type}
                 </span>

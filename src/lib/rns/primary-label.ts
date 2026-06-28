@@ -26,14 +26,18 @@ export function getPrimaryLabel(address: string): string | null {
   return read()[address.toLowerCase()] ?? null;
 }
 
+export const RNS_PRIMARY_LABEL_EVENT = "rns_primary_label_changed";
+
 export function setPrimaryLabel(address: string, label: string): void {
   const map = read();
   map[address.toLowerCase()] = label.toLowerCase();
   write(map);
+  window.dispatchEvent(new CustomEvent(RNS_PRIMARY_LABEL_EVENT, { detail: { address, label } }));
 }
 
 export function clearPrimaryLabel(address: string): void {
   const map = read();
   delete map[address.toLowerCase()];
   write(map);
+  window.dispatchEvent(new CustomEvent(RNS_PRIMARY_LABEL_EVENT, { detail: { address } }));
 }

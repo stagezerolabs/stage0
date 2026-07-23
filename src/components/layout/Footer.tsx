@@ -47,7 +47,7 @@ const Footer: React.FC<FooterProps> = ({ themeMode }) => {
               />
             </Link>
             <p className="text-[11px] sm:text-body-sm text-ink-faint text-center md:text-left">
-              {currentYear} Stage0 Labs. All Rights Reserved.
+              {currentYear} Stage0 Labs. All rights reserved.
             </p>
           </div>
 

@@ -13,7 +13,7 @@ import { useAccount, useChainId, useReadContract, useReadContracts } from "wagmi
 type UseRnsRegistrarOptions = {
   enabled?: boolean;
   duration?: bigint;
-  action?: "register" | "renew";
+  action?: "register" | "renew" | "fixed_premium_register";
 };
 
 export function useRnsAvailable(label: string, options: UseRnsRegistrarOptions = {}) {

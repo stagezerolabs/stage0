@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { riseTestnet } from '@/config';
+import { fetchRnsNameResolution } from '@/lib/api/rns';
 import {
   useRnsNameStatus,
   useRnsRegister,
@@ -59,6 +60,9 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     } catch {
       // localStorage may be unavailable in some browser modes; safe to ignore.
     }
+    void fetchRnsNameResolution({ name: requestedName, chainId: riseTestnet.id }).catch(() => {
+      // The normal indexer will still catch up; this only accelerates Senna's DB repair.
+    });
     queryClient.invalidateQueries({ queryKey: ['rns', 'api', 'domains', 'owner'] });
     queryClient.invalidateQueries({ queryKey: ['rns', 'subgraph', 'domains', 'owner'] });
   }, [isSuccess, address, requestedName, queryClient]);

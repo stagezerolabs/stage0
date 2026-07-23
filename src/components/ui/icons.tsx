@@ -66,6 +66,7 @@ import {
   UserIcon,
   UserMinusIcon,
   UserPlus as UserPlusIcon,
+  ViewIcon,
   Wallet02Icon,
   ZapIcon,
 } from '@hugeicons/core-free-icons';
@@ -144,6 +145,7 @@ export const User = createIcon(UserIcon);
 export const UserMinus = createIcon(UserMinusIcon);
 export const UserPlus = createIcon(UserPlusIcon);
 export const Users = createIcon(UserGroupIcon);
+export const View = createIcon(ViewIcon);
 export const Wallet = createIcon(Wallet02Icon);
 export const X = createIcon(Cancel01Icon);
 export const XCircle = createIcon(CancelCircleIcon);

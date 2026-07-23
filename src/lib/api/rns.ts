@@ -127,6 +127,30 @@ export type RnsPricingSummary = {
   };
 };
 
+export type RnsPrimaryAuctionSummary = {
+  chainId: number;
+  auctionId: bigint;
+  name: string;
+  fqdn: string;
+  duration: bigint;
+  reservePrice: bigint;
+  startTime: bigint;
+  endTime: bigint;
+  currentExtensionWindow: bigint | null;
+  bidCount: number;
+  highestBidder: Address | null;
+  highestBid: bigint;
+  status: string;
+  rawStatus?: string;
+  winner: Address | null;
+  settledAmount: bigint | null;
+  createdTxHash: `0x${string}` | null;
+  createdBlock: bigint | null;
+  createdAt: string | null;
+  lastIndexedBlock: bigint;
+  lastIndexedAt: string | null;
+};
+
 export type RnsMarketplaceListingSummary = {
   chainId: number;
   listingId: bigint;
@@ -182,8 +206,12 @@ export type RnsReservedNameSummary = {
   saleMode: RnsReservedSaleMode;
   reservePriceWei: bigint | null;
   fixedPriceWei: bigint | null;
+  auctionDurationSeconds: bigint;
   notes: string | null;
   displayOrder: number;
+  primaryAuctionId: bigint | null;
+  activationTxHash: `0x${string}` | null;
+  activatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -216,6 +244,30 @@ type ApiRnsMarketplaceListing = {
   status: string;
   buyer: Address | null;
   purchasedPrice: string | null;
+  createdTxHash: `0x${string}` | null;
+  createdBlock: string | null;
+  createdAt: string | null;
+  lastIndexedBlock: string;
+  lastIndexedAt: string | null;
+};
+
+type ApiRnsPrimaryAuction = {
+  chainId: number;
+  auctionId: string;
+  name: string;
+  fqdn: string;
+  duration: string;
+  reservePrice: string;
+  startTime: string;
+  endTime: string;
+  currentExtensionWindow: string | null;
+  bidCount: number;
+  highestBidder: Address | null;
+  highestBid: string;
+  status: string;
+  rawStatus?: string;
+  winner: Address | null;
+  settledAmount: string | null;
   createdTxHash: `0x${string}` | null;
   createdBlock: string | null;
   createdAt: string | null;
@@ -258,8 +310,12 @@ type ApiRnsReservedName = {
   saleMode: RnsReservedSaleMode;
   reservePriceWei: string | null;
   fixedPriceWei: string | null;
+  auctionDurationSeconds?: string;
   notes: string | null;
   displayOrder: number;
+  primaryAuctionId: string | null;
+  activationTxHash: `0x${string}` | null;
+  activatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -369,6 +425,32 @@ function toMarketplaceAuction(raw: ApiRnsMarketplaceAuction): RnsMarketplaceAuct
   };
 }
 
+function toPrimaryAuction(raw: ApiRnsPrimaryAuction): RnsPrimaryAuctionSummary {
+  return {
+    chainId: raw.chainId,
+    auctionId: BigInt(raw.auctionId),
+    name: raw.name,
+    fqdn: raw.fqdn,
+    duration: BigInt(raw.duration),
+    reservePrice: BigInt(raw.reservePrice),
+    startTime: BigInt(raw.startTime),
+    endTime: BigInt(raw.endTime),
+    currentExtensionWindow: raw.currentExtensionWindow ? BigInt(raw.currentExtensionWindow) : null,
+    bidCount: raw.bidCount,
+    highestBidder: raw.highestBidder,
+    highestBid: BigInt(raw.highestBid),
+    status: raw.status,
+    rawStatus: raw.rawStatus,
+    winner: raw.winner,
+    settledAmount: raw.settledAmount ? BigInt(raw.settledAmount) : null,
+    createdTxHash: raw.createdTxHash,
+    createdBlock: raw.createdBlock ? BigInt(raw.createdBlock) : null,
+    createdAt: raw.createdAt,
+    lastIndexedBlock: BigInt(raw.lastIndexedBlock),
+    lastIndexedAt: raw.lastIndexedAt,
+  };
+}
+
 function toReservedName(raw: ApiRnsReservedName): RnsReservedNameSummary {
   return {
     id: raw.id,
@@ -380,8 +462,12 @@ function toReservedName(raw: ApiRnsReservedName): RnsReservedNameSummary {
     saleMode: raw.saleMode,
     reservePriceWei: raw.reservePriceWei ? BigInt(raw.reservePriceWei) : null,
     fixedPriceWei: raw.fixedPriceWei ? BigInt(raw.fixedPriceWei) : null,
+    auctionDurationSeconds: BigInt(raw.auctionDurationSeconds ?? "259200"),
     notes: raw.notes,
     displayOrder: raw.displayOrder,
+    primaryAuctionId: raw.primaryAuctionId ? BigInt(raw.primaryAuctionId) : null,
+    activationTxHash: raw.activationTxHash,
+    activatedAt: raw.activatedAt,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };
@@ -465,7 +551,7 @@ export async function resolveRnsAddressInput(input: {
 }
 
 export async function fetchRnsPriceQuote(input: {
-  action: 'register' | 'renew';
+  action: 'register' | 'renew' | 'fixed_premium_register';
   name: string;
   beneficiary: Address;
   chainId: number;
@@ -545,6 +631,22 @@ export async function fetchRnsMarketplaceListings(input: {
 
   const payload = (await response.json()) as { listings?: ApiRnsMarketplaceListing[] };
   return (payload.listings ?? []).map(toMarketplaceListing);
+}
+
+export async function fetchRnsPrimaryAuctions(input: {
+  chainId: number;
+  limit?: number;
+}): Promise<RnsPrimaryAuctionSummary[]> {
+  const params = new URLSearchParams({ chainId: String(input.chainId) });
+  if (input.limit) params.set("limit", String(input.limit));
+  const response = await fetch(`${SENNA_API_URL}/api/public/rns/auctions?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(`RNS primary auctions request failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { auctions?: ApiRnsPrimaryAuction[] };
+  return (payload.auctions ?? []).map(toPrimaryAuction);
 }
 
 export async function fetchRnsMarketplaceAuctions(input: {
@@ -637,6 +739,7 @@ export async function upsertRnsAdminReservedName(input: {
   saleMode?: RnsReservedSaleMode;
   reservePriceWei?: bigint | null;
   fixedPriceWei?: bigint | null;
+  auctionDurationSeconds?: bigint;
   notes?: string | null;
   displayOrder?: number;
 }) {
@@ -653,6 +756,7 @@ export async function upsertRnsAdminReservedName(input: {
       saleMode: input.saleMode,
       reservePriceWei: input.reservePriceWei?.toString() ?? null,
       fixedPriceWei: input.fixedPriceWei?.toString() ?? null,
+      auctionDurationSeconds: input.auctionDurationSeconds?.toString(),
       notes: input.notes ?? null,
       displayOrder: input.displayOrder,
     }),
@@ -665,4 +769,30 @@ export async function upsertRnsAdminReservedName(input: {
 
   const payload = (await response.json()) as { ok: boolean; name: ApiRnsReservedName };
   return toReservedName(payload.name);
+}
+
+export async function activateRnsAdminReservedName(input: {
+  chainId: number;
+  id: number;
+  txHash: Hex;
+}) {
+  const response = await fetch(`${SENNA_API_URL}/api/rns/admin/reserved/activate`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      chainId: input.chainId,
+      id: input.id,
+      txHash: input.txHash,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
+    throw new Error(payload?.detail ?? `RNS reserved name activation failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { ok: boolean; name: ApiRnsReservedName | null };
+  return payload.name ? toReservedName(payload.name) : null;
 }

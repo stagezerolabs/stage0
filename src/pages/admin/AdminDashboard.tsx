@@ -2,20 +2,24 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAccount, useBalance, useReadContract } from 'wagmi';
-import { formatEther, formatUnits, isAddress, parseEther, type Address } from 'viem';
+import { formatEther, formatUnits, isAddress, keccak256, parseEther, stringToBytes, type Address, type Hex } from 'viem';
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { InlineLoading, Spinner } from '@/components/ui/spinner';
 import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from '@/components/ui/icons';
 import { RNSRegistrar } from '@/config';
 import {
+  activateRnsAdminReservedName,
   fetchRnsAdminReservedNames,
+  fetchRnsPrimaryAuctions,
   fetchRnsPricing,
   type RnsPricingSummary,
+  type RnsPrimaryAuctionSummary,
   type RnsReservedNameSummary,
   upsertRnsAdminReservedName,
 } from '@/lib/api/rns';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
+import { useRnsCreatePrimaryAuction, useRnsSetLabelPolicy } from '@/lib/hooks/rns';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useSetFeeRecipient, useSetNFTFactoryProceedsFeeBps } from '@/lib/hooks/useAdminActions';
 import { useTrackedWriteContract } from '@/lib/hooks/useTrackedWriteContract';
@@ -49,8 +53,55 @@ type ReservedNameDraft = {
   enabled: boolean;
   saleMode: 'auction' | 'buy_now';
   priceEth: string;
+  auctionDurationValue: string;
+  auctionDurationUnit: 'days' | 'weeks' | 'months' | 'years';
   displayOrder: string;
 };
+
+type PendingReservedPublish = {
+  id: number;
+  label: string;
+  fqdn: string;
+  saleMode: 'auction' | 'buy_now';
+  reservePrice: bigint;
+  auctionDurationSeconds: bigint;
+  stage: 'policy' | 'auction';
+};
+
+const RNS_DAY_SECONDS = 24n * 60n * 60n;
+const RNS_YEAR_SECONDS = 365n * 24n * 60n * 60n;
+const RNS_MAX_AUCTION_DURATION_SECONDS = 10n * RNS_YEAR_SECONDS;
+const RNS_LABEL_POLICY_AUCTION_ONLY = 2;
+const RNS_LABEL_POLICY_FIXED_PREMIUM = 3;
+
+function toAuctionDurationDraft(seconds: bigint): Pick<ReservedNameDraft, 'auctionDurationValue' | 'auctionDurationUnit'> {
+  if (seconds >= RNS_YEAR_SECONDS && seconds % RNS_YEAR_SECONDS === 0n) {
+    return { auctionDurationValue: String(seconds / RNS_YEAR_SECONDS), auctionDurationUnit: 'years' };
+  }
+  const monthSeconds = 30n * RNS_DAY_SECONDS;
+  if (seconds >= monthSeconds && seconds % monthSeconds === 0n) {
+    return { auctionDurationValue: String(seconds / monthSeconds), auctionDurationUnit: 'months' };
+  }
+  const weekSeconds = 7n * RNS_DAY_SECONDS;
+  if (seconds >= weekSeconds && seconds % weekSeconds === 0n) {
+    return { auctionDurationValue: String(seconds / weekSeconds), auctionDurationUnit: 'weeks' };
+  }
+  return { auctionDurationValue: String(seconds / RNS_DAY_SECONDS), auctionDurationUnit: 'days' };
+}
+
+function parseAuctionDuration(draft: ReservedNameDraft) {
+  const value = Number.parseInt(draft.auctionDurationValue, 10);
+  if (!Number.isInteger(value) || value < 1) return null;
+
+  const multiplier = {
+    days: RNS_DAY_SECONDS,
+    weeks: 7n * RNS_DAY_SECONDS,
+    months: 30n * RNS_DAY_SECONDS,
+    years: RNS_YEAR_SECONDS,
+  }[draft.auctionDurationUnit];
+  const seconds = BigInt(value) * multiplier;
+  return seconds <= RNS_MAX_AUCTION_DURATION_SECONDS ? seconds : null;
+}
 
 function formatUsdValue(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return 'USD loading';
@@ -88,12 +139,37 @@ const AdminDashboard: React.FC = () => {
   const [rnsAdminAction, setRnsAdminAction] = useState<'withdraw' | 'setTreasury' | null>(null);
   const [rnsPricing, setRnsPricing] = useState<RnsPricingSummary | null>(null);
   const [reservedNames, setReservedNames] = useState<RnsReservedNameSummary[]>([]);
+  const [primaryAuctions, setPrimaryAuctions] = useState<RnsPrimaryAuctionSummary[]>([]);
   const [reservedDrafts, setReservedDrafts] = useState<Record<number, ReservedNameDraft>>({});
   const [reservedSearch, setReservedSearch] = useState('');
   const [isLoadingReserved, setIsLoadingReserved] = useState(false);
   const [reservedError, setReservedError] = useState<string | null>(null);
   const [savingReservedIds, setSavingReservedIds] = useState<number[]>([]);
+  const [publishingReservedId, setPublishingReservedId] = useState<number | null>(null);
+  const [pendingReservedPublish, setPendingReservedPublish] = useState<PendingReservedPublish | null>(null);
   const [isReservedInventoryOpen, setIsReservedInventoryOpen] = useState(false);
+
+  const {
+    setLabelPolicy,
+    hash: setRnsPolicyHash,
+    isPending: isSetRnsPolicyPending,
+    isConfirming: isSetRnsPolicyConfirming,
+    isSuccess: isSetRnsPolicySuccess,
+    error: setRnsPolicyError,
+    reset: resetSetRnsPolicy,
+  } = useRnsSetLabelPolicy();
+
+  const {
+    createPrimaryAuction,
+    hash: launchPrimaryAuctionHash,
+    isPending: isLaunchPrimaryAuctionPending,
+    isConfirming: isLaunchPrimaryAuctionConfirming,
+    isSuccess: isLaunchPrimaryAuctionSuccess,
+    error: launchPrimaryAuctionError,
+    reset: resetLaunchPrimaryAuction,
+  } = useRnsCreatePrimaryAuction();
+  const isSettingRnsPolicy = isSetRnsPolicyPending || isSetRnsPolicyConfirming;
+  const isLaunchingPrimaryAuction = isLaunchPrimaryAuctionPending || isLaunchPrimaryAuctionConfirming;
 
   const {
     setFeeRecipient,
@@ -213,6 +289,130 @@ const AdminDashboard: React.FC = () => {
   }, [isProceedsFeeUpdateError, proceedsFeeUpdateError, resetProceedsFeeUpdate]);
 
   useEffect(() => {
+    if (!isSetRnsPolicySuccess) return;
+    resetSetRnsPolicy();
+
+    if (!pendingReservedPublish) {
+      toast.success('RNS sale policy updated on-chain.');
+      return;
+    }
+
+    if (pendingReservedPublish.stage !== 'policy') return;
+
+    if (pendingReservedPublish.saleMode === 'auction') {
+      const startTime = BigInt(Math.floor(Date.now() / 1000) + 120);
+      setPendingReservedPublish((current) =>
+        current ? { ...current, stage: 'auction' } : current,
+      );
+      createPrimaryAuction({
+        name: pendingReservedPublish.label,
+        duration: RNS_YEAR_SECONDS,
+        reservePrice: pendingReservedPublish.reservePrice,
+        minIncrementBps: 500,
+        startTime,
+        endTime: startTime + pendingReservedPublish.auctionDurationSeconds,
+      });
+      return;
+    }
+
+    if (!setRnsPolicyHash) {
+      toast.error('The policy transaction hash is unavailable. Refresh and publish again.');
+      setPublishingReservedId(null);
+      setPendingReservedPublish(null);
+      return;
+    }
+
+    void activateRnsAdminReservedName({
+      chainId,
+      id: pendingReservedPublish.id,
+      txHash: setRnsPolicyHash as Hex,
+    })
+      .then((activated) => {
+        if (activated) {
+          setReservedNames((current) =>
+            current.map((entry) => (entry.id === activated.id ? activated : entry)),
+          );
+        }
+        toast.success(`${pendingReservedPublish.fqdn} is live as a fixed-price sale.`);
+      })
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : 'Could not publish this fixed-price sale.');
+      })
+      .finally(() => {
+        setPublishingReservedId(null);
+        setPendingReservedPublish(null);
+      });
+  }, [
+    chainId,
+    createPrimaryAuction,
+    isSetRnsPolicySuccess,
+    pendingReservedPublish,
+    resetSetRnsPolicy,
+    setRnsPolicyHash,
+  ]);
+
+  useEffect(() => {
+    if (!setRnsPolicyError) return;
+    toast.error(setRnsPolicyError.message.split('\n')[0] ?? 'RNS policy update failed.');
+    setPublishingReservedId(null);
+    setPendingReservedPublish(null);
+    resetSetRnsPolicy();
+  }, [setRnsPolicyError, resetSetRnsPolicy]);
+
+  useEffect(() => {
+    if (!isLaunchPrimaryAuctionSuccess) return;
+    resetLaunchPrimaryAuction();
+
+    if (!pendingReservedPublish || pendingReservedPublish.stage !== 'auction') {
+      toast.success('Primary auction launched.');
+      return;
+    }
+
+    if (!launchPrimaryAuctionHash) {
+      toast.error('The auction transaction hash is unavailable. Refresh the marketplace to verify it.');
+      setPublishingReservedId(null);
+      setPendingReservedPublish(null);
+      return;
+    }
+
+    void activateRnsAdminReservedName({
+      chainId,
+      id: pendingReservedPublish.id,
+      txHash: launchPrimaryAuctionHash as Hex,
+    })
+      .then((activated) => {
+        if (activated) {
+          setReservedNames((current) =>
+            current.map((entry) => (entry.id === activated.id ? activated : entry)),
+          );
+        }
+        void fetchRnsPrimaryAuctions({ chainId, limit: 200 }).then(setPrimaryAuctions);
+        toast.success(`${pendingReservedPublish.fqdn} auction is live.`);
+      })
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : 'Auction launched, but marketplace refresh failed.');
+      })
+      .finally(() => {
+        setPublishingReservedId(null);
+        setPendingReservedPublish(null);
+      });
+  }, [
+    chainId,
+    isLaunchPrimaryAuctionSuccess,
+    launchPrimaryAuctionHash,
+    pendingReservedPublish,
+    resetLaunchPrimaryAuction,
+  ]);
+
+  useEffect(() => {
+    if (!launchPrimaryAuctionError) return;
+    toast.error(launchPrimaryAuctionError.message.split('\n')[0] ?? 'Primary auction launch failed.');
+    setPublishingReservedId(null);
+    setPendingReservedPublish(null);
+    resetLaunchPrimaryAuction();
+  }, [launchPrimaryAuctionError, resetLaunchPrimaryAuction]);
+
+  useEffect(() => {
     if (isRnsAdminSuccess) {
       toast.success(
         rnsAdminAction === 'withdraw'
@@ -257,6 +457,20 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
+    void fetchRnsPrimaryAuctions({ chainId, limit: 200 })
+      .then((auctions) => {
+        if (!cancelled) setPrimaryAuctions(auctions);
+      })
+      .catch(() => {
+        if (!cancelled) setPrimaryAuctions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chainId]);
+
+  useEffect(() => {
+    let cancelled = false;
     setIsLoadingReserved(true);
     fetchRnsAdminReservedNames({ chainId })
       .then((next) => {
@@ -273,6 +487,7 @@ const AdminDashboard: React.FC = () => {
                   enabled: name.enabled,
                   saleMode: name.saleMode,
                   priceEth: formatEditableEth(activePrice),
+                  ...toAuctionDurationDraft(name.auctionDurationSeconds),
                   displayOrder: String(name.displayOrder),
                 },
               ];
@@ -350,6 +565,11 @@ const AdminDashboard: React.FC = () => {
       toast.error(`Display order must be zero or greater for ${name.fqdn}.`);
       return;
     }
+    const auctionDurationSeconds = parseAuctionDuration(draft);
+    if (draft.saleMode === 'auction' && auctionDurationSeconds === null) {
+      toast.error(`Set an auction duration between 1 day and 10 years for ${name.fqdn}.`);
+      return;
+    }
 
     setSavingReservedIds((current) => [...current, name.id]);
     try {
@@ -361,6 +581,7 @@ const AdminDashboard: React.FC = () => {
         saleMode: draft.saleMode,
         reservePriceWei: draft.saleMode === 'auction' ? parsedPrice : null,
         fixedPriceWei: draft.saleMode === 'buy_now' ? parsedPrice : null,
+        auctionDurationSeconds: auctionDurationSeconds ?? name.auctionDurationSeconds,
         displayOrder,
       });
 
@@ -375,6 +596,7 @@ const AdminDashboard: React.FC = () => {
           priceEth: formatEditableEth(
             updated.saleMode === 'buy_now' ? updated.fixedPriceWei : updated.reservePriceWei,
           ),
+          ...toAuctionDurationDraft(updated.auctionDurationSeconds),
           displayOrder: String(updated.displayOrder),
         },
       }));
@@ -383,6 +605,103 @@ const AdminDashboard: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'Could not update reserved name.');
     } finally {
       setSavingReservedIds((current) => current.filter((id) => id !== name.id));
+    }
+  };
+
+  const getReservedDraft = (name: RnsReservedNameSummary) =>
+    reservedDrafts[name.id] ?? {
+      enabled: name.enabled,
+      saleMode: name.saleMode,
+      priceEth: formatEditableEth(name.saleMode === 'buy_now' ? name.fixedPriceWei : name.reservePriceWei),
+      ...toAuctionDurationDraft(name.auctionDurationSeconds),
+      displayOrder: String(name.displayOrder),
+    };
+
+  const handlePublishReservedName = async (name: RnsReservedNameSummary) => {
+    if (!isRnsOwner) {
+      toast.error('Connected wallet is not the RNS owner.');
+      return;
+    }
+
+    const draft = getReservedDraft(name);
+    if (!draft.enabled) {
+      toast.error(`Enable ${name.fqdn} before publishing it.`);
+      return;
+    }
+    const existingLiveAuction = primaryAuctions.find(
+      (auction) =>
+        auction.name.toLowerCase() === name.label.toLowerCase() &&
+        ["active", "scheduled"].includes(auction.status),
+    );
+    if (draft.saleMode === 'auction' && existingLiveAuction) {
+      toast.error(`${name.fqdn} already has a live or scheduled auction.`);
+      return;
+    }
+    if (!draft.priceEth.trim()) {
+      toast.error(`Set a price for ${name.fqdn}.`);
+      return;
+    }
+
+    let price: bigint;
+    try {
+      price = parseEther(draft.priceEth.trim());
+    } catch {
+      toast.error(`Enter a valid ETH price for ${name.fqdn}.`);
+      return;
+    }
+    if (price <= 0n) {
+      toast.error(`Price must be greater than zero for ${name.fqdn}.`);
+      return;
+    }
+
+    const displayOrder = Number.parseInt(draft.displayOrder, 10);
+    if (!Number.isInteger(displayOrder) || displayOrder < 0) {
+      toast.error(`Priority must be zero or greater for ${name.fqdn}.`);
+      return;
+    }
+    const auctionDurationSeconds = parseAuctionDuration(draft);
+    if (draft.saleMode === 'auction' && auctionDurationSeconds === null) {
+      toast.error(`Set an auction duration between 1 day and 10 years for ${name.fqdn}.`);
+      return;
+    }
+
+    setPublishingReservedId(name.id);
+    try {
+      const updated = await upsertRnsAdminReservedName({
+        chainId,
+        label: name.label,
+        category: name.category,
+        enabled: true,
+        saleMode: draft.saleMode,
+        reservePriceWei: draft.saleMode === 'auction' ? price : null,
+        fixedPriceWei: draft.saleMode === 'buy_now' ? price : null,
+        auctionDurationSeconds: auctionDurationSeconds ?? name.auctionDurationSeconds,
+        displayOrder,
+      });
+
+      setReservedNames((current) =>
+        current.map((entry) => (entry.id === updated.id ? updated : entry)),
+      );
+      setPendingReservedPublish({
+        id: updated.id,
+        label: updated.label,
+        fqdn: updated.fqdn,
+        saleMode: updated.saleMode,
+        reservePrice: price,
+        auctionDurationSeconds: updated.auctionDurationSeconds,
+        stage: 'policy',
+      });
+      setLabelPolicy({
+        labelHash: keccak256(stringToBytes(updated.label)),
+        policy:
+          updated.saleMode === 'buy_now'
+            ? RNS_LABEL_POLICY_FIXED_PREMIUM
+            : RNS_LABEL_POLICY_AUCTION_ONLY,
+      });
+    } catch (error) {
+      setPublishingReservedId(null);
+      setPendingReservedPublish(null);
+      toast.error(error instanceof Error ? error.message : 'Could not prepare this marketplace sale.');
     }
   };
 
@@ -616,7 +935,7 @@ const AdminDashboard: React.FC = () => {
             <span className="text-xs text-ink-faint">{rnsStatusLabel}</span>
           </div>
 
-          <div className="rounded-2xl border border-card-border bg-card-soft p-4">
+          <div className="rounded-2xl border border-border bg-canvas/50 p-4">
             <p className="text-body-sm text-ink-muted">Withdrawable Balance</p>
             <p className="font-display text-display-md text-ink">
               {isLoadingRnsBalance ? <Spinner size="sm" variant="dots" /> : rnsWithdrawableLabel}
@@ -748,7 +1067,7 @@ const AdminDashboard: React.FC = () => {
               placeholder="Search reserved names or categories"
               className="input-field"
             />
-            <div className="rounded-2xl border border-card-border bg-card-soft px-4 py-3 text-body-sm text-ink-muted">
+            <div className="rounded-2xl border border-border bg-canvas/50 px-4 py-3 text-body-sm text-ink-muted">
               Lower numbers show first.
             </div>
           </div>
@@ -759,12 +1078,13 @@ const AdminDashboard: React.FC = () => {
             </div>
           ) : null}
 
-          <div className="max-h-[34rem] overflow-auto rounded-3xl border border-card-border">
-            <div className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_150px_110px_110px] gap-3 border-b border-card-border bg-canvas-alt px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-faint sticky top-0 z-10">
+          <div className="max-h-[34rem] overflow-auto rounded-3xl border border-border">
+            <div className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_170px_190px_110px_110px_150px] gap-3 border-b border-border bg-canvas-alt px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-faint sticky top-0 z-10">
               <span>Name</span>
               <span>Category</span>
               <span>Enabled</span>
               <span>Sale Mode</span>
+              <span>Duration</span>
               <span>Price (ETH)</span>
               <span>
                 Priority{" "}
@@ -772,6 +1092,7 @@ const AdminDashboard: React.FC = () => {
                   (lower first)
                 </span>
               </span>
+              <span>Publish</span>
             </div>
 
             {isLoadingReserved ? (
@@ -796,7 +1117,7 @@ const AdminDashboard: React.FC = () => {
                 return (
                   <div
                     key={name.id}
-                    className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_150px_110px_110px] gap-3 border-b border-card-border/70 px-4 py-4 last:border-b-0 items-start"
+                    className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_170px_190px_110px_110px_150px] gap-3 border-b border-border/70 px-4 py-4 last:border-b-0 items-start"
                   >
                     <div className="min-w-0">
                       <p className="font-display text-body text-ink break-all">{name.fqdn}</p>
@@ -812,7 +1133,7 @@ const AdminDashboard: React.FC = () => {
                         }
                         className="h-4 w-4 rounded border-border"
                       />
-                      <span>{draft?.enabled ?? name.enabled ? 'Live' : 'Off'}</span>
+                      <span>{draft?.enabled ?? name.enabled ? 'On' : 'Off'}</span>
                     </label>
                     <select
                       value={draft?.saleMode ?? name.saleMode}
@@ -822,8 +1143,44 @@ const AdminDashboard: React.FC = () => {
                       className="input-field"
                     >
                       <option value="auction">Auction</option>
-                      <option value="buy_now">Fixed price</option>
+                      <option value="buy_now">Fixed price (until sold)</option>
                     </select>
+                    {(draft?.saleMode ?? name.saleMode) === 'auction' ? (
+                      <div className="grid grid-cols-[72px_minmax(100px,1fr)] gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={draft?.auctionDurationValue ?? toAuctionDurationDraft(name.auctionDurationSeconds).auctionDurationValue}
+                          onChange={(event) =>
+                            handleReservedDraftChange(name.id, 'auctionDurationValue', event.target.value)
+                          }
+                          aria-label={`Auction duration for ${name.fqdn}`}
+                          className="input-field font-mono"
+                        />
+                        <select
+                          value={draft?.auctionDurationUnit ?? toAuctionDurationDraft(name.auctionDurationSeconds).auctionDurationUnit}
+                          onChange={(event) =>
+                            handleReservedDraftChange(
+                              name.id,
+                              'auctionDurationUnit',
+                              event.target.value as ReservedNameDraft['auctionDurationUnit'],
+                            )
+                          }
+                          aria-label={`Auction duration unit for ${name.fqdn}`}
+                          className="input-field"
+                        >
+                          <option value="days">Days</option>
+                          <option value="weeks">Weeks</option>
+                          <option value="months">Months</option>
+                          <option value="years">Years</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-border bg-canvas-alt px-3 py-2 text-body-sm font-semibold text-ink-muted">
+                        Until sold
+                      </div>
+                    )}
                     <input
                       value={draft?.priceEth ?? ''}
                       onChange={(event) =>
@@ -849,6 +1206,44 @@ const AdminDashboard: React.FC = () => {
                       >
                         {isSaving ? <InlineLoading label="Saving..." /> : 'Save'}
                       </button>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-xs text-ink-muted">
+                        <span>{name.activatedAt ? 'Published' : 'Draft'}</span>
+                        {name.primaryAuctionId !== null ? (
+                          <span className="font-mono">Auction #{name.primaryAuctionId.toString()}</span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handlePublishReservedName(name)}
+                        disabled={
+                          !isRnsOwner ||
+                          publishingReservedId !== null ||
+                          isSettingRnsPolicy ||
+                          isLaunchingPrimaryAuction
+                        }
+                        className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {publishingReservedId === name.id ? (
+                          <InlineLoading
+                            label={
+                              pendingReservedPublish?.stage === 'auction'
+                                ? 'Launching...'
+                                : 'Publishing...'
+                            }
+                          />
+                        ) : (draft?.saleMode ?? name.saleMode) === 'auction' ? (
+                          'Publish auction'
+                        ) : (
+                          'Publish fixed sale'
+                        )}
+                      </button>
+                      <p className="text-xs text-ink-muted">
+                        {(draft?.saleMode ?? name.saleMode) === 'auction'
+                          ? 'Requires policy and auction signatures.'
+                          : 'Requires one policy signature.'}
+                      </p>
                     </div>
                   </div>
                 );

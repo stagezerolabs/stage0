@@ -1,5 +1,13 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
-import { fetchRnsPricing, type RnsPricingSummary } from "@/lib/api/rns";
+import {
+  fetchRnsMarketplaceReserved,
+  fetchRnsNameResolution,
+  fetchRnsPrimaryAuctions,
+  fetchRnsPricing,
+  type RnsPrimaryAuctionSummary,
+  type RnsPricingSummary,
+  type RnsReservedNameSummary,
+} from "@/lib/api/rns";
 import {
   AlertTriangle,
   ArrowRight,
@@ -65,13 +73,6 @@ const REGISTRATION_PERIODS = [
   { years: 3, label: "Builder" },
   { years: 5, label: "Diamond hand" },
 ] as const;
-
-const PREMIUM_NAMES = [
-  { label: "ai", bid: "10.0", bids: 23, ends: "4h 12m" },
-  { label: "gm", bid: "8.4", bids: 41, ends: "1d 03h" },
-  { label: "ok", bid: "6.2", bids: 17, ends: "11h 40m" },
-  { label: "vc", bid: "5.0", bids: 9, ends: "2d 06h" },
-];
 
 const WEI_PER_ETH = 1_000_000_000_000_000_000n;
 const MICROS_PER_USD = 1_000_000n;
@@ -153,6 +154,18 @@ function formatExpiry(expiry: bigint | number) {
     dateStyle: "medium",
   });
 }
+
+function getAuctionDisplayPrice(auction: RnsPrimaryAuctionSummary) {
+  return auction.highestBid > 0n ? auction.highestBid : auction.reservePrice;
+}
+
+function getReservedDisplayPrice(name: RnsReservedNameSummary) {
+  return name.saleMode === "buy_now" ? name.fixedPriceWei : name.reservePriceWei;
+}
+
+type ShortMarketItem =
+  | { kind: "auction"; label: string; priceWei: bigint; meta: string; rank: number; key: string }
+  | { kind: "reserved"; label: string; priceWei: bigint; meta: string; rank: number; key: string };
 
 function buildSearchSuggestions(input: string) {
   const clean = normalizeDomainName(input);
@@ -387,23 +400,25 @@ const OwnedNameCard: React.FC<{
           <>
             <button
               type="button"
-              className={`own-btn ${isSoon || isExpired ? "primary" : ""}`}
+              className="own-btn primary"
               onClick={handleRenew}
               disabled={isBusy}
             >
               {renewLabel}
             </button>
-            <Link to="/domains/marketplace" className="own-btn">
-              List
-            </Link>
-            <button
-              type="button"
-              className="own-btn own-btn-release"
-              onClick={handleRelease}
-              disabled={isReleasing}
-            >
-              {isReleasing ? <InlineLoading label="Releasing..." size="xs" /> : "Release"}
-            </button>
+            <div className="own-actions-row">
+              <Link to="/domains/marketplace" className="own-btn">
+                List
+              </Link>
+              <button
+                type="button"
+                className="own-btn own-btn-release"
+                onClick={handleRelease}
+                disabled={isReleasing}
+              >
+                {isReleasing ? <InlineLoading label="Releasing..." size="xs" /> : "Release"}
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -444,6 +459,8 @@ const DomainsPage: React.FC = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [pricing, setPricing] = useState<RnsPricingSummary | null>(null);
+  const [shortNameAuctions, setShortNameAuctions] = useState<RnsPrimaryAuctionSummary[]>([]);
+  const [reservedShortNames, setReservedShortNames] = useState<RnsReservedNameSummary[]>([]);
   const initialQueryName = useMemo(() => {
     const raw =
       (searchParams.get("name") ?? searchParams.get("q"))
@@ -609,17 +626,84 @@ const DomainsPage: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    fetchRnsPricing({ chainId: riseTestnet.id })
+
+    void fetchRnsPricing({ chainId: riseTestnet.id })
       .then((next) => {
         if (!cancelled) setPricing(next);
       })
       .catch(() => {
         if (!cancelled) setPricing(null);
       });
+
+    void fetchRnsPrimaryAuctions({ chainId: riseTestnet.id, limit: 100 })
+      .then((auctions) => {
+        if (cancelled) return;
+        setShortNameAuctions(
+          auctions
+            .filter((auction) => ["active", "scheduled"].includes(auction.status) && auction.name.length <= 4)
+            .sort((a, b) => {
+              const aPrice = getAuctionDisplayPrice(a);
+              const bPrice = getAuctionDisplayPrice(b);
+              if (aPrice === bPrice) return Number(a.endTime - b.endTime);
+              return aPrice > bPrice ? -1 : 1;
+            })
+            .slice(0, 4),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setShortNameAuctions([]);
+      });
+
+    void fetchRnsMarketplaceReserved({ chainId: riseTestnet.id })
+      .then((names) => {
+        if (cancelled) return;
+        setReservedShortNames(
+          names
+            .filter((name) => name.enabled && name.label.length <= 4)
+            .sort((a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label)),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setReservedShortNames([]);
+      });
+
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const shortMarketItems = useMemo<ShortMarketItem[]>(() => {
+    const auctionLabels = new Set(shortNameAuctions.map((auction) => auction.name.toLowerCase()));
+    const reservedRankByLabel = new Map(
+      reservedShortNames.map((name) => [name.label.toLowerCase(), name.displayOrder]),
+    );
+    const reservedItems: ShortMarketItem[] = reservedShortNames
+      .filter((name) => name.saleMode === "buy_now" && !auctionLabels.has(name.label.toLowerCase()))
+      .map((name) => ({
+        kind: "reserved",
+        key: `reserved-${name.chainId}-${name.id}`,
+        label: name.label,
+        priceWei: getReservedDisplayPrice(name) ?? 0n,
+        meta: name.saleMode === "buy_now" ? "Fixed price" : "0 bids",
+        rank: name.displayOrder,
+      }));
+    const auctionItems: ShortMarketItem[] = shortNameAuctions.map((auction) => ({
+      kind: "auction",
+      key: `auction-${auction.auctionId.toString()}`,
+      label: auction.name,
+      priceWei: getAuctionDisplayPrice(auction),
+      meta: `${auction.bidCount} bid${auction.bidCount === 1 ? "" : "s"}`,
+      rank: reservedRankByLabel.get(auction.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER,
+    }));
+
+    return [...reservedItems, ...auctionItems]
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        if (a.priceWei !== b.priceWei) return a.priceWei > b.priceWei ? -1 : 1;
+        return a.label.localeCompare(b.label);
+      })
+      .slice(0, 4);
+  }, [reservedShortNames, shortNameAuctions]);
 
   const nowSec = Math.floor(Date.now() / 1000);
   const ownedExpirySec = Number(ownedExpiry);
@@ -699,12 +783,15 @@ const DomainsPage: React.FC = () => {
       args: [node, "label", registeredName],
     });
     setHintLabel(registeredName);
-    void refetchOwned();
+    void fetchRnsNameResolution({ name: registeredName, chainId }).finally(() => {
+      void refetchOwned();
+    });
     void refetchStatus();
     toast.success(`Registered ${formatDomainDisplay(registeredName)}`);
     resetRegister();
   }, [
     address,
+    chainId,
     isRegisterSuccess,
     normalized,
     refetchOwned,
@@ -1279,8 +1366,7 @@ const DomainsPage: React.FC = () => {
               <motion.section variants={itemVariants}>
                 <div className="own-head">
                   <div>
-                    <div className="eyebrow">Your portfolio</div>
-                    <h2 className="font-display text-2xl text-ink mt-1">
+                    <h2 className="font-display text-2xl text-ink">
                       Your names
                     </h2>
                   </div>
@@ -1382,28 +1468,37 @@ const DomainsPage: React.FC = () => {
                 </Link>
               </div>
               <p className="nm-primary-cap" style={{ marginTop: 6 }}>
-                Premium 1-2 character auctions.
+                Top 4-character and shorter names from the marketplace.
               </p>
               <div className="hot-mini">
-                {PREMIUM_NAMES.map((item) => (
-                  <Link
-                    key={item.label}
-                    to="/domains/marketplace"
-                    className="hot-mini-row"
-                  >
-                    <div className="hot-mini-name">
-                      {item.label}
-                      <span className="tld">.rise</span>
-                    </div>
-                    <div className="hot-mini-right">
-                      <div className="hot-mini-bid">{item.bid} ETH</div>
-                      <div className="hot-mini-usd">
-                        ≈ {formatUsdValue(ethUsd ? Number(item.bid) * ethUsd : null) ?? "USD loading"}
+                {shortMarketItems.length > 0 ? (
+                  shortMarketItems.map((item) => (
+                    <Link
+                      key={item.key}
+                      to="/domains/marketplace"
+                      className="hot-mini-row"
+                    >
+                      <div className="hot-mini-name">
+                        {item.label}
+                        <span className="tld">.rise</span>
                       </div>
-                      <div className="hot-mini-time">{item.ends} left</div>
+                      <div className="hot-mini-right">
+                        <div className="hot-mini-bid">{formatEthValue(item.priceWei)}</div>
+                        <div className="hot-mini-usd">
+                          ≈ {formatUsdValue(ethUsd ? Number(formatEther(item.priceWei)) * ethUsd : null) ?? "USD loading"}
+                        </div>
+                        <div className="hot-mini-time">{item.meta}</div>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <Link to="/domains/marketplace" className="hot-mini-row">
+                    <div className="hot-mini-name">No live short auctions</div>
+                    <div className="hot-mini-right">
+                      <div className="hot-mini-time">Browse market</div>
                     </div>
                   </Link>
-                ))}
+                )}
               </div>
             </motion.section>
           </aside>

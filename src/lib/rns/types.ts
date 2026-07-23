@@ -65,6 +65,8 @@ export type RnsRegisterParams = {
   signature: Hex;
 };
 
+export type RnsRegisterFixedPremiumParams = RnsRegisterParams;
+
 export type RnsRenewParams = {
   name: string;
   duration?: bigint;
@@ -102,6 +104,29 @@ export type RnsBidMarketplaceAuctionParams = {
 
 export type RnsSettleMarketplaceAuctionParams = {
   auctionId: bigint;
+};
+
+export type RnsBidPrimaryAuctionParams = {
+  auctionId: bigint;
+  amount: bigint;
+};
+
+export type RnsSettlePrimaryAuctionParams = {
+  auctionId: bigint;
+};
+
+export type RnsCreatePrimaryAuctionParams = {
+  name: string;
+  duration: bigint;
+  reservePrice: bigint;
+  minIncrementBps: number;
+  startTime: bigint;
+  endTime: bigint;
+};
+
+export type RnsSetLabelPolicyParams = {
+  labelHash: Hex;
+  policy: number;
 };
 
 export type RnsSetResolverParams = {

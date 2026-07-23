@@ -2300,6 +2300,42 @@ export const RNSRegistrar = [
     type: "function",
   },
   {
+    inputs: [
+      { internalType: "string", name: "name", type: "string" },
+      { internalType: "uint256", name: "duration", type: "uint256" },
+      { internalType: "address", name: "resolver_", type: "address" },
+      {
+        internalType: "struct RNSRegistrarV2.PriceQuote",
+        name: "quote",
+        type: "tuple",
+        components: [
+          { internalType: "enum RNSRegistrarV2.QuoteAction", name: "action", type: "uint8" },
+          { internalType: "bytes32", name: "labelHash", type: "bytes32" },
+          { internalType: "address", name: "beneficiary", type: "address" },
+          { internalType: "uint256", name: "duration", type: "uint256" },
+          { internalType: "uint256", name: "priceWei", type: "uint256" },
+          { internalType: "uint256", name: "deadline", type: "uint256" },
+          { internalType: "bytes32", name: "nonce", type: "bytes32" },
+        ],
+      },
+      { internalType: "bytes", name: "sig", type: "bytes" },
+    ],
+    name: "registerFixedPremium",
+    outputs: [{ internalType: "bytes32", name: "node", type: "bytes32" }],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "bytes32", name: "labelHash", type: "bytes32" },
+      { internalType: "enum RNSRegistrarV2.LabelPolicy", name: "policy", type: "uint8" },
+    ],
+    name: "setLabelPolicy",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "priceSigner",
     outputs: [{ internalType: "address", name: "", type: "address" }],

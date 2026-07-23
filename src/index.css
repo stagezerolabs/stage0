@@ -3842,6 +3842,13 @@
   margin-top: 16px;
 }
 
+.mkt-detail-stat {
+  padding: 16px;
+  border: 1px solid rgb(var(--color-border) / 0.6);
+  border-radius: 16px;
+  background: rgb(var(--color-ink) / 0.03);
+}
+
 .hot-bid-lbl,
 .mkt-price-lbl,
 .mkt-stat-label {
@@ -4139,17 +4146,21 @@
 
 .own-actions {
   display: flex;
+  flex-direction: column;
   gap: 9px;
 }
 
-.own-actions.single {
+.own-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
 }
 
 .own-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  width: 100%;
   min-height: 42px;
   padding: 11px;
   border: 1px solid rgb(var(--color-border));
@@ -4183,9 +4194,15 @@
   opacity: 0.6;
 }
 
+.own-btn-release {
+  color: rgb(var(--color-ink-muted));
+  background: transparent;
+}
+
 .own-btn-release:hover {
-  border-color: rgb(var(--color-status-error));
+  border-color: rgb(var(--color-status-error) / 0.6);
   color: rgb(var(--color-status-error));
+  background: rgb(var(--color-status-error) / 0.06);
 }
 
 .own-make-pill {
@@ -4288,7 +4305,7 @@
 
 .mkt-hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -4297,22 +4314,60 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
-.mkt-owned-panel {
-  position: sticky;
-  top: 92px;
+.mkt-owned-section {
+  margin-top: 24px;
 }
 
 .mkt-owned-list {
-  margin-top: 16px;
+  margin-top: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.mkt-owned-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--color-border) / 0.66);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: padding-left 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.mkt-owned-row:hover {
+  padding-left: 3px;
+}
+
+.mkt-owned-row.is-selected {
+  margin-bottom: 6px;
+  padding: 13px 14px;
+  border: 1px solid rgb(var(--color-accent) / 0.35);
+  border-radius: 16px;
+  background: rgb(var(--color-accent) / 0.06);
+}
+
+.mkt-owned-row.is-selected .nm-tier {
+  color: rgb(var(--color-accent));
+  border-color: rgb(var(--color-accent) / 0.4);
+}
+
+.mkt-owned-content {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 18px;
 }
 
 .mkt-auction-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid rgb(var(--color-border) / 0.72);
+  margin-top: 0;
+  padding-left: 24px;
+  border-left: 1px solid rgb(var(--color-border) / 0.72);
 }
 
 .mkt-field {
@@ -4368,12 +4423,303 @@
   padding: 12px 13px;
 }
 
-.mkt-filter-section {
-  margin-top: 4px;
+/* Marketplace listing desk */
+.mkt-owned-panel {
+  overflow: hidden;
 }
 
-.mkt-reserved-section {
-  margin-top: 26px;
+.mkt-owned-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.mkt-owned-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 10px;
+  color: rgb(var(--color-accent));
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.mkt-selected-sale-status {
+  flex: 0 0 auto;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 999px;
+  color: rgb(var(--color-ink-muted));
+  font-size: 11px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.mkt-owned-content {
+  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
+  margin-top: 22px;
+}
+
+.mkt-owned-selector,
+.mkt-auction-form {
+  border: 1px solid rgb(var(--color-border) / 0.85);
+  border-radius: 20px;
+  background: rgb(var(--color-canvas-alt) / 0.5);
+  padding: 14px;
+}
+
+.mkt-form-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mkt-form-block-head > span {
+  color: rgb(var(--color-ink-faint));
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.mkt-owned-list {
+  margin-top: 0;
+}
+
+.mkt-owned-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: rgb(var(--color-canvas) / 0.42);
+  padding: 10px 11px;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.mkt-owned-row + .mkt-owned-row {
+  margin-top: 7px;
+}
+
+.mkt-owned-row:hover {
+  padding-left: 11px;
+  border-color: rgb(var(--color-border));
+  background: rgb(var(--color-canvas));
+  transform: translateY(-1px);
+}
+
+.mkt-owned-row.is-selected {
+  margin-bottom: 0;
+  padding: 10px 11px;
+  border-color: rgb(var(--color-accent) / 0.42);
+  border-radius: 14px;
+  background: rgb(var(--color-accent) / 0.08);
+}
+
+.mkt-owned-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.mkt-auction-form {
+  gap: 14px;
+  padding-left: 14px;
+  border-left: 1px solid rgb(var(--color-border) / 0.85);
+}
+
+.mkt-selected-sale {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 3px 2px 13px;
+  border-bottom: 1px solid rgb(var(--color-border) / 0.75);
+}
+
+.mkt-selected-sale-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mkt-selected-sale-copy strong {
+  overflow: hidden;
+  color: rgb(var(--color-ink));
+  font-family: 'Inconsolata', monospace;
+  font-size: 17px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mkt-form-block {
+  border: 1px solid rgb(var(--color-border) / 0.78);
+  border-radius: 17px;
+  background: rgb(var(--color-canvas) / 0.5);
+  padding: 13px;
+}
+
+.mkt-form-block-head {
+  margin-bottom: 10px;
+}
+
+.mkt-sale-methods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.mkt-sale-method {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 62px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 14px;
+  background: rgb(var(--color-canvas-alt) / 0.58);
+  color: rgb(var(--color-ink-muted));
+  cursor: pointer;
+  padding: 10px;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.mkt-sale-method:hover {
+  border-color: rgb(var(--color-ink-faint) / 0.65);
+  transform: translateY(-1px);
+}
+
+.mkt-sale-method.is-active {
+  border-color: rgb(var(--color-accent) / 0.44);
+  background: rgb(var(--color-accent) / 0.08);
+  color: rgb(var(--color-ink));
+}
+
+.mkt-sale-method-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mkt-sale-method-copy strong {
+  color: inherit;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.mkt-sale-method-copy small {
+  overflow: hidden;
+  color: rgb(var(--color-ink-faint));
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mkt-sale-method-check {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 50%;
+  background: rgb(var(--color-canvas));
+}
+
+.mkt-sale-method.is-active .mkt-sale-method-check {
+  border-color: rgb(var(--color-accent));
+  background: rgb(var(--color-accent));
+  box-shadow: 0 0 0 3px rgb(var(--color-accent) / 0.12);
+}
+
+.mkt-input-shell {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 13px;
+  background: rgb(var(--color-canvas-alt) / 0.68);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.mkt-input-shell:focus-within {
+  border-color: rgb(var(--color-accent) / 0.52);
+  background: rgb(var(--color-canvas));
+  box-shadow: 0 0 0 3px rgb(var(--color-accent) / 0.08);
+}
+
+.mkt-input-shell input,
+.mkt-input-shell input:focus {
+  min-height: 46px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.mkt-input-shell b {
+  flex: 0 0 auto;
+  margin-right: 11px;
+  color: rgb(var(--color-ink-faint));
+  font-family: 'Inconsolata', monospace;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mkt-listing-summary {
+  margin-top: 10px;
+  border-top: 1px solid rgb(var(--color-border) / 0.68);
+  padding-top: 11px;
+}
+
+.mkt-listing-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mkt-listing-summary span {
+  color: rgb(var(--color-ink-muted));
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.mkt-listing-summary strong {
+  color: rgb(var(--color-accent));
+  font-family: 'Inconsolata', monospace;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.mkt-listing-summary p {
+  margin: 5px 0 0;
+  color: rgb(var(--color-ink-faint));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.mkt-listing-action {
+  border-top: 1px solid rgb(var(--color-border) / 0.75);
+  padding-top: 13px;
+}
+
+.mkt-filter-section {
+  margin-top: 4px;
 }
 
 .mkt-grid {
@@ -4493,8 +4839,15 @@
 }
 
 .mkt-card-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(48px, 1fr);
   gap: 10px;
+  width: 100%;
+  margin: 6px 0 10px;
+}
+
+.mkt-card-actions .mkt-card-cta {
+  margin: 0;
 }
 
 .mkt-card-cta {
@@ -4511,7 +4864,7 @@
   font-size: 13px;
   font-weight: 850;
   letter-spacing: 0.01em;
-  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .mkt-card-cta:disabled {
@@ -4519,12 +4872,42 @@
   opacity: 1;
 }
 
-.mkt-card-cta.is-auction {
+.mkt-card-cta.is-auction,
+.mkt-card-view {
   background:
     linear-gradient(135deg, rgb(var(--color-accent-secondary) / 0.2), rgb(var(--color-accent-secondary) / 0.09));
   border-color: rgb(var(--color-accent-secondary) / 0.28);
   color: rgb(var(--color-accent-secondary));
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.mkt-card-cta.is-auction:not(:disabled):hover,
+.mkt-card-view:hover {
+  border-color: rgb(var(--color-accent-secondary) / 0.56);
+  background:
+    linear-gradient(135deg, rgb(var(--color-accent-secondary) / 0.3), rgb(var(--color-accent-secondary) / 0.14));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 10px 24px rgb(var(--color-accent-secondary) / 0.12);
+  transform: translateY(-2px);
+}
+
+.mkt-card-view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 44px;
+  border: 1px solid rgb(var(--color-accent-secondary) / 0.28);
+  border-radius: 15px;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.mkt-card-view:hover {
+  color: rgb(var(--color-accent-secondary));
+}
+
+.mkt-card-view:focus-visible {
+  outline: 2px solid rgb(var(--color-accent-secondary) / 0.7);
+  outline-offset: 2px;
 }
 
 .mkt-card-watch {
@@ -4586,8 +4969,7 @@
     grid-template-columns: 1fr;
   }
 
-  .names-side-column,
-  .mkt-owned-panel {
+  .names-side-column {
     position: static;
   }
 
@@ -4598,6 +4980,15 @@
   .mkt-featured-grid,
   .mkt-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mkt-owned-content {
+    grid-template-columns: 1fr;
+  }
+
+  .mkt-auction-form {
+    padding: 14px;
+    border: 1px solid rgb(var(--color-border) / 0.85);
   }
 }
 
@@ -5075,5 +5466,89 @@
   .ai-chat {
     width: min(420px, calc(100vw - 24px));
     height: calc(100svh - 120px);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────── *
+ *  Mobile pass — /domains, /domains/marketplace, /my-nfts.             *
+ *  Grids already collapse at 1080/900/760; these tune phone widths.    *
+ * ──────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* /domains — owned-name cards */
+  .own-card {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .own-name {
+    font-size: 21px;
+  }
+
+  .own-btn {
+    min-height: 44px;
+  }
+
+  /* /domains/marketplace — list panel + auction drawer */
+  .mkt-owned-list {
+    max-height: 260px;
+  }
+
+  .mkt-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mkt-owned-heading {
+    align-items: flex-end;
+  }
+
+  .mkt-form-block-head > span {
+    display: none;
+  }
+
+  .mkt-detail-stat {
+    padding: 13px;
+  }
+
+  .mkt-price-eth {
+    font-size: 18px;
+  }
+
+  /* /my-nfts — holdings cards */
+  .holding-info {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mkt-owned-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mkt-sale-methods {
+    grid-template-columns: 1fr;
+  }
+
+  .mkt-selected-sale-status {
+    display: none;
+  }
+
+  /* /domains */
+  .own-card {
+    padding: 14px;
+  }
+
+  .own-name {
+    font-size: 20px;
+  }
+
+  /* /my-nfts — tighten the 2-up thumbnail grid */
+  .holdings-grid {
+    gap: 10px;
+  }
+
+  .holding-img {
+    font-size: 28px;
   }
 }

@@ -1,15 +1,20 @@
 import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
 import { useRnsNode } from "@/lib/hooks/rns/useRnsNode";
-import { RNSMarketplaceEscrow, RNSRegistrar, RNSRegistry, RNSResolver } from "@/lib/rns/abis";
+import { RNSAuctionHouse, RNSMarketplaceEscrow, RNSRegistrar, RNSRegistry, RNSResolver } from "@/lib/rns/abis";
 import { RNS_DEFAULT_REGISTRATION_DURATION } from "@/lib/rns/constants";
 import type {
   RnsCreateMarketplaceAuctionParams,
   RnsCreateMarketplaceListingParams,
   RnsBuyMarketplaceListingParams,
   RnsBidMarketplaceAuctionParams,
+  RnsBidPrimaryAuctionParams,
+  RnsCreatePrimaryAuctionParams,
   RnsRegisterParams,
+  RnsRegisterFixedPremiumParams,
   RnsReleaseParams,
   RnsRenewParams,
+  RnsSetLabelPolicyParams,
+  RnsSettlePrimaryAuctionParams,
   RnsSettleMarketplaceAuctionParams,
   RnsSetAddrParams,
   RnsSetResolverParams,
@@ -46,6 +51,29 @@ export function useRnsRegister() {
   );
 
   return { ...write, register };
+}
+
+export function useRnsRegisterFixedPremium() {
+  const { registrar } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const registerFixedPremium = useCallback(
+    (params: RnsRegisterFixedPremiumParams) => {
+      const name = normalizeRnsLabel(params.name);
+      const duration = params.duration ?? RNS_DEFAULT_REGISTRATION_DURATION;
+
+      write.writeContract({
+        address: registrar,
+        abi: RNSRegistrar,
+        functionName: "registerFixedPremium",
+        args: [name, duration, params.resolver ?? "0x0000000000000000000000000000000000000000", params.quote, params.signature],
+        value: params.value ?? params.quote.priceWei,
+      });
+    },
+    [registrar, write],
+  );
+
+  return { ...write, registerFixedPremium };
 }
 
 export function useRnsRenew() {
@@ -117,6 +145,33 @@ export function useRnsCreateMarketplaceAuction() {
   return { ...write, createAuction };
 }
 
+export function useRnsCreatePrimaryAuction() {
+  const { auctionHouse } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const createPrimaryAuction = useCallback(
+    (params: RnsCreatePrimaryAuctionParams) => {
+      const name = normalizeRnsLabel(params.name);
+      write.writeContract({
+        address: auctionHouse,
+        abi: RNSAuctionHouse,
+        functionName: "createAuction",
+        args: [
+          name,
+          params.duration,
+          params.reservePrice,
+          BigInt(params.minIncrementBps),
+          params.startTime,
+          params.endTime,
+        ],
+      });
+    },
+    [auctionHouse, write],
+  );
+
+  return { ...write, createPrimaryAuction };
+}
+
 export function useRnsCreateMarketplaceListing() {
   const { marketplace } = useRnsContracts();
   const write = useRnsWrite();
@@ -177,6 +232,26 @@ export function useRnsBidMarketplaceAuction() {
   return { ...write, bidAuction };
 }
 
+export function useRnsBidPrimaryAuction() {
+  const { auctionHouse } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const bidPrimaryAuction = useCallback(
+    (params: RnsBidPrimaryAuctionParams) => {
+      write.writeContract({
+        address: auctionHouse,
+        abi: RNSAuctionHouse,
+        functionName: "bid",
+        args: [params.auctionId],
+        value: params.amount,
+      });
+    },
+    [auctionHouse, write],
+  );
+
+  return { ...write, bidPrimaryAuction };
+}
+
 export function useRnsSettleMarketplaceAuction() {
   const { marketplace } = useRnsContracts();
   const write = useRnsWrite();
@@ -196,6 +271,44 @@ export function useRnsSettleMarketplaceAuction() {
   return { ...write, settleAuction };
 }
 
+export function useRnsSettlePrimaryAuction() {
+  const { auctionHouse } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const settlePrimaryAuction = useCallback(
+    (params: RnsSettlePrimaryAuctionParams) => {
+      write.writeContract({
+        address: auctionHouse,
+        abi: RNSAuctionHouse,
+        functionName: "settle",
+        args: [params.auctionId],
+      });
+    },
+    [auctionHouse, write],
+  );
+
+  return { ...write, settlePrimaryAuction };
+}
+
+export function useRnsSetLabelPolicy() {
+  const { registrar } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const setLabelPolicy = useCallback(
+    (params: RnsSetLabelPolicyParams) => {
+      write.writeContract({
+        address: registrar,
+        abi: RNSRegistrar,
+        functionName: "setLabelPolicy",
+        args: [params.labelHash, params.policy],
+      });
+    },
+    [registrar, write],
+  );
+
+  return { ...write, setLabelPolicy };
+}
+
 export function useRnsWithdrawMarketplaceReturns() {
   const { marketplace } = useRnsContracts();
   const write = useRnsWrite();
@@ -210,6 +323,22 @@ export function useRnsWithdrawMarketplaceReturns() {
   }, [marketplace, write]);
 
   return { ...write, withdrawMarketplaceReturns };
+}
+
+export function useRnsWithdrawPrimaryAuctionReturns() {
+  const { auctionHouse } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const withdrawPrimaryAuctionReturns = useCallback(() => {
+    write.writeContract({
+      address: auctionHouse,
+      abi: RNSAuctionHouse,
+      functionName: "withdraw",
+      args: [],
+    });
+  }, [auctionHouse, write]);
+
+  return { ...write, withdrawPrimaryAuctionReturns };
 }
 
 export function useRnsSetResolver(label: string) {

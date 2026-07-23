@@ -1,21 +1,26 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
-import { ArrowRight, Search, Star } from "@/components/ui/icons";
+import { Search, View } from "@/components/ui/icons";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { InlineLoading, LoadingState, Spinner } from "@/components/ui/spinner";
 import {
   fetchRnsMarketplaceAuctions,
   fetchRnsMarketplaceListings,
   fetchRnsMarketplaceReserved,
+  fetchRnsNameResolution,
+  fetchRnsPrimaryAuctions,
   fetchRnsPricing,
   subscribeRnsMarketplaceNotifications,
   type RnsMarketplaceAuctionSummary,
   type RnsMarketplaceListingSummary,
+  type RnsPrimaryAuctionSummary,
   type RnsPricingSummary,
   type RnsReservedNameSummary,
+  type RnsReservedSaleMode,
 } from "@/lib/api/rns";
-import { RNSMarketplaceEscrow } from "@/lib/rns/abis";
+import { RNSAuctionHouse, RNSMarketplaceEscrow } from "@/lib/rns/abis";
 import {
   useRnsApproveForAll,
+  useRnsBidPrimaryAuction,
   useRnsBidMarketplaceAuction,
   useRnsBuyMarketplaceListing,
   useRnsContracts,
@@ -23,22 +28,28 @@ import {
   useRnsCreateMarketplaceListing,
   useRnsIsApproved,
   useRnsOwnedLabel,
+  useRnsRegisterFixedPremium,
+  useRnsRegistrationQuote,
+  useRnsSettlePrimaryAuction,
   useRnsSettleMarketplaceAuction,
   useRnsWithdrawMarketplaceReturns,
+  useRnsWithdrawPrimaryAuctionReturns,
 } from "@/lib/hooks/rns";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { formatEther, parseEther, type Address, type Hex } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 
 type ListingKind = "auction" | "buy-now";
 type SaleMethod = "auction" | "buy-now";
+type AuctionSource = "primary" | "marketplace";
+type AnyAuctionSummary = RnsMarketplaceAuctionSummary | RnsPrimaryAuctionSummary;
 
 type MarketCard =
   | {
       kind: "auction";
+      source: AuctionSource;
       id: string;
       label: string;
       length: number;
@@ -48,7 +59,7 @@ type MarketCard =
       bids: number;
       startsAt: bigint;
       endsAt: bigint;
-      raw: RnsMarketplaceAuctionSummary;
+      raw: AnyAuctionSummary;
     }
   | {
       kind: "buy-now";
@@ -59,6 +70,16 @@ type MarketCard =
       status: string;
       priceWei: bigint;
       raw: RnsMarketplaceListingSummary;
+    }
+  | {
+      kind: "reserved";
+      id: string;
+      label: string;
+      length: number;
+      status: "upcoming";
+      priceWei: bigint;
+      saleMode: RnsReservedSaleMode;
+      raw: RnsReservedNameSummary;
     };
 
 type NotifyModalState =
@@ -77,11 +98,13 @@ type NotifyModalState =
     }
   | {
       kind: "bid-auction";
-      auction: RnsMarketplaceAuctionSummary;
+      source: AuctionSource;
+      auction: AnyAuctionSummary;
     }
   | {
       kind: "watch-auction";
-      auction: RnsMarketplaceAuctionSummary;
+      source: AuctionSource;
+      auction: AnyAuctionSummary;
     }
   | {
       kind: "watch-reserved";
@@ -91,7 +114,8 @@ type NotifyModalState =
 type DetailSheetState =
   | {
       kind: "auction";
-      auction: RnsMarketplaceAuctionSummary;
+      source: AuctionSource;
+      auction: AnyAuctionSummary;
     }
   | {
       kind: "reserved";
@@ -126,6 +150,22 @@ function shortSeller(value: string) {
   return value.endsWith(".rise") ? value : `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
+function reservedPriceWei(reserved: RnsReservedNameSummary) {
+  return reserved.saleMode === "buy_now" ? reserved.fixedPriceWei : reserved.reservePriceWei;
+}
+
+function reservedListingKind(reserved: RnsReservedNameSummary): ListingKind {
+  return reserved.saleMode === "buy_now" ? "buy-now" : "auction";
+}
+
+function reservedSaleLabel(reserved: RnsReservedNameSummary) {
+  return reserved.saleMode === "buy_now" ? "Fixed price" : "Auction";
+}
+
+function cardSaleKind(card: MarketCard): ListingKind {
+  return card.kind === "reserved" ? reservedListingKind(card.raw) : card.kind;
+}
+
 function formatTimeLeft(targetUnix: bigint, nowUnix: number) {
   const diff = Number(targetUnix) - nowUnix;
   if (diff <= 0) return "Ended";
@@ -138,13 +178,96 @@ function formatTimeLeft(targetUnix: bigint, nowUnix: number) {
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
 }
 
+function auctionRuntimeStatus(auction: AnyAuctionSummary, nowUnix: number) {
+  if (auction.status === "settled" || auction.status === "cancelled") return auction.status;
+  if (nowUnix < Number(auction.startTime)) return "scheduled";
+  if (nowUnix < Number(auction.endTime)) return "active";
+  return "ended";
+}
+
 function cardStatusLabel(card: MarketCard, nowUnix: number) {
+  if (card.kind === "reserved") {
+    return card.saleMode === "buy_now" ? "Fixed price" : "0 bids";
+  }
   if (card.kind === "buy-now") return "Instant sale";
-  if (card.status === "scheduled") return `Starts ${formatTimeLeft(card.startsAt, nowUnix)}`;
-  if (card.status === "ended") return "Awaiting settlement";
-  if (card.status === "settled") return "Settled";
-  if (card.status === "cancelled") return "Cancelled";
+  const status = auctionRuntimeStatus(card.raw, nowUnix);
+  if (status === "scheduled") return `Starts ${formatTimeLeft(card.startsAt, nowUnix)}`;
+  if (status === "ended") return "Awaiting settlement";
+  if (status === "settled") return "Settled";
+  if (status === "cancelled") return "Cancelled";
   return `${card.bids} bid${card.bids === 1 ? "" : "s"}`;
+}
+
+function cardRank(card: MarketCard) {
+  return card.kind === "reserved" ? card.raw.displayOrder : Number.MAX_SAFE_INTEGER;
+}
+
+type AuctionMarketCard = Extract<MarketCard, { kind: "auction" }>;
+type ListingMarketCard = Extract<MarketCard, { kind: "buy-now" }>;
+type ReservedMarketCard = Extract<MarketCard, { kind: "reserved" }>;
+
+function auctionToMarketCard(auction: RnsMarketplaceAuctionSummary): AuctionMarketCard {
+  return {
+    kind: "auction",
+    source: "marketplace",
+    id: `auction-${auction.auctionId.toString()}`,
+    label: auction.name,
+    length: auction.name.length,
+    seller: shortSeller(auction.seller),
+    status: auction.status,
+    priceWei: auction.highestBid > 0n ? auction.highestBid : auction.reservePrice,
+    bids: auction.bidCount,
+    startsAt: auction.startTime,
+    endsAt: auction.endTime,
+    raw: auction,
+  };
+}
+
+function primaryAuctionToMarketCard(auction: RnsPrimaryAuctionSummary): AuctionMarketCard {
+  return {
+    kind: "auction",
+    source: "primary",
+    id: `primary-auction-${auction.auctionId.toString()}`,
+    label: auction.name,
+    length: auction.name.length,
+    seller: "Primary market",
+    status: auction.status,
+    priceWei: auction.highestBid > 0n ? auction.highestBid : auction.reservePrice,
+    bids: auction.bidCount,
+    startsAt: auction.startTime,
+    endsAt: auction.endTime,
+    raw: auction,
+  };
+}
+
+function isMarketplaceAuction(auction: AnyAuctionSummary): auction is RnsMarketplaceAuctionSummary {
+  return "node" in auction;
+}
+
+function listingToMarketCard(listing: RnsMarketplaceListingSummary): ListingMarketCard {
+  return {
+    kind: "buy-now",
+    id: `listing-${listing.listingId.toString()}`,
+    label: listing.name,
+    length: listing.name.length,
+    seller: shortSeller(listing.seller),
+    status: listing.status,
+    priceWei: listing.price,
+    raw: listing,
+  };
+}
+
+function reservedToMarketCard(reserved: RnsReservedNameSummary): ReservedMarketCard {
+  return {
+    kind: "reserved",
+    id: `reserved-${reserved.chainId}-${reserved.id}`,
+    label: reserved.label,
+    length: reserved.label.length,
+    status: "upcoming",
+    priceWei: reservedPriceWei(reserved) ?? 0n,
+    saleMode: reserved.saleMode,
+    raw: reserved,
+  };
 }
 
 async function persistNotificationIntent(intent: PendingNotificationIntent | null) {
@@ -161,7 +284,7 @@ async function persistNotificationIntent(intent: PendingNotificationIntent | nul
 
 function DomainsMarketplacePage() {
   const { address, isConnected } = useAccount();
-  const { chainId, marketplace } = useRnsContracts();
+  const { auctionHouse, chainId, marketplace } = useRnsContracts();
   const { allDomains } = useRnsOwnedLabel(address);
   const { isApproved, refetch: refetchApproval } = useRnsIsApproved(address, marketplace);
 
@@ -211,6 +334,15 @@ function DomainsMarketplacePage() {
   } = useRnsBidMarketplaceAuction();
 
   const {
+    bidPrimaryAuction,
+    isPending: isBidPrimaryPending,
+    isConfirming: isBidPrimaryConfirming,
+    isSuccess: isBidPrimarySuccess,
+    error: bidPrimaryError,
+    reset: resetBidPrimary,
+  } = useRnsBidPrimaryAuction();
+
+  const {
     settleAuction,
     isPending: isSettleAuctionPending,
     isConfirming: isSettleAuctionConfirming,
@@ -218,6 +350,24 @@ function DomainsMarketplacePage() {
     error: settleAuctionError,
     reset: resetSettleAuction,
   } = useRnsSettleMarketplaceAuction();
+
+  const {
+    settlePrimaryAuction,
+    isPending: isSettlePrimaryPending,
+    isConfirming: isSettlePrimaryConfirming,
+    isSuccess: isSettlePrimarySuccess,
+    error: settlePrimaryError,
+    reset: resetSettlePrimary,
+  } = useRnsSettlePrimaryAuction();
+
+  const {
+    registerFixedPremium,
+    isPending: isFixedPremiumPending,
+    isConfirming: isFixedPremiumConfirming,
+    isSuccess: isFixedPremiumSuccess,
+    error: fixedPremiumError,
+    reset: resetFixedPremium,
+  } = useRnsRegisterFixedPremium();
 
   const {
     withdrawMarketplaceReturns,
@@ -228,16 +378,27 @@ function DomainsMarketplacePage() {
     reset: resetWithdraw,
   } = useRnsWithdrawMarketplaceReturns();
 
+  const {
+    withdrawPrimaryAuctionReturns,
+    isPending: isWithdrawPrimaryPending,
+    isConfirming: isWithdrawPrimaryConfirming,
+    isSuccess: isWithdrawPrimarySuccess,
+    error: withdrawPrimaryError,
+    reset: resetWithdrawPrimary,
+  } = useRnsWithdrawPrimaryAuctionReturns();
+
   const [kind, setKind] = useState<"all" | ListingKind>("all");
   const [lengthFilter, setLengthFilter] = useState<"all" | "2" | "3" | "4" | "5">("all");
   const [sort, setSort] = useState("hot");
   const [query, setQuery] = useState("");
   const [pricing, setPricing] = useState<RnsPricingSummary | null>(null);
   const [liveListings, setLiveListings] = useState<RnsMarketplaceListingSummary[]>([]);
+  const [primaryAuctions, setPrimaryAuctions] = useState<RnsPrimaryAuctionSummary[]>([]);
   const [liveAuctions, setLiveAuctions] = useState<RnsMarketplaceAuctionSummary[]>([]);
   const [reservedDomains, setReservedDomains] = useState<RnsReservedNameSummary[]>([]);
   const [isLoadingMarket, setIsLoadingMarket] = useState(true);
   const [marketError, setMarketError] = useState<string | null>(null);
+  const [marketRefreshNonce, setMarketRefreshNonce] = useState(0);
   const [nowUnix, setNowUnix] = useState(() => Math.floor(Date.now() / 1000));
   const [saleMethod, setSaleMethod] = useState<SaleMethod>("auction");
   const [selectedOwnedName, setSelectedOwnedName] = useState("");
@@ -251,6 +412,7 @@ function DomainsMarketplacePage() {
   const [pendingAuctionSubscription, setPendingAuctionSubscription] = useState<PendingNotificationIntent | null>(null);
   const [pendingListingSubscription, setPendingListingSubscription] = useState<PendingNotificationIntent | null>(null);
   const [pendingBidSubscription, setPendingBidSubscription] = useState<PendingNotificationIntent | null>(null);
+  const [pendingMarketActionName, setPendingMarketActionName] = useState<string | null>(null);
 
   const ownedNames = useMemo(
     () => allDomains.filter((domain) => Boolean(domain.label) && (domain.custody ?? "wallet") === "wallet"),
@@ -265,66 +427,87 @@ function DomainsMarketplacePage() {
   const ethUsd = pricing?.ethUsd ?? null;
   const reserveUsd = Number(reserveEth) > 0 && ethUsd ? Number(reserveEth) * ethUsd : null;
   const fixedPriceUsd = Number(fixedPriceEth) > 0 && ethUsd ? Number(fixedPriceEth) * ethUsd : null;
+  const fixedReservedInView =
+    detailSheet?.kind === "reserved" && detailSheet.reserved.saleMode === "buy_now"
+      ? detailSheet.reserved
+      : null;
+  const fixedPremiumQuote = useRnsRegistrationQuote(fixedReservedInView?.label ?? "", {
+    action: "fixed_premium_register",
+    enabled: Boolean(isConnected && fixedReservedInView),
+  });
   const isApprovalBusy = isApprovalPending || isApprovalConfirming;
   const isCreateAuctionBusy = isCreateAuctionPending || isCreateAuctionConfirming;
   const isCreateListingBusy = isCreateListingPending || isCreateListingConfirming;
   const isBuyListingBusy = isBuyListingPending || isBuyListingConfirming;
-  const isBidAuctionBusy = isBidAuctionPending || isBidAuctionConfirming;
-  const isSettleAuctionBusy = isSettleAuctionPending || isSettleAuctionConfirming;
+  const isBidAuctionBusy = isBidAuctionPending || isBidAuctionConfirming || isBidPrimaryPending || isBidPrimaryConfirming;
+  const isSettleAuctionBusy =
+    isSettleAuctionPending || isSettleAuctionConfirming || isSettlePrimaryPending || isSettlePrimaryConfirming;
+  const isFixedPremiumBusy = isFixedPremiumPending || isFixedPremiumConfirming;
   const isWithdrawBusy = isWithdrawPending || isWithdrawConfirming;
+  const isWithdrawPrimaryBusy = isWithdrawPrimaryPending || isWithdrawPrimaryConfirming;
 
-  const featuredAuctions = useMemo(() => {
-    return [...liveAuctions]
-      .filter((auction) => auction.status === "active" || auction.status === "scheduled")
+  const reservedMarketCards = useMemo(() => {
+    const liveLabels = new Set(
+      [
+        ...liveAuctions
+          .filter((auction) => !["cancelled", "settled"].includes(auction.status))
+          .map((auction) => auction.name.toLowerCase()),
+        ...primaryAuctions
+          .filter((auction) => !["cancelled", "settled"].includes(auction.status))
+          .map((auction) => auction.name.toLowerCase()),
+        ...liveListings
+          .filter((listing) => listing.status === "active")
+          .map((listing) => listing.name.toLowerCase()),
+      ],
+    );
+
+    return reservedDomains
+      .filter((reserved) => reserved.enabled && reserved.saleMode === "buy_now" && !liveLabels.has(reserved.label.toLowerCase()))
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label))
+      .map(reservedToMarketCard);
+  }, [liveAuctions, liveListings, primaryAuctions, reservedDomains]);
+
+  const featuredShortCards = useMemo(() => {
+    const activeAuctionCards = liveAuctions
+      .filter((auction) => ["active", "scheduled"].includes(auction.status) && auction.name.length <= 4)
+      .map(auctionToMarketCard);
+    const activePrimaryAuctionCards = primaryAuctions
+      .filter((auction) => ["active", "scheduled"].includes(auction.status) && auction.name.length <= 4)
+      .map(primaryAuctionToMarketCard);
+    const rankByLabel = new Map(
+      reservedDomains.map((reserved) => [reserved.label.toLowerCase(), reserved.displayOrder]),
+    );
+
+    return [...reservedMarketCards.filter((card) => card.length <= 4), ...activePrimaryAuctionCards, ...activeAuctionCards]
       .sort((a, b) => {
-        const aValue = a.highestBid > 0n ? a.highestBid : a.reservePrice;
-        const bValue = b.highestBid > 0n ? b.highestBid : b.reservePrice;
-        if (aValue === bValue) return Number(a.endTime - b.endTime);
-        return aValue > bValue ? -1 : 1;
+        const aRank = rankByLabel.get(a.label.toLowerCase()) ?? cardRank(a);
+        const bRank = rankByLabel.get(b.label.toLowerCase()) ?? cardRank(b);
+        if (aRank !== bRank) return aRank - bRank;
+        if (a.priceWei !== b.priceWei) return a.priceWei > b.priceWei ? -1 : 1;
+        if (a.kind === "auction" && b.kind === "auction") {
+          return Number(a.endsAt - b.endsAt);
+        }
+        return a.label.localeCompare(b.label);
       })
       .slice(0, 6);
-  }, [liveAuctions]);
-
-  const featuredReserved = useMemo(() => {
-    return [...reservedDomains]
-      .filter((reserved) => reserved.enabled)
-      .sort((a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label))
-      .slice(0, 12);
-  }, [reservedDomains]);
+  }, [liveAuctions, primaryAuctions, reservedDomains, reservedMarketCards]);
 
   const marketCards = useMemo(() => {
     const cards: MarketCard[] = [
       ...liveAuctions
         .filter((auction) => !["cancelled", "settled"].includes(auction.status))
-        .map((auction) => ({
-          kind: "auction" as const,
-          id: `auction-${auction.auctionId.toString()}`,
-          label: auction.name,
-          length: auction.name.length,
-          seller: shortSeller(auction.seller),
-          status: auction.status,
-          priceWei: auction.highestBid > 0n ? auction.highestBid : auction.reservePrice,
-          bids: auction.bidCount,
-          startsAt: auction.startTime,
-          endsAt: auction.endTime,
-          raw: auction,
-        })),
+        .map(auctionToMarketCard),
+      ...primaryAuctions
+        .filter((auction) => !["cancelled", "settled"].includes(auction.status))
+        .map(primaryAuctionToMarketCard),
       ...liveListings
         .filter((listing) => listing.status === "active")
-        .map((listing) => ({
-          kind: "buy-now" as const,
-          id: `listing-${listing.listingId.toString()}`,
-          label: listing.name,
-          length: listing.name.length,
-          seller: shortSeller(listing.seller),
-          status: listing.status,
-          priceWei: listing.price,
-          raw: listing,
-        })),
+        .map(listingToMarketCard),
+      ...reservedMarketCards.filter((card) => card.length > 4),
     ];
 
     let result = cards.filter((card) => {
-      const kindMatch = kind === "all" || card.kind === kind;
+      const kindMatch = kind === "all" || cardSaleKind(card) === kind;
       const lengthMatch =
         lengthFilter === "all" ||
         (lengthFilter === "5" ? card.length >= 5 : card.length === Number(lengthFilter));
@@ -344,7 +527,9 @@ function DomainsMarketplacePage() {
       });
     } else {
       result = [...result].sort((a, b) => {
-        if (a.kind !== b.kind) return a.kind === "auction" ? -1 : 1;
+        const aKind = cardSaleKind(a);
+        const bKind = cardSaleKind(b);
+        if (aKind !== bKind) return aKind === "auction" ? -1 : 1;
         if (a.kind === "auction" && b.kind === "auction") {
           if (a.status !== b.status) {
             const rank = (status: string) =>
@@ -358,29 +543,38 @@ function DomainsMarketplacePage() {
     }
 
     return result;
-  }, [kind, lengthFilter, liveAuctions, liveListings, query, sort]);
+  }, [kind, lengthFilter, liveAuctions, liveListings, primaryAuctions, query, reservedMarketCards, sort]);
 
   const currentBidAuctionId =
     notifyModal?.kind === "bid-auction" ? notifyModal.auction.auctionId : undefined;
+  const currentBidSource = notifyModal?.kind === "bid-auction" ? notifyModal.source : undefined;
   const { data: minimumNextBid } = useReadContract({
-    address: marketplace,
-    abi: RNSMarketplaceEscrow,
+    address: currentBidSource === "primary" ? auctionHouse : marketplace,
+    abi: currentBidSource === "primary" ? RNSAuctionHouse : RNSMarketplaceEscrow,
     functionName: "minimumNextBid",
     args: currentBidAuctionId !== undefined ? [currentBidAuctionId] : undefined,
     query: { enabled: currentBidAuctionId !== undefined },
   });
   const detailAuctionId = detailSheet?.kind === "auction" ? detailSheet.auction.auctionId : undefined;
+  const detailAuctionSource = detailSheet?.kind === "auction" ? detailSheet.source : undefined;
   const { data: detailMinimumNextBid } = useReadContract({
-    address: marketplace,
-    abi: RNSMarketplaceEscrow,
+    address: detailAuctionSource === "primary" ? auctionHouse : marketplace,
+    abi: detailAuctionSource === "primary" ? RNSAuctionHouse : RNSMarketplaceEscrow,
     functionName: "minimumNextBid",
     args: detailAuctionId !== undefined ? [detailAuctionId] : undefined,
     query: { enabled: detailAuctionId !== undefined },
   });
 
-  const { data: pendingReturns } = useReadContract({
+  const { data: marketplacePendingReturns } = useReadContract({
     address: marketplace,
     abi: RNSMarketplaceEscrow,
+    functionName: "pendingReturns",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address) },
+  });
+  const { data: primaryPendingReturns } = useReadContract({
+    address: auctionHouse,
+    abi: RNSAuctionHouse,
     functionName: "pendingReturns",
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address) },
@@ -399,10 +593,11 @@ function DomainsMarketplacePage() {
     const loadMarket = async (showSpinner: boolean) => {
       if (showSpinner) setIsLoadingMarket(true);
       try {
-        const [nextPricing, nextListings, nextAuctions, nextReserved] = await Promise.all([
+        const [nextPricing, nextListings, nextAuctions, nextPrimaryAuctions, nextReserved] = await Promise.all([
           fetchRnsPricing({ chainId }),
           fetchRnsMarketplaceListings({ chainId, limit: 100 }),
           fetchRnsMarketplaceAuctions({ chainId, limit: 100 }),
+          fetchRnsPrimaryAuctions({ chainId, limit: 100 }),
           fetchRnsMarketplaceReserved({ chainId }),
         ]);
 
@@ -410,6 +605,7 @@ function DomainsMarketplacePage() {
         setPricing(nextPricing);
         setLiveListings(nextListings);
         setLiveAuctions(nextAuctions);
+        setPrimaryAuctions(nextPrimaryAuctions);
         setReservedDomains(nextReserved);
         setMarketError(null);
       } catch (error) {
@@ -429,7 +625,7 @@ function DomainsMarketplacePage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [chainId]);
+  }, [chainId, marketRefreshNonce]);
 
   useEffect(() => {
     if (!selectedOwnedName && ownedNames[0]?.label) {
@@ -456,84 +652,164 @@ function DomainsMarketplacePage() {
     resetApproval();
   }, [approvalError, resetApproval]);
 
+  const refreshMarketAfterNameAction = (label: string | null) => {
+    if (!label) {
+      setMarketRefreshNonce((value) => value + 1);
+      return;
+    }
+
+    void fetchRnsNameResolution({ name: label, chainId })
+      .catch(() => null)
+      .finally(() => {
+        setMarketRefreshNonce((value) => value + 1);
+      });
+  };
+
   useEffect(() => {
     if (!isCreateAuctionSuccess) return;
     toast.success("Auction created. It should appear here as soon as Senna indexes it.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
     void persistNotificationIntent(pendingAuctionSubscription).catch((error) =>
       toast.error(error.message ?? "Could not save auction email updates."),
     );
     setPendingAuctionSubscription(null);
+    setPendingMarketActionName(null);
     setNotifyEmail("");
     resetCreateAuction();
-  }, [isCreateAuctionSuccess, pendingAuctionSubscription, resetCreateAuction]);
+  }, [isCreateAuctionSuccess, pendingAuctionSubscription, pendingMarketActionName, resetCreateAuction]);
 
   useEffect(() => {
     if (!createAuctionError) return;
     toast.error(createAuctionError.message.split("\n")[0] ?? "Auction creation failed.");
     setPendingAuctionSubscription(null);
+    setPendingMarketActionName(null);
     resetCreateAuction();
   }, [createAuctionError, resetCreateAuction]);
 
   useEffect(() => {
     if (!isCreateListingSuccess) return;
     toast.success("Listing created. It should appear here as soon as Senna indexes it.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
     void persistNotificationIntent(pendingListingSubscription).catch((error) =>
       toast.error(error.message ?? "Could not save listing email updates."),
     );
     setPendingListingSubscription(null);
+    setPendingMarketActionName(null);
     setNotifyEmail("");
     resetCreateListing();
-  }, [isCreateListingSuccess, pendingListingSubscription, resetCreateListing]);
+  }, [isCreateListingSuccess, pendingListingSubscription, pendingMarketActionName, resetCreateListing]);
 
   useEffect(() => {
     if (!createListingError) return;
     toast.error(createListingError.message.split("\n")[0] ?? "Listing creation failed.");
     setPendingListingSubscription(null);
+    setPendingMarketActionName(null);
     resetCreateListing();
   }, [createListingError, resetCreateListing]);
 
   useEffect(() => {
     if (!isBuyListingSuccess) return;
     toast.success("Listing purchased.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
+    setPendingMarketActionName(null);
     resetBuyListing();
-  }, [isBuyListingSuccess, resetBuyListing]);
+  }, [isBuyListingSuccess, pendingMarketActionName, resetBuyListing]);
 
   useEffect(() => {
     if (!buyListingError) return;
     toast.error(buyListingError.message.split("\n")[0] ?? "Purchase failed.");
+    setPendingMarketActionName(null);
     resetBuyListing();
   }, [buyListingError, resetBuyListing]);
 
   useEffect(() => {
     if (!isBidAuctionSuccess) return;
     toast.success("Bid submitted. If it lands top, the marketplace will update shortly.");
+    refreshMarketAfterNameAction(null);
     void persistNotificationIntent(pendingBidSubscription).catch((error) =>
       toast.error(error.message ?? "Could not save bid email updates."),
     );
     setPendingBidSubscription(null);
     setNotifyEmail("");
     setBidAmountEth("");
+    setPendingMarketActionName(null);
     resetBidAuction();
   }, [isBidAuctionSuccess, pendingBidSubscription, resetBidAuction]);
+
+  useEffect(() => {
+    if (!isBidPrimarySuccess) return;
+    toast.success("Bid submitted. If it lands top, the auction will update shortly.");
+    refreshMarketAfterNameAction(null);
+    void persistNotificationIntent(pendingBidSubscription).catch((error) =>
+      toast.error(error.message ?? "Could not save bid email updates."),
+    );
+    setPendingBidSubscription(null);
+    setNotifyEmail("");
+    setBidAmountEth("");
+    setPendingMarketActionName(null);
+    resetBidPrimary();
+  }, [isBidPrimarySuccess, pendingBidSubscription, resetBidPrimary]);
 
   useEffect(() => {
     if (!bidAuctionError) return;
     toast.error(bidAuctionError.message.split("\n")[0] ?? "Bid failed.");
     setPendingBidSubscription(null);
+    setPendingMarketActionName(null);
     resetBidAuction();
   }, [bidAuctionError, resetBidAuction]);
 
   useEffect(() => {
+    if (!bidPrimaryError) return;
+    toast.error(bidPrimaryError.message.split("\n")[0] ?? "Bid failed.");
+    setPendingBidSubscription(null);
+    setPendingMarketActionName(null);
+    resetBidPrimary();
+  }, [bidPrimaryError, resetBidPrimary]);
+
+  useEffect(() => {
     if (!isSettleAuctionSuccess) return;
     toast.success("Auction settled.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
+    setPendingMarketActionName(null);
     resetSettleAuction();
-  }, [isSettleAuctionSuccess, resetSettleAuction]);
+  }, [isSettleAuctionSuccess, pendingMarketActionName, resetSettleAuction]);
+
+  useEffect(() => {
+    if (!isSettlePrimarySuccess) return;
+    toast.success("Auction settled.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
+    setPendingMarketActionName(null);
+    resetSettlePrimary();
+  }, [isSettlePrimarySuccess, pendingMarketActionName, resetSettlePrimary]);
 
   useEffect(() => {
     if (!settleAuctionError) return;
     toast.error(settleAuctionError.message.split("\n")[0] ?? "Settlement failed.");
+    setPendingMarketActionName(null);
     resetSettleAuction();
   }, [settleAuctionError, resetSettleAuction]);
+
+  useEffect(() => {
+    if (!settlePrimaryError) return;
+    toast.error(settlePrimaryError.message.split("\n")[0] ?? "Settlement failed.");
+    setPendingMarketActionName(null);
+    resetSettlePrimary();
+  }, [settlePrimaryError, resetSettlePrimary]);
+
+  useEffect(() => {
+    if (!isFixedPremiumSuccess) return;
+    toast.success("Name purchased. It should appear in your names after Senna indexes it.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
+    setPendingMarketActionName(null);
+    resetFixedPremium();
+  }, [isFixedPremiumSuccess, pendingMarketActionName, resetFixedPremium]);
+
+  useEffect(() => {
+    if (!fixedPremiumError) return;
+    toast.error(fixedPremiumError.message.split("\n")[0] ?? "Purchase failed.");
+    setPendingMarketActionName(null);
+    resetFixedPremium();
+  }, [fixedPremiumError, resetFixedPremium]);
 
   useEffect(() => {
     if (!isWithdrawSuccess) return;
@@ -546,6 +822,18 @@ function DomainsMarketplacePage() {
     toast.error(withdrawError.message.split("\n")[0] ?? "Refund withdrawal failed.");
     resetWithdraw();
   }, [withdrawError, resetWithdraw]);
+
+  useEffect(() => {
+    if (!isWithdrawPrimarySuccess) return;
+    toast.success("Primary auction refund withdrawn.");
+    resetWithdrawPrimary();
+  }, [isWithdrawPrimarySuccess, resetWithdrawPrimary]);
+
+  useEffect(() => {
+    if (!withdrawPrimaryError) return;
+    toast.error(withdrawPrimaryError.message.split("\n")[0] ?? "Primary auction refund withdrawal failed.");
+    resetWithdrawPrimary();
+  }, [withdrawPrimaryError, resetWithdrawPrimary]);
 
   const handleOpenComposeModal = () => {
     if (!selectedOwnedName || !selectedOwnedDomain) {
@@ -588,7 +876,7 @@ function DomainsMarketplacePage() {
     });
   };
 
-  const handleOpenBidModal = (auction: RnsMarketplaceAuctionSummary) => {
+  const handleOpenBidModal = (auction: AnyAuctionSummary, source: AuctionSource) => {
     if (!isConnected) {
       toast.error("Connect your wallet to bid.");
       return;
@@ -596,21 +884,21 @@ function DomainsMarketplacePage() {
     setDetailSheet(null);
     setNotifyEmail("");
     setBidAmountEth("");
-    setNotifyModal({ kind: "bid-auction", auction });
+    setNotifyModal({ kind: "bid-auction", source, auction });
   };
 
-  const handleOpenAuctionDetails = (auction: RnsMarketplaceAuctionSummary) => {
-    setDetailSheet({ kind: "auction", auction });
+  const handleOpenAuctionDetails = (auction: AnyAuctionSummary, source: AuctionSource) => {
+    setDetailSheet({ kind: "auction", source, auction });
   };
 
   const handleOpenReservedDetails = (reserved: RnsReservedNameSummary) => {
     setDetailSheet({ kind: "reserved", reserved });
   };
 
-  const handleOpenWatchAuctionModal = (auction: RnsMarketplaceAuctionSummary) => {
+  const handleOpenWatchAuctionModal = (auction: AnyAuctionSummary, source: AuctionSource) => {
     setDetailSheet(null);
     setNotifyEmail("");
-    setNotifyModal({ kind: "watch-auction", auction });
+    setNotifyModal({ kind: "watch-auction", source, auction });
   };
 
   const handleOpenWatchReservedModal = (reserved: RnsReservedNameSummary) => {
@@ -654,6 +942,7 @@ function DomainsMarketplacePage() {
         startTime,
         endTime,
       });
+      setPendingMarketActionName(notifyModal.name);
       setNotifyModal(null);
       return;
     }
@@ -677,6 +966,7 @@ function DomainsMarketplacePage() {
         name: notifyModal.name,
         price: parseEther(notifyModal.priceEth),
       });
+      setPendingMarketActionName(notifyModal.name);
       setNotifyModal(null);
       return;
     }
@@ -693,14 +983,22 @@ function DomainsMarketplacePage() {
           email,
           wallet: address ?? undefined,
           name: notifyModal.auction.name,
-          node: notifyModal.auction.node,
+          node: isMarketplaceAuction(notifyModal.auction) ? notifyModal.auction.node : null,
           auctionId: notifyModal.auction.auctionId,
         });
       }
-      bidAuction({
-        auctionId: notifyModal.auction.auctionId,
-        amount: parseEther(bidAmountEth),
-      });
+      if (notifyModal.source === "primary") {
+        bidPrimaryAuction({
+          auctionId: notifyModal.auction.auctionId,
+          amount: parseEther(bidAmountEth),
+        });
+      } else {
+        bidAuction({
+          auctionId: notifyModal.auction.auctionId,
+          amount: parseEther(bidAmountEth),
+        });
+      }
+      setPendingMarketActionName(notifyModal.auction.name);
       setNotifyModal(null);
       return;
     }
@@ -716,7 +1014,7 @@ function DomainsMarketplacePage() {
         email,
         wallet: address ?? undefined,
         name: notifyModal.auction.name,
-        node: notifyModal.auction.node,
+        node: isMarketplaceAuction(notifyModal.auction) ? notifyModal.auction.node : null,
         auctionId: notifyModal.auction.auctionId,
       })
         .then(() => {
@@ -732,7 +1030,7 @@ function DomainsMarketplacePage() {
 
     if (notifyModal?.kind === "watch-reserved") {
       if (!email) {
-        toast.error("Add an email to watch this reserved name.");
+        toast.error("Add an email to watch this name.");
         return;
       }
       void persistNotificationIntent({
@@ -758,21 +1056,51 @@ function DomainsMarketplacePage() {
       toast.error("Connect your wallet to buy a name.");
       return;
     }
+    setPendingMarketActionName(listing.name);
     buyListing({
       listingId: listing.listingId,
       price: listing.price,
     });
   };
 
-  const handleSettleAuction = (auction: RnsMarketplaceAuctionSummary) => {
+  const handleSettleAuction = (auction: AnyAuctionSummary, source: AuctionSource) => {
     if (!isConnected) {
       toast.error("Connect your wallet to settle this auction.");
       return;
     }
-    settleAuction({ auctionId: auction.auctionId });
+    if (source === "primary") {
+      settlePrimaryAuction({ auctionId: auction.auctionId });
+    } else {
+      settleAuction({ auctionId: auction.auctionId });
+    }
+    setPendingMarketActionName(auction.name);
   };
 
-  const withdrawableEth = pendingReturns ? formatEthCompact(pendingReturns) : null;
+  const handleBuyReservedName = (reserved: RnsReservedNameSummary) => {
+    if (!isConnected) {
+      toast.error("Connect your wallet to buy this name.");
+      return;
+    }
+    if (!fixedPremiumQuote.signedQuote || !fixedPremiumQuote.signature) {
+      toast.error(fixedPremiumQuote.isLoading ? "Preparing purchase quote..." : "Purchase quote is not ready.");
+      return;
+    }
+    registerFixedPremium({
+      name: reserved.label,
+      duration: fixedPremiumQuote.duration,
+      quote: fixedPremiumQuote.signedQuote,
+      signature: fixedPremiumQuote.signature,
+      value: fixedPremiumQuote.price,
+    });
+    setPendingMarketActionName(reserved.label);
+  };
+
+  const marketplaceWithdrawableEth = marketplacePendingReturns
+    ? formatEthCompact(marketplacePendingReturns)
+    : null;
+  const primaryWithdrawableEth = primaryPendingReturns
+    ? formatEthCompact(primaryPendingReturns)
+    : null;
 
   return (
     <motion.div
@@ -798,141 +1126,261 @@ function DomainsMarketplacePage() {
         <div className="rns-card rns-card-pad">
           <div className="names-card-heading">
             <div>
-              <div className="nm-suggest-label">Most contested</div>
-              <h2 className="font-display text-2xl text-ink mt-1">Hottest short names</h2>
+              <h2 className="font-display text-2xl text-ink">Hottest short names</h2>
             </div>
-            <span className="nm-tag nm-tag-auction">Live</span>
+            <span className="nm-tag nm-tag-auction">≤4 chars</span>
           </div>
-          {featuredAuctions.length > 0 ? (
+          {featuredShortCards.length > 0 ? (
             <div className="hot-grid mkt-featured-grid">
-              {featuredAuctions.map((auction) => {
-                const displayBid = auction.highestBid > 0n ? auction.highestBid : auction.reservePrice;
+              {featuredShortCards.map((card) => {
+                const saleKind = cardSaleKind(card);
+                const isAuctionCard = card.kind === "auction";
+                const isReservedCard = card.kind === "reserved";
+                const runtimeStatus = isAuctionCard ? auctionRuntimeStatus(card.raw, nowUnix) : null;
+                const isOwnAuction =
+                  isAuctionCard &&
+                  card.source === "marketplace" &&
+                  isMarketplaceAuction(card.raw) &&
+                  address?.toLowerCase() === card.raw.seller.toLowerCase();
+                const canBid = runtimeStatus === "active" && !isOwnAuction;
+                const bidLabel =
+                  isAuctionCard && card.raw.highestBid > 0n
+                    ? "Top bid"
+                    : saleKind === "auction"
+                      ? "Opening reserve"
+                      : "Price";
                 return (
-                  <div key={auction.auctionId.toString()} className="hot-card big">
+                  <div key={card.id} className="hot-card big">
                     <div className="hot-top">
-                      <span className="nm-tier">{auction.name.length}-char</span>
+                      <span className="nm-tier">{card.length}-char</span>
                     </div>
                     <div className="hot-name">
-                      {auction.name}
+                      {card.label}
                       <span className="tld">.rise</span>
                     </div>
                     <div className="hot-meta">
-                      <div className="hot-bid-lbl">{auction.highestBid > 0n ? "Top bid" : "Reserve"}</div>
-                      <div className="hot-bid">{formatEthCompact(displayBid)} ETH</div>
+                      <div className="hot-bid-lbl">{bidLabel}</div>
+                      <div className="hot-bid">{formatEthCompact(card.priceWei)} ETH</div>
                       <div className="mkt-price-usd-value">
-                        ≈ {formatUsd(ethUsd ? Number(formatEther(displayBid)) * ethUsd : null)}
+                        ≈ {formatUsd(ethUsd ? Number(formatEther(card.priceWei)) * ethUsd : null)}
                       </div>
                     </div>
                     <div className="hot-foot">
-                      <span>{auction.bidCount} bid{auction.bidCount === 1 ? "" : "s"}</span>
+                      <span>
+                        {isAuctionCard
+                          ? `${card.raw.bidCount} bid${card.raw.bidCount === 1 ? "" : "s"}`
+                          : saleKind === "auction"
+                            ? "0 bids"
+                            : "Fixed price"}
+                      </span>
                       <span className="hot-timer">
-                        {auction.status === "scheduled"
-                          ? `Starts ${formatTimeLeft(auction.startTime, nowUnix)}`
-                          : formatTimeLeft(auction.endTime, nowUnix)}
+                        {isAuctionCard
+                          ? runtimeStatus === "scheduled"
+                            ? `Starts ${formatTimeLeft(card.raw.startTime, nowUnix)}`
+                            : runtimeStatus === "active"
+                              ? formatTimeLeft(card.raw.endTime, nowUnix)
+                              : "Ended"
+                          : reservedSaleLabel(card.raw)}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenAuctionDetails(auction)}
-                      className="mkt-card-cta is-auction"
-                    >
-                      View auction
-                    </button>
+                    {isAuctionCard ? (
+                      <div className="mkt-card-actions">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenBidModal(card.raw, card.source)}
+                          disabled={!canBid || isBidAuctionBusy}
+                          className="mkt-card-cta is-auction"
+                        >
+                          {runtimeStatus === "scheduled"
+                            ? "Starts soon"
+                            : runtimeStatus === "ended"
+                              ? "Auction ended"
+                              : isOwnAuction
+                                ? "Your auction"
+                                : isBidAuctionBusy
+                                  ? <InlineLoading label="Submitting..." />
+                                  : "Place bid"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAuctionDetails(card.raw, card.source)}
+                          className="mkt-card-view"
+                          aria-label={`View ${card.label}.rise auction details`}
+                          title="View auction details"
+                        >
+                          <View size={20} aria-hidden="true" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (card.kind === "reserved") handleOpenReservedDetails(card.raw);
+                        }}
+                        className={`mkt-card-cta ${saleKind === "auction" ? "is-auction" : "is-buy-now"}`}
+                      >
+                        {isReservedCard && saleKind === "buy-now" ? "Buy now" : "Bid"}
+                      </button>
+                    )}
                   </div>
                 );
               })}
             </div>
           ) : (
             <div className="rns-card rns-card-pad mkt-empty-state">
-              <h3 className="font-display text-2xl text-ink">No live short-name auctions yet</h3>
+              <h3 className="font-display text-2xl text-ink">No short names listed yet</h3>
               <p className="text-body-sm text-ink-muted mt-2">
-                Once people start listing short .rise names here, they will surface in this strip.
+                Four-character and shorter .rise names will surface in this strip.
               </p>
             </div>
           )}
         </div>
+      </section>
 
-        <aside className="rns-card rns-card-pad mkt-owned-panel">
-          <span className="nm-primary-pill">
-            <Star className="w-3 h-3" />
-            Your names
-          </span>
-          <h2 className="font-display text-2xl text-ink mt-4">Sell your .rise names</h2>
-          <p className="text-body-sm text-ink-muted mt-2">
-            Pick a wallet-held name, then choose whether to run an auction or post a fixed-price sale.
-          </p>
+      <section className="rns-card rns-card-pad mkt-owned-panel mkt-owned-section">
+        <div className="mkt-owned-heading">
+          <div>
+            <div className="mkt-owned-eyebrow">
+              Sell from your wallet
+            </div>
+            <h2 className="font-display text-2xl text-ink">List a .rise name</h2>
+            <p className="text-body-sm text-ink-muted mt-2">
+              Choose a name, pick a sale method, and set your terms.
+            </p>
+          </div>
+        </div>
 
-          {ownedNames.length > 0 ? (
-            <>
+        {ownedNames.length > 0 ? (
+          <div className="mkt-owned-content">
+            <div className="mkt-owned-selector">
               <div className="nm-list mkt-owned-list">
-                {ownedNames.slice(0, 4).map((domain) => (
-                  <div key={domain.node} className="nm-row">
-                    <span className="nm-row-name">
-                      <b>{domain.label}</b>
-                      <span className="tld">.rise</span>
-                    </span>
-                    <span className="nm-tier">Owned</span>
-                  </div>
-                ))}
+                {ownedNames.map((domain) => {
+                  const isSelected = domain.label === selectedOwnedName;
+                  return (
+                    <button
+                      key={domain.node}
+                      type="button"
+                      className={`nm-row mkt-owned-row ${isSelected ? "is-selected" : ""}`}
+                      onClick={() => setSelectedOwnedName(domain.label)}
+                      aria-pressed={isSelected}
+                    >
+                      <span className="mkt-owned-name-wrap">
+                        <span className="nm-row-name">
+                          <b>{domain.label}</b>
+                          <span className="tld">.rise</span>
+                        </span>
+                      </span>
+                      <span className="nm-tier">{isSelected ? "Selected" : "Owned"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mkt-auction-form">
+              <div className="mkt-selected-sale">
+                <div className="mkt-selected-sale-copy">
+                  <strong>{selectedOwnedName}.rise</strong>
+                </div>
+                <span className="mkt-selected-sale-status">Wallet held</span>
               </div>
 
-              <div className="mkt-auction-form">
-                <div className="nm-suggest-label">Sale method</div>
-                <div className="chip-group mb-4">
-                  {[
-                    ["auction", "Auction"],
-                    ["buy-now", "Fixed price"],
-                  ].map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`chip ${saleMethod === value ? "active" : ""}`}
-                      onClick={() => setSaleMethod(value as SaleMethod)}
-                    >
-                      {label}
-                    </button>
-                  ))}
+              <div className="mkt-form-block">
+                <div className="mkt-form-block-head">
+                  <div className="nm-suggest-label">Sale method</div>
+                  <span>How should buyers purchase it?</span>
                 </div>
+                <div className="mkt-sale-methods">
+                  <button
+                    type="button"
+                    className={`mkt-sale-method ${saleMethod === "auction" ? "is-active" : ""}`}
+                    onClick={() => setSaleMethod("auction")}
+                    aria-pressed={saleMethod === "auction"}
+                  >
+                    <span className="mkt-sale-method-copy">
+                      <strong>Auction</strong>
+                      <small>Let buyers compete</small>
+                    </span>
+                    <span className="mkt-sale-method-check" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={`mkt-sale-method ${saleMethod === "buy-now" ? "is-active" : ""}`}
+                    onClick={() => setSaleMethod("buy-now")}
+                    aria-pressed={saleMethod === "buy-now"}
+                  >
+                    <span className="mkt-sale-method-copy">
+                      <strong>Fixed price</strong>
+                      <small>Sell instantly at your price</small>
+                    </span>
+                    <span className="mkt-sale-method-check" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
 
-                <label className="mkt-field">
-                  <span>Choose name</span>
-                  <select value={selectedOwnedName} onChange={(event) => setSelectedOwnedName(event.target.value)}>
-                    {ownedNames.map((domain) => (
-                      <option key={domain.node} value={domain.label}>
-                        {domain.label}.rise
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
+              <div className="mkt-form-block">
                 {saleMethod === "auction" ? (
                   <>
                     <div className="mkt-field-grid">
                       <label className="mkt-field">
                         <span>Opening reserve</span>
-                        <input value={reserveEth} onChange={(event) => setReserveEth(event.target.value)} inputMode="decimal" />
+                        <div className="mkt-input-shell">
+                          <input
+                            aria-label="Opening reserve in ETH"
+                            value={reserveEth}
+                            onChange={(event) => setReserveEth(event.target.value)}
+                            inputMode="decimal"
+                          />
+                          <b>ETH</b>
+                        </div>
                       </label>
                       <label className="mkt-field">
                         <span>Duration</span>
-                        <input value={auctionDays} onChange={(event) => setAuctionDays(event.target.value)} inputMode="numeric" />
+                        <div className="mkt-input-shell">
+                          <input
+                            aria-label="Auction duration in days"
+                            value={auctionDays}
+                            onChange={(event) => setAuctionDays(event.target.value)}
+                            inputMode="numeric"
+                          />
+                          <b>Days</b>
+                        </div>
                       </label>
                     </div>
-                    <div className="mkt-auction-estimate">
-                      Opening reserve: {formatUsd(reserveUsd)}. Each new bid must clear the 5% minimum step.
+                    <div className="mkt-listing-summary">
+                      <div>
+                        <span>Reserve · 5% bid step</span>
+                        <strong>{formatUsd(reserveUsd)}</strong>
+                      </div>
+                      <p>The highest valid bid wins when the auction ends.</p>
                     </div>
                   </>
                 ) : (
                   <>
                     <label className="mkt-field">
                       <span>Fixed price</span>
-                      <input value={fixedPriceEth} onChange={(event) => setFixedPriceEth(event.target.value)} inputMode="decimal" />
+                      <div className="mkt-input-shell">
+                        <input
+                          aria-label="Fixed price in ETH"
+                          value={fixedPriceEth}
+                          onChange={(event) => setFixedPriceEth(event.target.value)}
+                          inputMode="decimal"
+                        />
+                        <b>ETH</b>
+                      </div>
                     </label>
-                    <div className="mkt-auction-estimate">
-                      Fixed price: {formatUsd(fixedPriceUsd)}. Buyers can purchase immediately at this amount.
+                    <div className="mkt-listing-summary">
+                      <div>
+                        <span>Buyer pays</span>
+                        <strong>{formatUsd(fixedPriceUsd)}</strong>
+                      </div>
+                      <p>The first buyer can purchase immediately at this amount.</p>
                     </div>
                   </>
                 )}
+              </div>
 
+              <div className="mkt-listing-action">
                 {!isApproved ? (
                   <button
                     type="button"
@@ -958,94 +1406,39 @@ function DomainsMarketplacePage() {
                         : "List now"}
                   </button>
                 )}
-
-                {pendingReturns && pendingReturns > 0n ? (
-                  <button
-                    type="button"
-                    onClick={() => withdrawMarketplaceReturns()}
-                    disabled={isWithdrawBusy}
-                    className="btn-secondary names-action-btn w-full disabled:opacity-60"
-                  >
-                    {isWithdrawBusy ? <InlineLoading label="Withdrawing..." /> : `Withdraw refunds · ${withdrawableEth} ETH`}
-                  </button>
-                ) : null}
               </div>
-            </>
-          ) : null}
-
-          <Link to="/domains" className="btn-primary names-action-btn mt-5">
-            Register a name <ArrowRight className="w-4 h-4" />
-          </Link>
-        </aside>
-      </section>
-
-      {featuredReserved.length > 0 ? (
-        <section className="mkt-reserved-section">
-          <div className="names-card-heading">
-            <div>
-              <div className="nm-suggest-label">Reserved board</div>
-              <h2 className="font-display text-2xl text-ink mt-1">Curated names going to market</h2>
             </div>
-            <span className="nm-tag nm-tag-search">Admin managed</span>
           </div>
-          <p className="text-body-sm text-ink-muted mt-3 max-w-2xl">
-            These reserved .rise names are being staged from the admin panel. Watch any one to get emailed when it moves.
-          </p>
-          <div className="mkt-grid mt-5">
-            {featuredReserved.map((reserved) => {
-              const priceWei =
-                reserved.saleMode === "buy_now" ? reserved.fixedPriceWei : reserved.reservePriceWei;
-              const usdValue =
-                priceWei && ethUsd ? Number(formatEther(priceWei)) * ethUsd : null;
-              return (
-                <div key={`${reserved.chainId}-${reserved.label}`} className="mkt-card mkt-card-preview">
-                  <div className="mkt-card-top">
-                    <div>
-                      <div className="mkt-card-name">
-                        {reserved.label}
-                        <span className="tld">.rise</span>
-                      </div>
-                      <div className="mkt-card-seller">{reserved.category.replace(/_/g, " ")}</div>
-                    </div>
-                    <span className="nm-tier">
-                      {reserved.saleMode === "buy_now" ? "Fixed price" : "Auction"}
-                    </span>
-                  </div>
-                  <div className="mkt-card-price-row">
-                    <div>
-                      <div className="mkt-price-lbl">
-                        {reserved.saleMode === "buy_now" ? "Target price" : "Opening reserve"}
-                      </div>
-                      <div className="mkt-price-eth">
-                        {priceWei ? `${formatEthCompact(priceWei)} ETH` : "TBA"}
-                      </div>
-                      <div className="mkt-price-usd-value">
-                        ≈ {priceWei ? formatUsd(usdValue) : "Price pending"}
-                      </div>
-                    </div>
-                    <div className="mkt-price-right">
-                      <div className="mkt-price-lbl">State</div>
-                      <div className="mkt-price-meta">Coming up</div>
-                      <div className="mkt-price-subtle">
-                        {reserved.saleMode === "buy_now" ? "Watch sale alerts" : "Watch auction alerts"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mkt-card-actions">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenReservedDetails(reserved)}
-                      className="mkt-card-cta is-auction"
-                    >
-                      View details
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
+        ) : null}
+        {marketplacePendingReturns && marketplacePendingReturns > 0n ? (
+          <button
+            type="button"
+            onClick={() => withdrawMarketplaceReturns()}
+            disabled={isWithdrawBusy}
+            className="btn-secondary names-action-btn mt-4 w-full disabled:opacity-60"
+          >
+            {isWithdrawBusy ? (
+              <InlineLoading label="Withdrawing..." />
+            ) : (
+              `Withdraw marketplace refund · ${marketplaceWithdrawableEth} ETH`
+            )}
+          </button>
+        ) : null}
+        {primaryPendingReturns && primaryPendingReturns > 0n ? (
+          <button
+            type="button"
+            onClick={() => withdrawPrimaryAuctionReturns()}
+            disabled={isWithdrawPrimaryBusy}
+            className="btn-secondary names-action-btn mt-3 w-full disabled:opacity-60"
+          >
+            {isWithdrawPrimaryBusy ? (
+              <InlineLoading label="Withdrawing..." />
+            ) : (
+              `Withdraw primary auction refund · ${primaryWithdrawableEth} ETH`
+            )}
+          </button>
+        ) : null}
+      </section>
 
       <section className="mkt-filter-section">
         <div className="filter-bar">
@@ -1118,72 +1511,126 @@ function DomainsMarketplacePage() {
           <div className="mkt-grid">
             {marketCards.map((card) => {
               const usdValue = ethUsd ? Number(formatEther(card.priceWei)) * ethUsd : null;
-              const isOwnEntry = address?.toLowerCase() === card.raw.seller.toLowerCase();
               const isAuction = card.kind === "auction";
-              const showSettle = isAuction && card.raw.status === "ended";
+              const isReserved = card.kind === "reserved";
+              const saleKind = cardSaleKind(card);
+              const pricePending = isReserved && !reservedPriceWei(card.raw);
+              const runtimeStatus = card.kind === "auction" ? auctionRuntimeStatus(card.raw, nowUnix) : null;
+              const isOwnEntry =
+                card.kind === "buy-now"
+                  ? address?.toLowerCase() === card.raw.seller.toLowerCase()
+                  : card.kind === "auction" && card.source === "marketplace" && isMarketplaceAuction(card.raw)
+                    ? address?.toLowerCase() === card.raw.seller.toLowerCase()
+                    : false;
+              const showSettle = runtimeStatus === "ended";
+              const canBid = runtimeStatus === "active" && !isOwnEntry;
 
               return (
-                <div key={card.id} className="mkt-card">
+                <div key={card.id} className={`mkt-card ${isReserved ? "mkt-card-preview" : ""}`}>
                   <div className="mkt-card-top">
                     <div>
                       <div className="mkt-card-name">
                         {card.label}
                         <span className="tld">.rise</span>
                       </div>
-                      <div className="mkt-card-seller">by {card.seller}</div>
+                      <div className="mkt-card-seller">
+                        {isReserved
+                          ? `${card.length}-char ${reservedSaleLabel(card.raw).toLowerCase()}`
+                          : isAuction && card.source === "primary"
+                            ? `${card.length}-char auction`
+                            : `by ${card.seller}`}
+                      </div>
                     </div>
                   </div>
                   <div className="mkt-card-price-row">
                     <div>
                       <div className="mkt-price-lbl">
-                        {isAuction && card.raw.highestBid > 0n ? "Current bid" : isAuction ? "Reserve" : "Price"}
+                        {isAuction && card.raw.highestBid > 0n
+                          ? "Current bid"
+                          : saleKind === "auction"
+                            ? "Opening reserve"
+                            : "Price"}
                       </div>
-                      <div className="mkt-price-eth">{formatEthCompact(card.priceWei)} ETH</div>
-                      <div className="mkt-price-usd-value">≈ {formatUsd(usdValue)}</div>
+                      <div className="mkt-price-eth">{pricePending ? "TBA" : `${formatEthCompact(card.priceWei)} ETH`}</div>
+                      <div className="mkt-price-usd-value">
+                        ≈ {pricePending ? "Price pending" : formatUsd(usdValue)}
+                      </div>
                     </div>
                     <div className="mkt-price-right">
-                      <div className="mkt-price-lbl">{isAuction ? "Status" : "Length"}</div>
+                      <div className="mkt-price-lbl">{saleKind === "auction" ? "Status" : "Length"}</div>
                       <div className={`mkt-price-meta ${isAuction ? "timer" : ""}`}>
                         {isAuction
-                          ? card.raw.status === "scheduled"
+                          ? runtimeStatus === "scheduled"
                             ? `Starts ${formatTimeLeft(card.raw.startTime, nowUnix)}`
-                            : card.raw.status === "active"
+                            : runtimeStatus === "active"
                               ? formatTimeLeft(card.raw.endTime, nowUnix)
                               : "Ended"
+                          : isReserved
+                            ? reservedSaleLabel(card.raw)
                           : `${card.length} char`}
                       </div>
                       <div className="mkt-price-subtle">{cardStatusLabel(card, nowUnix)}</div>
                     </div>
                   </div>
 
-                  {isAuction ? (
+                  {saleKind === "auction" ? (
                     <div className="mkt-auction-strip">
                       <span className="mkt-auction-pill">
-                        {card.raw.bidCount} bid{card.raw.bidCount === 1 ? "" : "s"}
+                        {isAuction ? `${card.raw.bidCount} bid${card.raw.bidCount === 1 ? "" : "s"}` : "0 bids"}
                       </span>
                       <span className="mkt-auction-pill is-secondary">
-                        {card.raw.highestBidder
+                        {isAuction && card.raw.highestBidder
                           ? `Top ${shortSeller(card.raw.highestBidder)}`
-                          : "Waiting for first bid"}
+                          : isReserved
+                            ? "Waiting for first bid"
+                            : "Waiting for first bid"}
                       </span>
                     </div>
                   ) : null}
 
-                  {showSettle ? (
+                  {isAuction ? (
+                    <div className="mkt-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (showSettle) {
+                            handleSettleAuction(card.raw, card.source);
+                            return;
+                          }
+                          handleOpenBidModal(card.raw, card.source);
+                        }}
+                        disabled={showSettle ? isSettleAuctionBusy : !canBid || isBidAuctionBusy}
+                        className="mkt-card-cta is-auction"
+                      >
+                        {showSettle
+                          ? isSettleAuctionBusy
+                            ? <InlineLoading label="Settling..." />
+                            : "Settle auction"
+                          : runtimeStatus === "scheduled"
+                            ? "Starts soon"
+                            : isOwnEntry
+                              ? "Your auction"
+                              : isBidAuctionBusy
+                                ? <InlineLoading label="Submitting..." />
+                                : "Place bid"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAuctionDetails(card.raw, card.source)}
+                        className="mkt-card-view"
+                        aria-label={`View ${card.label}.rise auction details`}
+                        title="View auction details"
+                      >
+                        <View size={20} aria-hidden="true" />
+                      </button>
+                    </div>
+                  ) : isReserved ? (
                     <button
                       type="button"
-                      onClick={() => handleOpenAuctionDetails(card.raw)}
-                      className="mkt-card-cta is-auction"
+                      onClick={() => handleOpenReservedDetails(card.raw)}
+                      className={`mkt-card-cta ${saleKind === "auction" ? "is-auction" : "is-buy-now"}`}
                     >
-                      View auction
-                    </button>
-                  ) : isAuction ? (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenAuctionDetails(card.raw)}
-                      className="mkt-card-cta is-auction"
-                    >
-                      View auction
+                      {saleKind === "auction" ? "Bid" : "Buy now"}
                     </button>
                   ) : (
                     <button
@@ -1209,19 +1656,6 @@ function DomainsMarketplacePage() {
         ) : null}
       </section>
 
-      <section className="mkt-list-banner">
-        <div>
-          <div className="eyebrow">Live market</div>
-          <h2 className="font-display text-3xl text-ink mt-2">List it for sale or auction</h2>
-          <p className="text-body-sm text-ink-muted mt-3 max-w-md">
-            Sellers can choose fixed-price sales or timed auctions. Bidders can follow auctions with optional email updates.
-          </p>
-        </div>
-        <Link to="/domains" className="btn-primary names-action-btn">
-          Manage names <ArrowRight className="w-4 h-4" />
-        </Link>
-      </section>
-
       {detailSheet ? (
         <ResponsiveDialog
           open={Boolean(detailSheet)}
@@ -1240,18 +1674,20 @@ function DomainsMarketplacePage() {
           }
           description={
             detailSheet.kind === "auction"
-              ? `Seller ${shortSeller(detailSheet.auction.seller)} · ${
-                  detailSheet.auction.status === "scheduled"
+              ? `${
+                  detailSheet.source === "primary"
+                    ? "Primary auction"
+                    : `Seller ${shortSeller(isMarketplaceAuction(detailSheet.auction) ? detailSheet.auction.seller : "Stage0")}`
+                } · ${
+                  auctionRuntimeStatus(detailSheet.auction, nowUnix) === "scheduled"
                     ? "Starts soon"
-                    : detailSheet.auction.status === "active"
+                    : auctionRuntimeStatus(detailSheet.auction, nowUnix) === "active"
                       ? "Live now"
-                      : detailSheet.auction.status === "ended"
+                      : auctionRuntimeStatus(detailSheet.auction, nowUnix) === "ended"
                         ? "Awaiting settlement"
-                        : detailSheet.auction.status
+                        : auctionRuntimeStatus(detailSheet.auction, nowUnix)
                 }`
-              : `${detailSheet.reserved.category.replace(/_/g, " ")} · ${
-                  detailSheet.reserved.saleMode === "buy_now" ? "Fixed-price setup" : "Auction setup"
-                }`
+              : `${reservedSaleLabel(detailSheet.reserved)} · ${formatEthCompact(reservedPriceWei(detailSheet.reserved) ?? 0n)} ETH`
           }
         >
           {detailSheet.kind === "auction" ? (() => {
@@ -1260,20 +1696,24 @@ function DomainsMarketplacePage() {
             const currentBidUsd = ethUsd ? Number(formatEther(currentBid)) * ethUsd : null;
             const nextBidUsd =
               detailMinimumNextBid && ethUsd ? Number(formatEther(detailMinimumNextBid)) * ethUsd : null;
-            const isOwnAuction = address?.toLowerCase() === auction.seller.toLowerCase();
-            const canSettle = auction.status === "ended";
-            const canBid = auction.status === "active" && !isOwnAuction;
+            const isOwnAuction =
+              detailSheet.source === "marketplace" &&
+              isMarketplaceAuction(auction) &&
+              address?.toLowerCase() === auction.seller.toLowerCase();
+            const runtimeStatus = auctionRuntimeStatus(auction, nowUnix);
+            const canSettle = runtimeStatus === "ended";
+            const canBid = runtimeStatus === "active" && !isOwnAuction;
             return (
               <>
                 <div className="eyebrow">Auction details</div>
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-card-border bg-card-soft p-4">
+                  <div className="mkt-detail-stat">
                     <div className="mkt-price-lbl">{auction.highestBid > 0n ? "Current bid" : "Reserve"}</div>
                     <div className="mkt-price-eth mt-1">{formatEthCompact(currentBid)} ETH</div>
                     <div className="mkt-price-usd-value">≈ {formatUsd(currentBidUsd)}</div>
                   </div>
-                  <div className="rounded-2xl border border-card-border bg-card-soft p-4">
+                  <div className="mkt-detail-stat">
                     <div className="mkt-price-lbl">Bid activity</div>
                     <div className="mkt-price-eth mt-1">{auction.bidCount}</div>
                     <div className="mkt-price-subtle">
@@ -1283,25 +1723,25 @@ function DomainsMarketplacePage() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-card-border bg-card-soft p-4">
+                  <div className="mkt-detail-stat">
                     <div className="mkt-price-lbl">Lead wallet</div>
                     <div className="mkt-price-meta mt-1">
                       {auction.highestBidder ? shortSeller(auction.highestBidder) : "No bids yet"}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-card-border bg-card-soft p-4">
+                  <div className="mkt-detail-stat">
                     <div className="mkt-price-lbl">Time</div>
                     <div className="mkt-price-meta mt-1">
-                      {auction.status === "scheduled"
+                      {runtimeStatus === "scheduled"
                         ? `Starts ${formatTimeLeft(auction.startTime, nowUnix)}`
-                        : auction.status === "active"
+                        : runtimeStatus === "active"
                           ? formatTimeLeft(auction.endTime, nowUnix)
                           : "Ended"}
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-3 rounded-2xl border border-card-border bg-card-soft p-4">
+                <div className="mt-3 mkt-detail-stat">
                   <div className="mkt-price-lbl">Next valid bid</div>
                   <div className="mkt-price-eth mt-1">
                     {detailMinimumNextBid ? `${formatEthCompact(detailMinimumNextBid)} ETH` : "Waiting to calculate"}
@@ -1318,7 +1758,7 @@ function DomainsMarketplacePage() {
                   {canSettle ? (
                     <button
                       type="button"
-                      onClick={() => handleSettleAuction(auction)}
+                      onClick={() => handleSettleAuction(auction, detailSheet.source)}
                       disabled={isSettleAuctionBusy}
                       className="btn-primary names-action-btn w-full disabled:opacity-60"
                     >
@@ -1327,11 +1767,11 @@ function DomainsMarketplacePage() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => handleOpenBidModal(auction)}
+                      onClick={() => handleOpenBidModal(auction, detailSheet.source)}
                       disabled={!canBid || isBidAuctionBusy}
                       className="btn-primary names-action-btn w-full disabled:opacity-60"
                     >
-                      {auction.status === "scheduled"
+                      {runtimeStatus === "scheduled"
                         ? "Bidding opens soon"
                         : isOwnAuction
                           ? "Your auction"
@@ -1342,7 +1782,7 @@ function DomainsMarketplacePage() {
                   )}
                   <button
                     type="button"
-                    onClick={() => handleOpenWatchAuctionModal(auction)}
+                    onClick={() => handleOpenWatchAuctionModal(auction, detailSheet.source)}
                     className="btn-secondary names-action-btn w-full"
                   >
                     Watch by email
@@ -1352,11 +1792,9 @@ function DomainsMarketplacePage() {
             );
           })() : (
             <>
-              <div className="eyebrow">Reserved name</div>
-
-              <div className="rounded-2xl border border-card-border bg-card-soft p-4">
+              <div className="mkt-detail-stat">
                 <div className="mkt-price-lbl">
-                  {detailSheet.reserved.saleMode === "buy_now" ? "Target price" : "Opening reserve"}
+                  {detailSheet.reserved.saleMode === "buy_now" ? "Price" : "Opening reserve"}
                 </div>
                 <div className="mkt-price-eth mt-1">
                   {(() => {
@@ -1378,17 +1816,28 @@ function DomainsMarketplacePage() {
                   })()}
                 </div>
                 <p className="mt-3 text-body-sm text-ink-muted">
-                  This name is reserved by Stage0 policy. Join the watchlist and Senna will email you when it moves into a live marketplace flow.
+                  Buy this .rise name instantly at the price shown above.
                 </p>
               </div>
 
               <div className="mt-6 grid gap-3">
                 <button
                   type="button"
-                  onClick={() => handleOpenWatchReservedModal(detailSheet.reserved)}
-                  className="btn-primary names-action-btn w-full"
+                  onClick={() =>
+                    detailSheet.reserved.saleMode === "buy_now"
+                      ? handleBuyReservedName(detailSheet.reserved)
+                      : handleOpenWatchReservedModal(detailSheet.reserved)
+                  }
+                  disabled={detailSheet.reserved.saleMode === "buy_now" && (isFixedPremiumBusy || fixedPremiumQuote.isLoading)}
+                  className="btn-primary names-action-btn w-full disabled:opacity-60"
                 >
-                  Join watchlist
+                  {detailSheet.reserved.saleMode === "buy_now"
+                    ? isFixedPremiumBusy
+                      ? <InlineLoading label="Buying..." />
+                      : fixedPremiumQuote.isLoading
+                        ? <InlineLoading label="Preparing quote..." />
+                        : "Buy now"
+                    : "Bid"}
                 </button>
               </div>
             </>
@@ -1408,16 +1857,18 @@ function DomainsMarketplacePage() {
           }}
           title={
             notifyModal.kind === "bid-auction"
-              ? `Follow ${notifyModal.auction.name}.rise`
+              ? `Bid on ${notifyModal.auction.name}.rise`
               : notifyModal.kind === "watch-auction"
                 ? `Watch ${notifyModal.auction.name}.rise`
-                : notifyModal.kind === "watch-reserved"
+              : notifyModal.kind === "watch-reserved"
                   ? `Watch ${notifyModal.reserved.fqdn}`
-                  : `Follow ${notifyModal.name}.rise`
+                  : notifyModal.kind === "create-auction"
+                    ? `Auction ${notifyModal.name}.rise`
+                    : `List ${notifyModal.name}.rise`
           }
           description={
             notifyModal.kind === "watch-auction" || notifyModal.kind === "watch-reserved"
-              ? "Add an email to join the watchlist for this name. Stage0 will send updates when the auction moves."
+              ? "Add an email to join the watchlist for this name. Stage0 will send updates when the market moves."
               : "Add an email if you want Stage0 to send updates about this listing or auction. Leave it blank if you do not need alerts."
           }
           className="max-w-md"
@@ -1460,7 +1911,11 @@ function DomainsMarketplacePage() {
             <button type="button" onClick={handleConfirmNotifyAction} className="btn-primary names-action-btn w-full">
               {notifyModal.kind === "watch-auction" || notifyModal.kind === "watch-reserved"
                 ? "Join watchlist"
-                : "Continue"}
+                : notifyModal.kind === "bid-auction"
+                  ? "Place bid"
+                  : notifyModal.kind === "create-auction"
+                    ? "Start auction"
+                    : "List name"}
             </button>
           </div>
         </ResponsiveDialog>

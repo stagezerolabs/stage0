@@ -325,6 +325,22 @@ export function useRnsWithdrawMarketplaceReturns() {
   return { ...write, withdrawMarketplaceReturns };
 }
 
+export function useRnsWithdrawMarketplaceProceeds() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const withdrawMarketplaceProceeds = useCallback(() => {
+    write.writeContract({
+      address: marketplace,
+      abi: RNSMarketplaceEscrow,
+      functionName: "withdrawProceeds",
+      args: [],
+    });
+  }, [marketplace, write]);
+
+  return { ...write, withdrawMarketplaceProceeds };
+}
+
 export function useRnsWithdrawPrimaryAuctionReturns() {
   const { auctionHouse } = useRnsContracts();
   const write = useRnsWrite();

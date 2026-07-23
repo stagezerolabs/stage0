@@ -29,6 +29,7 @@ export {
   useRnsSettlePrimaryAuction,
   useRnsSettleMarketplaceAuction,
   useRnsWithdrawMarketplaceReturns,
+  useRnsWithdrawMarketplaceProceeds,
   useRnsWithdrawPrimaryAuctionReturns,
   useRnsSetLabelPolicy,
   useRnsSetResolver,

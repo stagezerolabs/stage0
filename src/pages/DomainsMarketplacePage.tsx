@@ -33,6 +33,7 @@ import {
   useRnsSettlePrimaryAuction,
   useRnsSettleMarketplaceAuction,
   useRnsWithdrawMarketplaceReturns,
+  useRnsWithdrawMarketplaceProceeds,
   useRnsWithdrawPrimaryAuctionReturns,
 } from "@/lib/hooks/rns";
 import { motion } from "framer-motion";
@@ -192,7 +193,7 @@ function cardStatusLabel(card: MarketCard, nowUnix: number) {
   if (card.kind === "buy-now") return "Instant sale";
   const status = auctionRuntimeStatus(card.raw, nowUnix);
   if (status === "scheduled") return `Starts ${formatTimeLeft(card.startsAt, nowUnix)}`;
-  if (status === "ended") return "Awaiting settlement";
+  if (status === "ended") return card.bids === 0 ? "Ended · No bids" : "Ready to finalize";
   if (status === "settled") return "Settled";
   if (status === "cancelled") return "Cancelled";
   return `${card.bids} bid${card.bids === 1 ? "" : "s"}`;
@@ -242,6 +243,33 @@ function primaryAuctionToMarketCard(auction: RnsPrimaryAuctionSummary): AuctionM
 
 function isMarketplaceAuction(auction: AnyAuctionSummary): auction is RnsMarketplaceAuctionSummary {
   return "node" in auction;
+}
+
+function auctionActionKey(source: AuctionSource, auction: AnyAuctionSummary) {
+  return `${source}:${auction.auctionId.toString()}`;
+}
+
+function auctionSettlementLabel(
+  auction: AnyAuctionSummary,
+  source: AuctionSource,
+  address?: Address,
+) {
+  const connectedAddress = address?.toLowerCase();
+  const isSeller =
+    source === "marketplace" &&
+    isMarketplaceAuction(auction) &&
+    connectedAddress === auction.seller.toLowerCase();
+
+  if (auction.bidCount === 0) return isSeller ? "Reclaim name" : "Close auction";
+  if (connectedAddress && connectedAddress === auction.highestBidder?.toLowerCase()) return "Claim name";
+  return isSeller ? "Finalize sale" : "Finalize auction";
+}
+
+function auctionSettlementLoadingLabel(label: string) {
+  if (label === "Claim name") return "Claiming...";
+  if (label === "Reclaim name") return "Reclaiming...";
+  if (label === "Close auction") return "Closing...";
+  return "Finalizing...";
 }
 
 function listingToMarketCard(listing: RnsMarketplaceListingSummary): ListingMarketCard {
@@ -379,6 +407,15 @@ function DomainsMarketplacePage() {
   } = useRnsWithdrawMarketplaceReturns();
 
   const {
+    withdrawMarketplaceProceeds,
+    isPending: isWithdrawProceedsPending,
+    isConfirming: isWithdrawProceedsConfirming,
+    isSuccess: isWithdrawProceedsSuccess,
+    error: withdrawProceedsError,
+    reset: resetWithdrawProceeds,
+  } = useRnsWithdrawMarketplaceProceeds();
+
+  const {
     withdrawPrimaryAuctionReturns,
     isPending: isWithdrawPrimaryPending,
     isConfirming: isWithdrawPrimaryConfirming,
@@ -413,6 +450,9 @@ function DomainsMarketplacePage() {
   const [pendingListingSubscription, setPendingListingSubscription] = useState<PendingNotificationIntent | null>(null);
   const [pendingBidSubscription, setPendingBidSubscription] = useState<PendingNotificationIntent | null>(null);
   const [pendingMarketActionName, setPendingMarketActionName] = useState<string | null>(null);
+  const [pendingBidAuctionKey, setPendingBidAuctionKey] = useState<string | null>(null);
+  const [pendingSettlementAuctionKey, setPendingSettlementAuctionKey] = useState<string | null>(null);
+  const [pendingListingPurchaseId, setPendingListingPurchaseId] = useState<string | null>(null);
 
   const ownedNames = useMemo(
     () => allDomains.filter((domain) => Boolean(domain.label) && (domain.custody ?? "wallet") === "wallet"),
@@ -444,6 +484,7 @@ function DomainsMarketplacePage() {
     isSettleAuctionPending || isSettleAuctionConfirming || isSettlePrimaryPending || isSettlePrimaryConfirming;
   const isFixedPremiumBusy = isFixedPremiumPending || isFixedPremiumConfirming;
   const isWithdrawBusy = isWithdrawPending || isWithdrawConfirming;
+  const isWithdrawProceedsBusy = isWithdrawProceedsPending || isWithdrawProceedsConfirming;
   const isWithdrawPrimaryBusy = isWithdrawPrimaryPending || isWithdrawPrimaryConfirming;
 
   const reservedMarketCards = useMemo(() => {
@@ -565,14 +606,21 @@ function DomainsMarketplacePage() {
     query: { enabled: detailAuctionId !== undefined },
   });
 
-  const { data: marketplacePendingReturns } = useReadContract({
+  const { data: marketplacePendingReturns, refetch: refetchMarketplacePendingReturns } = useReadContract({
     address: marketplace,
     abi: RNSMarketplaceEscrow,
     functionName: "pendingReturns",
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address) },
   });
-  const { data: primaryPendingReturns } = useReadContract({
+  const { data: marketplaceClaimableProceeds, refetch: refetchMarketplaceClaimableProceeds } = useReadContract({
+    address: marketplace,
+    abi: RNSMarketplaceEscrow,
+    functionName: "claimableProceeds",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address) },
+  });
+  const { data: primaryPendingReturns, refetch: refetchPrimaryPendingReturns } = useReadContract({
     address: auctionHouse,
     abi: RNSAuctionHouse,
     functionName: "pendingReturns",
@@ -712,6 +760,7 @@ function DomainsMarketplacePage() {
     toast.success("Listing purchased.");
     refreshMarketAfterNameAction(pendingMarketActionName);
     setPendingMarketActionName(null);
+    setPendingListingPurchaseId(null);
     resetBuyListing();
   }, [isBuyListingSuccess, pendingMarketActionName, resetBuyListing]);
 
@@ -719,6 +768,7 @@ function DomainsMarketplacePage() {
     if (!buyListingError) return;
     toast.error(buyListingError.message.split("\n")[0] ?? "Purchase failed.");
     setPendingMarketActionName(null);
+    setPendingListingPurchaseId(null);
     resetBuyListing();
   }, [buyListingError, resetBuyListing]);
 
@@ -733,6 +783,7 @@ function DomainsMarketplacePage() {
     setNotifyEmail("");
     setBidAmountEth("");
     setPendingMarketActionName(null);
+    setPendingBidAuctionKey(null);
     resetBidAuction();
   }, [isBidAuctionSuccess, pendingBidSubscription, resetBidAuction]);
 
@@ -747,6 +798,7 @@ function DomainsMarketplacePage() {
     setNotifyEmail("");
     setBidAmountEth("");
     setPendingMarketActionName(null);
+    setPendingBidAuctionKey(null);
     resetBidPrimary();
   }, [isBidPrimarySuccess, pendingBidSubscription, resetBidPrimary]);
 
@@ -755,6 +807,7 @@ function DomainsMarketplacePage() {
     toast.error(bidAuctionError.message.split("\n")[0] ?? "Bid failed.");
     setPendingBidSubscription(null);
     setPendingMarketActionName(null);
+    setPendingBidAuctionKey(null);
     resetBidAuction();
   }, [bidAuctionError, resetBidAuction]);
 
@@ -763,6 +816,7 @@ function DomainsMarketplacePage() {
     toast.error(bidPrimaryError.message.split("\n")[0] ?? "Bid failed.");
     setPendingBidSubscription(null);
     setPendingMarketActionName(null);
+    setPendingBidAuctionKey(null);
     resetBidPrimary();
   }, [bidPrimaryError, resetBidPrimary]);
 
@@ -770,15 +824,18 @@ function DomainsMarketplacePage() {
     if (!isSettleAuctionSuccess) return;
     toast.success("Auction settled.");
     refreshMarketAfterNameAction(pendingMarketActionName);
+    void refetchMarketplaceClaimableProceeds();
     setPendingMarketActionName(null);
+    setPendingSettlementAuctionKey(null);
     resetSettleAuction();
-  }, [isSettleAuctionSuccess, pendingMarketActionName, resetSettleAuction]);
+  }, [isSettleAuctionSuccess, pendingMarketActionName, refetchMarketplaceClaimableProceeds, resetSettleAuction]);
 
   useEffect(() => {
     if (!isSettlePrimarySuccess) return;
     toast.success("Auction settled.");
     refreshMarketAfterNameAction(pendingMarketActionName);
     setPendingMarketActionName(null);
+    setPendingSettlementAuctionKey(null);
     resetSettlePrimary();
   }, [isSettlePrimarySuccess, pendingMarketActionName, resetSettlePrimary]);
 
@@ -786,6 +843,7 @@ function DomainsMarketplacePage() {
     if (!settleAuctionError) return;
     toast.error(settleAuctionError.message.split("\n")[0] ?? "Settlement failed.");
     setPendingMarketActionName(null);
+    setPendingSettlementAuctionKey(null);
     resetSettleAuction();
   }, [settleAuctionError, resetSettleAuction]);
 
@@ -793,6 +851,7 @@ function DomainsMarketplacePage() {
     if (!settlePrimaryError) return;
     toast.error(settlePrimaryError.message.split("\n")[0] ?? "Settlement failed.");
     setPendingMarketActionName(null);
+    setPendingSettlementAuctionKey(null);
     resetSettlePrimary();
   }, [settlePrimaryError, resetSettlePrimary]);
 
@@ -814,8 +873,9 @@ function DomainsMarketplacePage() {
   useEffect(() => {
     if (!isWithdrawSuccess) return;
     toast.success("Refund withdrawn.");
+    void refetchMarketplacePendingReturns();
     resetWithdraw();
-  }, [isWithdrawSuccess, resetWithdraw]);
+  }, [isWithdrawSuccess, refetchMarketplacePendingReturns, resetWithdraw]);
 
   useEffect(() => {
     if (!withdrawError) return;
@@ -824,10 +884,24 @@ function DomainsMarketplacePage() {
   }, [withdrawError, resetWithdraw]);
 
   useEffect(() => {
+    if (!isWithdrawProceedsSuccess) return;
+    toast.success("Marketplace proceeds withdrawn.");
+    void refetchMarketplaceClaimableProceeds();
+    resetWithdrawProceeds();
+  }, [isWithdrawProceedsSuccess, refetchMarketplaceClaimableProceeds, resetWithdrawProceeds]);
+
+  useEffect(() => {
+    if (!withdrawProceedsError) return;
+    toast.error(withdrawProceedsError.message.split("\n")[0] ?? "Proceeds withdrawal failed.");
+    resetWithdrawProceeds();
+  }, [withdrawProceedsError, resetWithdrawProceeds]);
+
+  useEffect(() => {
     if (!isWithdrawPrimarySuccess) return;
     toast.success("Primary auction refund withdrawn.");
+    void refetchPrimaryPendingReturns();
     resetWithdrawPrimary();
-  }, [isWithdrawPrimarySuccess, resetWithdrawPrimary]);
+  }, [isWithdrawPrimarySuccess, refetchPrimaryPendingReturns, resetWithdrawPrimary]);
 
   useEffect(() => {
     if (!withdrawPrimaryError) return;
@@ -988,11 +1062,13 @@ function DomainsMarketplacePage() {
         });
       }
       if (notifyModal.source === "primary") {
+        setPendingBidAuctionKey(auctionActionKey("primary", notifyModal.auction));
         bidPrimaryAuction({
           auctionId: notifyModal.auction.auctionId,
           amount: parseEther(bidAmountEth),
         });
       } else {
+        setPendingBidAuctionKey(auctionActionKey("marketplace", notifyModal.auction));
         bidAuction({
           auctionId: notifyModal.auction.auctionId,
           amount: parseEther(bidAmountEth),
@@ -1057,6 +1133,7 @@ function DomainsMarketplacePage() {
       return;
     }
     setPendingMarketActionName(listing.name);
+    setPendingListingPurchaseId(listing.listingId.toString());
     buyListing({
       listingId: listing.listingId,
       price: listing.price,
@@ -1068,6 +1145,7 @@ function DomainsMarketplacePage() {
       toast.error("Connect your wallet to settle this auction.");
       return;
     }
+    setPendingSettlementAuctionKey(auctionActionKey(source, auction));
     if (source === "primary") {
       settlePrimaryAuction({ auctionId: auction.auctionId });
     } else {
@@ -1100,6 +1178,9 @@ function DomainsMarketplacePage() {
     : null;
   const primaryWithdrawableEth = primaryPendingReturns
     ? formatEthCompact(primaryPendingReturns)
+    : null;
+  const marketplaceProceedsEth = marketplaceClaimableProceeds
+    ? formatEthCompact(marketplaceClaimableProceeds)
     : null;
 
   return (
@@ -1143,6 +1224,14 @@ function DomainsMarketplacePage() {
                   isMarketplaceAuction(card.raw) &&
                   address?.toLowerCase() === card.raw.seller.toLowerCase();
                 const canBid = runtimeStatus === "active" && !isOwnAuction;
+                const actionKey = isAuctionCard ? auctionActionKey(card.source, card.raw) : null;
+                const isThisBidPending = isBidAuctionBusy && pendingBidAuctionKey === actionKey;
+                const isThisSettlementPending =
+                  isSettleAuctionBusy && pendingSettlementAuctionKey === actionKey;
+                const showSettle = runtimeStatus === "ended";
+                const settlementLabel = isAuctionCard
+                  ? auctionSettlementLabel(card.raw, card.source, address)
+                  : "Finalize auction";
                 const bidLabel =
                   isAuctionCard && card.raw.highestBid > 0n
                     ? "Top bid"
@@ -1187,17 +1276,25 @@ function DomainsMarketplacePage() {
                       <div className="mkt-card-actions">
                         <button
                           type="button"
-                          onClick={() => handleOpenBidModal(card.raw, card.source)}
-                          disabled={!canBid || isBidAuctionBusy}
+                          onClick={() => {
+                            if (showSettle) {
+                              handleSettleAuction(card.raw, card.source);
+                              return;
+                            }
+                            handleOpenBidModal(card.raw, card.source);
+                          }}
+                          disabled={showSettle ? isSettleAuctionBusy : !canBid || isBidAuctionBusy}
                           className="mkt-card-cta is-auction"
                         >
-                          {runtimeStatus === "scheduled"
+                          {showSettle
+                            ? isThisSettlementPending
+                              ? <InlineLoading label={auctionSettlementLoadingLabel(settlementLabel)} />
+                              : settlementLabel
+                            : runtimeStatus === "scheduled"
                             ? "Starts soon"
-                            : runtimeStatus === "ended"
-                              ? "Auction ended"
-                              : isOwnAuction
+                            : isOwnAuction
                                 ? "Your auction"
-                                : isBidAuctionBusy
+                                : isThisBidPending
                                   ? <InlineLoading label="Submitting..." />
                                   : "Place bid"}
                         </button>
@@ -1424,6 +1521,20 @@ function DomainsMarketplacePage() {
             )}
           </button>
         ) : null}
+        {marketplaceClaimableProceeds && marketplaceClaimableProceeds > 0n ? (
+          <button
+            type="button"
+            onClick={() => withdrawMarketplaceProceeds()}
+            disabled={isWithdrawProceedsBusy}
+            className="btn-secondary names-action-btn mt-3 w-full disabled:opacity-60"
+          >
+            {isWithdrawProceedsBusy ? (
+              <InlineLoading label="Withdrawing..." />
+            ) : (
+              `Withdraw marketplace proceeds · ${marketplaceProceedsEth} ETH`
+            )}
+          </button>
+        ) : null}
         {primaryPendingReturns && primaryPendingReturns > 0n ? (
           <button
             type="button"
@@ -1524,6 +1635,17 @@ function DomainsMarketplacePage() {
                     : false;
               const showSettle = runtimeStatus === "ended";
               const canBid = runtimeStatus === "active" && !isOwnEntry;
+              const actionKey = isAuction ? auctionActionKey(card.source, card.raw) : null;
+              const isThisBidPending = isBidAuctionBusy && pendingBidAuctionKey === actionKey;
+              const isThisSettlementPending =
+                isSettleAuctionBusy && pendingSettlementAuctionKey === actionKey;
+              const settlementLabel = isAuction
+                ? auctionSettlementLabel(card.raw, card.source, address)
+                : "Finalize auction";
+              const isThisPurchasePending =
+                card.kind === "buy-now" &&
+                isBuyListingBusy &&
+                pendingListingPurchaseId === card.raw.listingId.toString();
 
               return (
                 <div key={card.id} className={`mkt-card ${isReserved ? "mkt-card-preview" : ""}`}>
@@ -1603,14 +1725,14 @@ function DomainsMarketplacePage() {
                         className="mkt-card-cta is-auction"
                       >
                         {showSettle
-                          ? isSettleAuctionBusy
-                            ? <InlineLoading label="Settling..." />
-                            : "Settle auction"
+                          ? isThisSettlementPending
+                            ? <InlineLoading label={auctionSettlementLoadingLabel(settlementLabel)} />
+                            : settlementLabel
                           : runtimeStatus === "scheduled"
                             ? "Starts soon"
                             : isOwnEntry
                               ? "Your auction"
-                              : isBidAuctionBusy
+                              : isThisBidPending
                                 ? <InlineLoading label="Submitting..." />
                                 : "Place bid"}
                       </button>
@@ -1639,7 +1761,7 @@ function DomainsMarketplacePage() {
                       disabled={isOwnEntry || isBuyListingBusy}
                       className="mkt-card-cta is-buy-now"
                     >
-                      {isOwnEntry ? "Your listing" : isBuyListingBusy ? <InlineLoading label="Buying..." /> : "Buy now"}
+                      {isOwnEntry ? "Your listing" : isThisPurchasePending ? <InlineLoading label="Buying..." /> : "Buy now"}
                     </button>
                   )}
                 </div>
@@ -1684,7 +1806,9 @@ function DomainsMarketplacePage() {
                     : auctionRuntimeStatus(detailSheet.auction, nowUnix) === "active"
                       ? "Live now"
                       : auctionRuntimeStatus(detailSheet.auction, nowUnix) === "ended"
-                        ? "Awaiting settlement"
+                        ? detailSheet.auction.bidCount === 0
+                          ? "Ended without bids"
+                          : "Ready to finalize"
                         : auctionRuntimeStatus(detailSheet.auction, nowUnix)
                 }`
               : `${reservedSaleLabel(detailSheet.reserved)} · ${formatEthCompact(reservedPriceWei(detailSheet.reserved) ?? 0n)} ETH`
@@ -1703,6 +1827,11 @@ function DomainsMarketplacePage() {
             const runtimeStatus = auctionRuntimeStatus(auction, nowUnix);
             const canSettle = runtimeStatus === "ended";
             const canBid = runtimeStatus === "active" && !isOwnAuction;
+            const actionKey = auctionActionKey(detailSheet.source, auction);
+            const isThisBidPending = isBidAuctionBusy && pendingBidAuctionKey === actionKey;
+            const isThisSettlementPending =
+              isSettleAuctionBusy && pendingSettlementAuctionKey === actionKey;
+            const settlementLabel = auctionSettlementLabel(auction, detailSheet.source, address);
             return (
               <>
                 <div className="eyebrow">Auction details</div>
@@ -1762,7 +1891,11 @@ function DomainsMarketplacePage() {
                       disabled={isSettleAuctionBusy}
                       className="btn-primary names-action-btn w-full disabled:opacity-60"
                     >
-                      {isSettleAuctionBusy ? <InlineLoading label="Settling..." /> : "Settle auction"}
+                      {isThisSettlementPending ? (
+                        <InlineLoading label={auctionSettlementLoadingLabel(settlementLabel)} />
+                      ) : (
+                        settlementLabel
+                      )}
                     </button>
                   ) : (
                     <button
@@ -1775,7 +1908,7 @@ function DomainsMarketplacePage() {
                         ? "Bidding opens soon"
                         : isOwnAuction
                           ? "Your auction"
-                          : isBidAuctionBusy
+                          : isThisBidPending
                             ? <InlineLoading label="Submitting bid..." />
                             : "Place bid"}
                     </button>

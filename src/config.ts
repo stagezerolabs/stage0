@@ -1801,11 +1801,11 @@ export type RnsContractAddressMap = {
 
 export const RNS_CONTRACT_ADDRESSES: Record<number, RnsContractAddressMap> = {
   [riseTestnet.id]: {
-    registry: "0x70b9896Aef2f01b2Ccc05d6127ec5be8390A6860",
-    resolver: "0xAF79d3D6a2dd498c86A2Eff9B42c18D4979f6236",
-    registrar: "0x0ddAfd215E134ab5A397c3EdF2cadB432a80a3CC",
-    auctionHouse: "0x3304Cd2ebEDC81e6313076b332e80a05bF758fdB",
-    marketplace: "0x9C96108c8eB45c4Bd192E73f5A2685d2B3D9bFBe",
+    registry: "0x18E2B26E04B624131630355f00655330FAcb3d0C",
+    resolver: "0x50593CAB471272c0D67014F6233eAcb897F5d705",
+    registrar: "0x87e6e5fA7E63fF008d8Dc5347503a8ED5d6bdA77",
+    auctionHouse: "0xaCb8DE38FD057ed8288BAa6AE60434FBB5f1DEd0",
+    marketplace: "0x92b421f992892e26074e9529f61acf1b86f13bd7",
   },
 };
 

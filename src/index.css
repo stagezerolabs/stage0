@@ -5198,6 +5198,201 @@
   position: relative;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Rise Cards — warm-glow marketplace treatment
+   Scoped to .names-marketplace-page and its detail dialog (portaled to
+   <body>, so its .mkt-detail-* / .mkt-market-dialog classes are targeted
+   directly). Green is primary throughout: emerald for auctions, mint for
+   fixed sales; orange stays a warm accent for timers and highlights.
+   ══════════════════════════════════════════════════════════════════════ */
+.names-marketplace-page,
+.mkt-market-dialog {
+  --rise-surface: #1c1a22;
+  --rise-surface-inner: #100e13;
+  --rise-line: rgba(255, 255, 255, 0.07);
+  --rise-line-soft: rgba(255, 255, 255, 0.06);
+  --rise-divider: rgba(255, 255, 255, 0.1);
+  --rise-ink: #f1ede9;
+  --rise-ink-strong: #f6f3f0;
+  --rise-ink-muted: #948d87;
+  --rise-ink-faint: #8b847d;
+  --rise-label: #7d766f;
+  --rise-emerald: #23c98a;
+  --rise-emerald-hover: #2ed897;
+  --rise-emerald-ink: #06231a;
+  --rise-mint: #46e3a0;
+  --rise-mint-hover: #5cebae;
+  --rise-mint-ink: #052016;
+  --rise-eye-line: rgba(70, 227, 160, 0.28);
+  --rise-eye-fill: rgba(70, 227, 160, 0.06);
+  --rise-eye-ink: #7fecb8;
+  --rise-amber-soft: #f4b45f;
+}
+
+/* — Card surfaces (listing grid + featured "hot" cards) — */
+.mkt-card,
+.hot-card {
+  overflow: hidden;
+  border: 1px solid var(--rise-line);
+  border-radius: 22px;
+  background: var(--rise-surface);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5);
+}
+
+.mkt-card { padding: 24px; }
+.hot-card.big { padding: 24px; }
+
+.mkt-card:hover,
+.hot-card:hover {
+  border-color: rgba(70, 227, 160, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 26px 54px rgba(0, 0, 0, 0.55);
+}
+
+.mkt-card-preview {
+  border-color: rgba(242, 163, 65, 0.24);
+}
+
+/* — Card typography (warm, theme-independent so it stays legible) — */
+.mkt-card-name,
+.hot-name {
+  color: var(--rise-ink);
+}
+
+.mkt-card-name .tld,
+.hot-name .tld {
+  color: var(--rise-ink-faint);
+}
+
+.mkt-card-seller {
+  color: var(--rise-ink-muted);
+}
+
+.mkt-price-eth,
+.hot-bid {
+  color: var(--rise-ink-strong);
+}
+
+.mkt-price-usd-value {
+  color: var(--rise-ink-muted);
+}
+
+.mkt-price-lbl,
+.hot-bid-lbl,
+.hot-card .nm-tier {
+  color: var(--rise-label);
+}
+
+.hot-foot {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rise-divider);
+  color: var(--rise-ink-muted);
+}
+
+.mkt-card-marketline {
+  border-top-color: var(--rise-line);
+  color: var(--rise-ink-muted);
+}
+
+.mkt-card-marketline span:last-child,
+.hot-timer {
+  color: var(--rise-amber-soft);
+}
+
+/* — CTAs: solid green fills (emerald auction / mint fixed) — */
+.mkt-card-cta,
+.mkt-card-view {
+  min-height: 50px;
+  border-radius: 14px;
+}
+
+.mkt-card-cta.is-auction {
+  border-color: transparent;
+  background: var(--rise-emerald);
+  color: var(--rise-emerald-ink);
+  box-shadow: 0 8px 22px rgba(35, 201, 138, 0.26);
+}
+
+.mkt-card-cta.is-auction:not(:disabled):hover {
+  background: var(--rise-emerald-hover);
+  box-shadow: 0 12px 28px rgba(35, 201, 138, 0.4);
+  transform: translateY(-1px);
+}
+
+.mkt-card-cta.is-buy-now {
+  border-color: transparent;
+  background: var(--rise-mint);
+  color: var(--rise-mint-ink);
+  box-shadow: 0 8px 22px rgba(70, 227, 160, 0.28);
+}
+
+.mkt-card-cta.is-buy-now:not(:disabled):hover {
+  background: var(--rise-mint-hover);
+  box-shadow: 0 12px 28px rgba(70, 227, 160, 0.42);
+  transform: translateY(-1px);
+}
+
+.mkt-card-cta.is-auction:disabled,
+.mkt-card-cta.is-buy-now:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+/* — Eye / "view details" button: always a green outline — */
+.mkt-card-view.is-auction,
+.mkt-card-view.is-buy-now {
+  border-color: var(--rise-eye-line);
+  background: var(--rise-eye-fill);
+  color: var(--rise-eye-ink);
+  box-shadow: none;
+}
+
+.mkt-card-view.is-auction:hover,
+.mkt-card-view.is-buy-now:hover {
+  border-color: rgba(70, 227, 160, 0.55);
+  background: rgba(70, 227, 160, 0.15);
+  color: #a6f3cf;
+  transform: translateY(-2px);
+}
+
+/* — Detail dialog (portaled): warm inner price panel + green primary — */
+.mkt-detail-hero {
+  border-color: var(--rise-line-soft);
+  background:
+    radial-gradient(85% 140% at 100% 0%, rgba(35, 201, 138, 0.1), transparent 60%),
+    var(--rise-surface-inner);
+}
+
+.mkt-detail-kicker {
+  color: var(--rise-label);
+}
+
+.mkt-detail-price {
+  color: var(--rise-ink-strong);
+}
+
+.mkt-detail-usd {
+  color: var(--rise-ink-muted);
+}
+
+.mkt-detail-status {
+  border-color: var(--rise-line);
+  color: var(--rise-ink-muted);
+}
+
+.mkt-detail-primary {
+  background: var(--rise-emerald);
+  color: var(--rise-emerald-ink);
+  box-shadow: 0 10px 26px rgba(35, 201, 138, 0.3);
+}
+
+.mkt-detail-primary:not(:disabled):hover {
+  background: var(--rise-emerald-hover);
+  box-shadow: 0 14px 32px rgba(35, 201, 138, 0.44);
+  transform: translateY(-1px);
+}
+
 /* ── Reserved-name inventory ─────────────────────────────────────── */
 .reserved-inventory-panel {
   display: grid;

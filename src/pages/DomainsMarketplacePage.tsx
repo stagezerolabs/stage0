@@ -2048,15 +2048,15 @@ function DomainsMarketplacePage() {
                     <strong className="mkt-detail-price">{formatEthCompact(currentBid)} ETH</strong>
                     <span className="mkt-detail-usd">≈ {formatUsd(currentBidUsd)}</span>
                   </div>
-                  <span className={`mkt-detail-status is-${runtimeStatus}`}>
-                    {runtimeStatus === "active"
-                      ? "Live"
-                      : runtimeStatus === "scheduled"
+                  {runtimeStatus !== "active" ? (
+                    <span className={`mkt-detail-status is-${runtimeStatus}`}>
+                      {runtimeStatus === "scheduled"
                         ? "Scheduled"
                         : runtimeStatus === "ended"
                           ? auction.bidCount === 0 ? "No bids" : "Ended"
                           : runtimeStatus}
-                  </span>
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="mkt-detail-facts">
@@ -2136,7 +2136,7 @@ function DomainsMarketplacePage() {
                     onClick={() => handleOpenWatchAuctionModal(auction, detailSheet.source)}
                     className="mkt-detail-secondary"
                   >
-                    Get auction updates
+                    Join watchlist
                   </button>
                 </div>
               </div>

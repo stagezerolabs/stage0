@@ -5198,6 +5198,253 @@
   position: relative;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Rise Cards — warm-glow marketplace treatment
+   Scoped to .names-marketplace-page and its detail dialog (portaled to
+   <body>, so its .mkt-detail-* / .mkt-market-dialog classes are targeted
+   directly). Dark mode uses green actions; light mode switches to a warm
+   orange treatment that sits cleanly against the cream card surfaces.
+   ══════════════════════════════════════════════════════════════════════ */
+.names-marketplace-page,
+.mkt-market-dialog {
+  --rise-surface: #0e0e1a;
+  --rise-surface-inner: #1b1922;
+  --rise-line: rgba(255, 255, 255, 0.07);
+  --rise-line-soft: rgba(255, 255, 255, 0.06);
+  --rise-divider: rgba(255, 255, 255, 0.1);
+  --rise-ink: #f1ede9;
+  --rise-ink-strong: #f6f3f0;
+  --rise-ink-muted: #948d87;
+  --rise-ink-faint: #8b847d;
+  --rise-label: #7d766f;
+  --rise-emerald: #23c98a;
+  --rise-emerald-hover: #2ed897;
+  --rise-emerald-ink: #06231a;
+  --rise-mint: #46e3a0;
+  --rise-mint-hover: #5cebae;
+  --rise-mint-ink: #052016;
+  --rise-eye-line: rgba(70, 227, 160, 0.28);
+  --rise-eye-fill: rgba(70, 227, 160, 0.06);
+  --rise-eye-ink: #7fecb8;
+  --rise-eye-hover-line: rgba(70, 227, 160, 0.55);
+  --rise-eye-hover-fill: rgba(70, 227, 160, 0.15);
+  --rise-eye-hover-ink: #a6f3cf;
+  --rise-amber-soft: #f4b45f;
+  --rise-hover-line: rgba(70, 227, 160, 0.3);
+  --rise-preview-line: rgba(242, 163, 65, 0.24);
+  --rise-card-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  --rise-card-shadow-hover: 0 24px 52px rgba(0, 0, 0, 0.42);
+  --rise-cta-shadow: 0 8px 22px rgba(35, 201, 138, 0.26);
+  --rise-cta-shadow-hover: 0 12px 28px rgba(35, 201, 138, 0.4);
+  --rise-detail-glow: rgba(35, 201, 138, 0.1);
+}
+
+:root[data-theme='light'] .names-marketplace-page,
+:root[data-theme='light'] .mkt-market-dialog {
+  --rise-surface: #fffaf2;
+  --rise-surface-inner: #fffdf8;
+  --rise-line: rgba(91, 70, 48, 0.16);
+  --rise-line-soft: rgba(91, 70, 48, 0.13);
+  --rise-divider: rgba(91, 70, 48, 0.17);
+  --rise-ink: #302820;
+  --rise-ink-strong: #201a15;
+  --rise-ink-muted: #736454;
+  --rise-ink-faint: #93816e;
+  --rise-label: #806d59;
+  --rise-emerald: #ff8a00;
+  --rise-emerald-hover: #e67c00;
+  --rise-emerald-ink: #2d1800;
+  --rise-mint: #ff8a00;
+  --rise-mint-hover: #e67c00;
+  --rise-mint-ink: #2d1800;
+  --rise-eye-line: rgba(255, 138, 0, 0.42);
+  --rise-eye-fill: rgba(255, 138, 0, 0.08);
+  --rise-eye-ink: #9b4f00;
+  --rise-eye-hover-line: rgba(255, 138, 0, 0.68);
+  --rise-eye-hover-fill: rgba(255, 138, 0, 0.16);
+  --rise-eye-hover-ink: #713900;
+  --rise-amber-soft: #a85e00;
+  --rise-hover-line: rgba(255, 138, 0, 0.4);
+  --rise-preview-line: rgba(190, 105, 0, 0.25);
+  --rise-card-shadow: 0 16px 38px rgba(98, 75, 45, 0.09), 0 3px 10px rgba(98, 75, 45, 0.05);
+  --rise-card-shadow-hover: 0 22px 48px rgba(98, 75, 45, 0.13), 0 6px 16px rgba(98, 75, 45, 0.07);
+  --rise-cta-shadow: 0 8px 20px rgba(255, 138, 0, 0.2);
+  --rise-cta-shadow-hover: 0 11px 26px rgba(255, 138, 0, 0.3);
+  --rise-detail-glow: rgba(255, 138, 0, 0.09);
+}
+
+/* — Card surfaces (listing grid + featured "hot" cards) — */
+.names-marketplace-page .mkt-card,
+.names-marketplace-page .hot-card {
+  overflow: hidden;
+  border: 1px solid var(--rise-line);
+  border-radius: 22px;
+  background: var(--rise-surface);
+  box-shadow: var(--rise-card-shadow);
+}
+
+.names-marketplace-page .mkt-card { padding: 24px; }
+.names-marketplace-page .hot-card.big { padding: 24px; }
+
+.names-marketplace-page .mkt-card:hover,
+.names-marketplace-page .hot-card:hover {
+  border-color: var(--rise-hover-line);
+  transform: translateY(-3px);
+  box-shadow: var(--rise-card-shadow-hover);
+}
+
+.names-marketplace-page .mkt-card-preview {
+  border-color: var(--rise-preview-line);
+}
+
+/* — Card typography — */
+.names-marketplace-page .mkt-card-name,
+.names-marketplace-page .hot-name {
+  color: var(--rise-ink);
+}
+
+.names-marketplace-page .mkt-card-name .tld,
+.names-marketplace-page .hot-name .tld {
+  color: var(--rise-ink-faint);
+}
+
+.names-marketplace-page .mkt-card-seller {
+  color: var(--rise-ink-muted);
+}
+
+.names-marketplace-page .mkt-price-eth,
+.names-marketplace-page .hot-bid {
+  color: var(--rise-ink-strong);
+}
+
+.names-marketplace-page .mkt-price-usd-value {
+  color: var(--rise-ink-muted);
+}
+
+.names-marketplace-page .mkt-price-lbl,
+.names-marketplace-page .hot-bid-lbl,
+.names-marketplace-page .hot-card .nm-tier {
+  color: var(--rise-label);
+}
+
+.names-marketplace-page .hot-foot {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rise-divider);
+  color: var(--rise-ink-muted);
+}
+
+.names-marketplace-page .hot-card .mkt-card-actions {
+  margin-top: 20px;
+}
+
+.names-marketplace-page .mkt-card-marketline {
+  border-top-color: var(--rise-line);
+  color: var(--rise-ink-muted);
+}
+
+.names-marketplace-page .mkt-card-marketline span:last-child,
+.names-marketplace-page .hot-timer {
+  color: var(--rise-amber-soft);
+}
+
+/* — CTAs: solid theme-aware fills (auction / fixed sale) — */
+.names-marketplace-page .mkt-card-cta,
+.names-marketplace-page .mkt-card-view {
+  min-height: 50px;
+  border-radius: 14px;
+}
+
+.names-marketplace-page .mkt-card-cta.is-auction {
+  border-color: transparent;
+  background: var(--rise-emerald);
+  color: var(--rise-emerald-ink);
+  box-shadow: var(--rise-cta-shadow);
+}
+
+.names-marketplace-page .mkt-card-cta.is-auction:not(:disabled):hover {
+  background: var(--rise-emerald-hover);
+  box-shadow: var(--rise-cta-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.names-marketplace-page .mkt-card-cta.is-buy-now {
+  border-color: transparent;
+  background: var(--rise-mint);
+  color: var(--rise-mint-ink);
+  box-shadow: var(--rise-cta-shadow);
+}
+
+.names-marketplace-page .mkt-card-cta.is-buy-now:not(:disabled):hover {
+  background: var(--rise-mint-hover);
+  box-shadow: var(--rise-cta-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.names-marketplace-page .mkt-card-cta.is-auction:disabled,
+.names-marketplace-page .mkt-card-cta.is-buy-now:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+/* — Eye / "view details" button: theme-matched outline — */
+.names-marketplace-page .mkt-card-view.is-auction,
+.names-marketplace-page .mkt-card-view.is-buy-now {
+  border-color: var(--rise-eye-line);
+  background: var(--rise-eye-fill);
+  color: var(--rise-eye-ink);
+  box-shadow: none;
+}
+
+.names-marketplace-page .mkt-card-view.is-auction:hover,
+.names-marketplace-page .mkt-card-view.is-buy-now:hover {
+  border-color: var(--rise-eye-hover-line);
+  background: var(--rise-eye-hover-fill);
+  color: var(--rise-eye-hover-ink);
+  transform: translateY(-2px);
+}
+
+/* — Detail dialog (portaled): warm inner price panel + themed primary — */
+.mkt-detail-hero {
+  border-color: var(--rise-line-soft);
+  background:
+    radial-gradient(85% 140% at 100% 0%, var(--rise-detail-glow), transparent 60%),
+    var(--rise-surface-inner);
+}
+
+.mkt-detail-kicker {
+  color: var(--rise-label);
+}
+
+.mkt-detail-price {
+  color: var(--rise-ink-strong);
+}
+
+.mkt-detail-usd {
+  color: var(--rise-ink-muted);
+}
+
+.mkt-detail-status {
+  border-color: var(--rise-line);
+  color: var(--rise-ink-muted);
+}
+
+.mkt-detail-primary {
+  background: var(--rise-emerald);
+  color: var(--rise-emerald-ink);
+  box-shadow: var(--rise-cta-shadow);
+}
+
+.mkt-detail-primary:not(.is-cancel):not(:disabled):hover {
+  background: var(--rise-emerald-hover);
+  box-shadow: var(--rise-cta-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.mkt-detail-primary.is-cancel {
+  box-shadow: none;
+}
+
 /* ── Reserved-name inventory ─────────────────────────────────────── */
 .reserved-inventory-panel {
   display: grid;

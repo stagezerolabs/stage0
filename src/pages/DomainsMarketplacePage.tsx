@@ -23,6 +23,8 @@ import {
   useRnsBidPrimaryAuction,
   useRnsBidMarketplaceAuction,
   useRnsBuyMarketplaceListing,
+  useRnsCancelMarketplaceAuction,
+  useRnsCancelMarketplaceListing,
   useRnsContracts,
   useRnsCreateMarketplaceAuction,
   useRnsCreateMarketplaceListing,
@@ -117,6 +119,10 @@ type DetailSheetState =
       kind: "auction";
       source: AuctionSource;
       auction: AnyAuctionSummary;
+    }
+  | {
+      kind: "listing";
+      listing: RnsMarketplaceListingSummary;
     }
   | {
       kind: "reserved";
@@ -249,6 +255,10 @@ function auctionActionKey(source: AuctionSource, auction: AnyAuctionSummary) {
   return `${source}:${auction.auctionId.toString()}`;
 }
 
+function listingActionKey(listing: RnsMarketplaceListingSummary) {
+  return `listing:${listing.listingId.toString()}`;
+}
+
 function auctionSettlementLabel(
   auction: AnyAuctionSummary,
   source: AuctionSource,
@@ -353,6 +363,15 @@ function DomainsMarketplacePage() {
   } = useRnsBuyMarketplaceListing();
 
   const {
+    cancelListing,
+    isPending: isCancelListingPending,
+    isConfirming: isCancelListingConfirming,
+    isSuccess: isCancelListingSuccess,
+    error: cancelListingError,
+    reset: resetCancelListing,
+  } = useRnsCancelMarketplaceListing();
+
+  const {
     bidAuction,
     isPending: isBidAuctionPending,
     isConfirming: isBidAuctionConfirming,
@@ -378,6 +397,15 @@ function DomainsMarketplacePage() {
     error: settleAuctionError,
     reset: resetSettleAuction,
   } = useRnsSettleMarketplaceAuction();
+
+  const {
+    cancelAuction,
+    isPending: isCancelAuctionPending,
+    isConfirming: isCancelAuctionConfirming,
+    isSuccess: isCancelAuctionSuccess,
+    error: cancelAuctionError,
+    reset: resetCancelAuction,
+  } = useRnsCancelMarketplaceAuction();
 
   const {
     settlePrimaryAuction,
@@ -453,6 +481,7 @@ function DomainsMarketplacePage() {
   const [pendingBidAuctionKey, setPendingBidAuctionKey] = useState<string | null>(null);
   const [pendingSettlementAuctionKey, setPendingSettlementAuctionKey] = useState<string | null>(null);
   const [pendingListingPurchaseId, setPendingListingPurchaseId] = useState<string | null>(null);
+  const [pendingCancellationKey, setPendingCancellationKey] = useState<string | null>(null);
 
   const ownedNames = useMemo(
     () => allDomains.filter((domain) => Boolean(domain.label) && (domain.custody ?? "wallet") === "wallet"),
@@ -479,9 +508,11 @@ function DomainsMarketplacePage() {
   const isCreateAuctionBusy = isCreateAuctionPending || isCreateAuctionConfirming;
   const isCreateListingBusy = isCreateListingPending || isCreateListingConfirming;
   const isBuyListingBusy = isBuyListingPending || isBuyListingConfirming;
+  const isCancelListingBusy = isCancelListingPending || isCancelListingConfirming;
   const isBidAuctionBusy = isBidAuctionPending || isBidAuctionConfirming || isBidPrimaryPending || isBidPrimaryConfirming;
   const isSettleAuctionBusy =
     isSettleAuctionPending || isSettleAuctionConfirming || isSettlePrimaryPending || isSettlePrimaryConfirming;
+  const isCancelAuctionBusy = isCancelAuctionPending || isCancelAuctionConfirming;
   const isFixedPremiumBusy = isFixedPremiumPending || isFixedPremiumConfirming;
   const isWithdrawBusy = isWithdrawPending || isWithdrawConfirming;
   const isWithdrawProceedsBusy = isWithdrawProceedsPending || isWithdrawProceedsConfirming;
@@ -773,6 +804,24 @@ function DomainsMarketplacePage() {
   }, [buyListingError, resetBuyListing]);
 
   useEffect(() => {
+    if (!isCancelListingSuccess) return;
+    toast.success("Sale cancelled. The name is returning to your wallet.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
+    setDetailSheet(null);
+    setPendingMarketActionName(null);
+    setPendingCancellationKey(null);
+    resetCancelListing();
+  }, [isCancelListingSuccess, pendingMarketActionName, resetCancelListing]);
+
+  useEffect(() => {
+    if (!cancelListingError) return;
+    toast.error(cancelListingError.message.split("\n")[0] ?? "Could not cancel this sale.");
+    setPendingMarketActionName(null);
+    setPendingCancellationKey(null);
+    resetCancelListing();
+  }, [cancelListingError, resetCancelListing]);
+
+  useEffect(() => {
     if (!isBidAuctionSuccess) return;
     toast.success("Bid submitted. If it lands top, the marketplace will update shortly.");
     refreshMarketAfterNameAction(null);
@@ -854,6 +903,24 @@ function DomainsMarketplacePage() {
     setPendingSettlementAuctionKey(null);
     resetSettlePrimary();
   }, [settlePrimaryError, resetSettlePrimary]);
+
+  useEffect(() => {
+    if (!isCancelAuctionSuccess) return;
+    toast.success("Auction cancelled. The name is returning to your wallet.");
+    refreshMarketAfterNameAction(pendingMarketActionName);
+    setDetailSheet(null);
+    setPendingMarketActionName(null);
+    setPendingCancellationKey(null);
+    resetCancelAuction();
+  }, [isCancelAuctionSuccess, pendingMarketActionName, resetCancelAuction]);
+
+  useEffect(() => {
+    if (!cancelAuctionError) return;
+    toast.error(cancelAuctionError.message.split("\n")[0] ?? "Could not cancel this auction.");
+    setPendingMarketActionName(null);
+    setPendingCancellationKey(null);
+    resetCancelAuction();
+  }, [cancelAuctionError, resetCancelAuction]);
 
   useEffect(() => {
     if (!isFixedPremiumSuccess) return;
@@ -963,6 +1030,10 @@ function DomainsMarketplacePage() {
 
   const handleOpenAuctionDetails = (auction: AnyAuctionSummary, source: AuctionSource) => {
     setDetailSheet({ kind: "auction", source, auction });
+  };
+
+  const handleOpenListingDetails = (listing: RnsMarketplaceListingSummary) => {
+    setDetailSheet({ kind: "listing", listing });
   };
 
   const handleOpenReservedDetails = (reserved: RnsReservedNameSummary) => {
@@ -1140,6 +1211,35 @@ function DomainsMarketplacePage() {
     });
   };
 
+  const handleCancelListing = (listing: RnsMarketplaceListingSummary) => {
+    if (!address || address.toLowerCase() !== listing.seller.toLowerCase()) {
+      toast.error("Only the seller can cancel this sale.");
+      return;
+    }
+    setPendingMarketActionName(listing.name);
+    setPendingCancellationKey(listingActionKey(listing));
+    cancelListing({ listingId: listing.listingId });
+  };
+
+  const handleCancelAuction = (auction: AnyAuctionSummary, source: AuctionSource) => {
+    if (
+      source !== "marketplace" ||
+      !isMarketplaceAuction(auction) ||
+      !address ||
+      address.toLowerCase() !== auction.seller.toLowerCase()
+    ) {
+      toast.error("Only the seller can cancel this auction.");
+      return;
+    }
+    if (auction.bidCount > 0) {
+      toast.error("An auction with bids cannot be cancelled by the seller.");
+      return;
+    }
+    setPendingMarketActionName(auction.name);
+    setPendingCancellationKey(auctionActionKey(source, auction));
+    cancelAuction({ auctionId: auction.auctionId });
+  };
+
   const handleSettleAuction = (auction: AnyAuctionSummary, source: AuctionSource) => {
     if (!isConnected) {
       toast.error("Connect your wallet to settle this auction.");
@@ -1228,6 +1328,13 @@ function DomainsMarketplacePage() {
                 const isThisBidPending = isBidAuctionBusy && pendingBidAuctionKey === actionKey;
                 const isThisSettlementPending =
                   isSettleAuctionBusy && pendingSettlementAuctionKey === actionKey;
+                const canCancelAuction =
+                  isAuctionCard &&
+                  isOwnAuction &&
+                  card.raw.bidCount === 0 &&
+                  (runtimeStatus === "scheduled" || runtimeStatus === "active");
+                const isThisCancellationPending =
+                  isCancelAuctionBusy && pendingCancellationKey === actionKey;
                 const showSettle = runtimeStatus === "ended";
                 const settlementLabel = isAuctionCard
                   ? auctionSettlementLabel(card.raw, card.source, address)
@@ -1281,19 +1388,33 @@ function DomainsMarketplacePage() {
                               handleSettleAuction(card.raw, card.source);
                               return;
                             }
+                            if (canCancelAuction) {
+                              handleCancelAuction(card.raw, card.source);
+                              return;
+                            }
                             handleOpenBidModal(card.raw, card.source);
                           }}
-                          disabled={showSettle ? isSettleAuctionBusy : !canBid || isBidAuctionBusy}
-                          className="mkt-card-cta is-auction"
+                          disabled={
+                            showSettle
+                              ? isSettleAuctionBusy
+                              : canCancelAuction
+                                ? isCancelAuctionBusy
+                                : !canBid || isBidAuctionBusy
+                          }
+                          className={`mkt-card-cta ${canCancelAuction ? "is-cancel" : "is-auction"}`}
                         >
                           {showSettle
                             ? isThisSettlementPending
                               ? <InlineLoading label={auctionSettlementLoadingLabel(settlementLabel)} />
                               : settlementLabel
+                            : canCancelAuction
+                              ? isThisCancellationPending
+                                ? <InlineLoading label="Cancelling..." />
+                                : "Cancel auction"
                             : runtimeStatus === "scheduled"
                             ? "Starts soon"
                             : isOwnAuction
-                                ? "Your auction"
+                                ? "Auction live"
                                 : isThisBidPending
                                   ? <InlineLoading label="Submitting..." />
                                   : "Place bid"}
@@ -1301,7 +1422,7 @@ function DomainsMarketplacePage() {
                         <button
                           type="button"
                           onClick={() => handleOpenAuctionDetails(card.raw, card.source)}
-                          className="mkt-card-view"
+                          className={`mkt-card-view ${canCancelAuction ? "is-cancel" : "is-auction"}`}
                           aria-label={`View ${card.label}.rise auction details`}
                           title="View auction details"
                         >
@@ -1309,15 +1430,28 @@ function DomainsMarketplacePage() {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (card.kind === "reserved") handleOpenReservedDetails(card.raw);
-                        }}
-                        className={`mkt-card-cta ${saleKind === "auction" ? "is-auction" : "is-buy-now"}`}
-                      >
-                        {isReservedCard && saleKind === "buy-now" ? "Buy now" : "Bid"}
-                      </button>
+                      <div className="mkt-card-actions">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (card.kind === "reserved") handleOpenReservedDetails(card.raw);
+                          }}
+                          className={`mkt-card-cta ${saleKind === "auction" ? "is-auction" : "is-buy-now"}`}
+                        >
+                          {isReservedCard && saleKind === "buy-now" ? "Buy now" : "Bid"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (card.kind === "reserved") handleOpenReservedDetails(card.raw);
+                          }}
+                          className={`mkt-card-view ${saleKind === "auction" ? "is-auction" : "is-buy-now"}`}
+                          aria-label={`View ${card.label}.rise details`}
+                          title="View details"
+                        >
+                          <View size={20} aria-hidden="true" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -1379,7 +1513,6 @@ function DomainsMarketplacePage() {
                 <div className="mkt-selected-sale-copy">
                   <strong>{selectedOwnedName}.rise</strong>
                 </div>
-                <span className="mkt-selected-sale-status">Wallet held</span>
               </div>
 
               <div className="mkt-form-block">
@@ -1627,18 +1760,31 @@ function DomainsMarketplacePage() {
               const saleKind = cardSaleKind(card);
               const pricePending = isReserved && !reservedPriceWei(card.raw);
               const runtimeStatus = card.kind === "auction" ? auctionRuntimeStatus(card.raw, nowUnix) : null;
-              const isOwnEntry =
-                card.kind === "buy-now"
-                  ? address?.toLowerCase() === card.raw.seller.toLowerCase()
-                  : card.kind === "auction" && card.source === "marketplace" && isMarketplaceAuction(card.raw)
-                    ? address?.toLowerCase() === card.raw.seller.toLowerCase()
-                    : false;
+              const isOwnListing =
+                card.kind === "buy-now" && address?.toLowerCase() === card.raw.seller.toLowerCase();
+              const isOwnAuction =
+                card.kind === "auction" &&
+                card.source === "marketplace" &&
+                isMarketplaceAuction(card.raw) &&
+                address?.toLowerCase() === card.raw.seller.toLowerCase();
+              const isOwnEntry = isOwnListing || isOwnAuction;
               const showSettle = runtimeStatus === "ended";
               const canBid = runtimeStatus === "active" && !isOwnEntry;
               const actionKey = isAuction ? auctionActionKey(card.source, card.raw) : null;
+              const cancellationKey =
+                card.kind === "buy-now" ? listingActionKey(card.raw) : actionKey;
               const isThisBidPending = isBidAuctionBusy && pendingBidAuctionKey === actionKey;
               const isThisSettlementPending =
                 isSettleAuctionBusy && pendingSettlementAuctionKey === actionKey;
+              const canCancelAuction =
+                card.kind === "auction" &&
+                isOwnAuction &&
+                card.raw.bidCount === 0 &&
+                (runtimeStatus === "scheduled" || runtimeStatus === "active");
+              const canCancelListing = card.kind === "buy-now" && isOwnListing;
+              const isThisCancellationPending =
+                pendingCancellationKey === cancellationKey &&
+                (isCancelAuctionBusy || isCancelListingBusy);
               const settlementLabel = isAuction
                 ? auctionSettlementLabel(card.raw, card.source, address)
                 : "Finalize auction";
@@ -1648,7 +1794,7 @@ function DomainsMarketplacePage() {
                 pendingListingPurchaseId === card.raw.listingId.toString();
 
               return (
-                <div key={card.id} className={`mkt-card ${isReserved ? "mkt-card-preview" : ""}`}>
+                <article key={card.id} className={`mkt-card ${isReserved ? "mkt-card-preview" : ""}`}>
                   <div className="mkt-card-top">
                     <div>
                       <div className="mkt-card-name">
@@ -1657,114 +1803,144 @@ function DomainsMarketplacePage() {
                       </div>
                       <div className="mkt-card-seller">
                         {isReserved
-                          ? `${card.length}-char ${reservedSaleLabel(card.raw).toLowerCase()}`
+                          ? `${card.length} characters`
                           : isAuction && card.source === "primary"
-                            ? `${card.length}-char auction`
-                            : `by ${card.seller}`}
+                            ? "Primary auction"
+                            : `Seller ${card.seller}`}
                       </div>
                     </div>
                   </div>
-                  <div className="mkt-card-price-row">
-                    <div>
-                      <div className="mkt-price-lbl">
-                        {isAuction && card.raw.highestBid > 0n
-                          ? "Current bid"
-                          : saleKind === "auction"
-                            ? "Opening reserve"
-                            : "Price"}
-                      </div>
-                      <div className="mkt-price-eth">{pricePending ? "TBA" : `${formatEthCompact(card.priceWei)} ETH`}</div>
-                      <div className="mkt-price-usd-value">
-                        ≈ {pricePending ? "Price pending" : formatUsd(usdValue)}
-                      </div>
+                  <div className="mkt-card-value">
+                    <div className="mkt-price-lbl">
+                      {isAuction && card.raw.highestBid > 0n
+                        ? "Current bid"
+                        : saleKind === "auction"
+                          ? "Opening reserve"
+                          : "Price"}
                     </div>
-                    <div className="mkt-price-right">
-                      <div className="mkt-price-lbl">{saleKind === "auction" ? "Status" : "Length"}</div>
-                      <div className={`mkt-price-meta ${isAuction ? "timer" : ""}`}>
-                        {isAuction
-                          ? runtimeStatus === "scheduled"
-                            ? `Starts ${formatTimeLeft(card.raw.startTime, nowUnix)}`
-                            : runtimeStatus === "active"
-                              ? formatTimeLeft(card.raw.endTime, nowUnix)
-                              : "Ended"
-                          : isReserved
-                            ? reservedSaleLabel(card.raw)
-                          : `${card.length} char`}
-                      </div>
-                      <div className="mkt-price-subtle">{cardStatusLabel(card, nowUnix)}</div>
+                    <div className="mkt-price-eth">{pricePending ? "TBA" : `${formatEthCompact(card.priceWei)} ETH`}</div>
+                    <div className="mkt-price-usd-value">
+                      ≈ {pricePending ? "Price pending" : formatUsd(usdValue)}
                     </div>
                   </div>
 
-                  {saleKind === "auction" ? (
-                    <div className="mkt-auction-strip">
-                      <span className="mkt-auction-pill">
-                        {isAuction ? `${card.raw.bidCount} bid${card.raw.bidCount === 1 ? "" : "s"}` : "0 bids"}
-                      </span>
-                      <span className="mkt-auction-pill is-secondary">
-                        {isAuction && card.raw.highestBidder
-                          ? `Top ${shortSeller(card.raw.highestBidder)}`
-                          : isReserved
-                            ? "Waiting for first bid"
-                            : "Waiting for first bid"}
-                      </span>
-                    </div>
-                  ) : null}
+                  <div className="mkt-card-marketline">
+                    <span>
+                      {isAuction
+                        ? `${card.raw.bidCount} bid${card.raw.bidCount === 1 ? "" : "s"}`
+                        : saleKind === "auction"
+                          ? "No bids yet"
+                          : "Fixed price"}
+                    </span>
+                    <span>
+                      {isAuction
+                        ? runtimeStatus === "scheduled"
+                          ? `Starts in ${formatTimeLeft(card.raw.startTime, nowUnix)}`
+                          : runtimeStatus === "active"
+                            ? `${formatTimeLeft(card.raw.endTime, nowUnix)} left`
+                            : cardStatusLabel(card, nowUnix)
+                        : `${card.length} characters`}
+                    </span>
+                  </div>
 
-                  {isAuction ? (
-                    <div className="mkt-card-actions">
-                      <button
-                        type="button"
-                        onClick={() => {
+                  <div className="mkt-card-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (card.kind === "auction") {
                           if (showSettle) {
                             handleSettleAuction(card.raw, card.source);
                             return;
                           }
+                          if (canCancelAuction) {
+                            handleCancelAuction(card.raw, card.source);
+                            return;
+                          }
                           handleOpenBidModal(card.raw, card.source);
-                        }}
-                        disabled={showSettle ? isSettleAuctionBusy : !canBid || isBidAuctionBusy}
-                        className="mkt-card-cta is-auction"
-                      >
-                        {showSettle
+                          return;
+                        }
+                        if (card.kind === "reserved") {
+                          handleOpenReservedDetails(card.raw);
+                          return;
+                        }
+                        if (canCancelListing) {
+                          handleCancelListing(card.raw);
+                          return;
+                        }
+                        handleBuyListing(card.raw);
+                      }}
+                      disabled={
+                        card.kind === "auction"
+                          ? showSettle
+                            ? isSettleAuctionBusy
+                            : canCancelAuction
+                              ? isCancelAuctionBusy
+                              : !canBid || isBidAuctionBusy
+                          : card.kind === "buy-now"
+                            ? canCancelListing
+                              ? isCancelListingBusy
+                              : isBuyListingBusy
+                            : false
+                      }
+                      className={`mkt-card-cta ${
+                        canCancelAuction || canCancelListing
+                          ? "is-cancel"
+                          : saleKind === "auction"
+                            ? "is-auction"
+                            : "is-buy-now"
+                      }`}
+                    >
+                      {card.kind === "auction"
+                        ? showSettle
                           ? isThisSettlementPending
                             ? <InlineLoading label={auctionSettlementLoadingLabel(settlementLabel)} />
                             : settlementLabel
-                          : runtimeStatus === "scheduled"
-                            ? "Starts soon"
-                            : isOwnEntry
-                              ? "Your auction"
-                              : isThisBidPending
-                                ? <InlineLoading label="Submitting..." />
-                                : "Place bid"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenAuctionDetails(card.raw, card.source)}
-                        className="mkt-card-view"
-                        aria-label={`View ${card.label}.rise auction details`}
-                        title="View auction details"
-                      >
-                        <View size={20} aria-hidden="true" />
-                      </button>
-                    </div>
-                  ) : isReserved ? (
+                          : canCancelAuction
+                            ? isThisCancellationPending
+                              ? <InlineLoading label="Cancelling..." />
+                              : "Cancel auction"
+                            : runtimeStatus === "scheduled"
+                              ? "Starts soon"
+                              : isOwnAuction
+                                ? "Auction live"
+                                : isThisBidPending
+                                  ? <InlineLoading label="Submitting..." />
+                                  : "Place bid"
+                        : card.kind === "reserved"
+                          ? saleKind === "auction" ? "View auction" : "Buy now"
+                          : canCancelListing
+                            ? isThisCancellationPending
+                              ? <InlineLoading label="Cancelling..." />
+                              : "Cancel sale"
+                            : isThisPurchasePending
+                              ? <InlineLoading label="Buying..." />
+                              : "Buy now"}
+                    </button>
                     <button
                       type="button"
-                      onClick={() => handleOpenReservedDetails(card.raw)}
-                      className={`mkt-card-cta ${saleKind === "auction" ? "is-auction" : "is-buy-now"}`}
+                      onClick={() => {
+                        if (card.kind === "auction") {
+                          handleOpenAuctionDetails(card.raw, card.source);
+                        } else if (card.kind === "reserved") {
+                          handleOpenReservedDetails(card.raw);
+                        } else {
+                          handleOpenListingDetails(card.raw);
+                        }
+                      }}
+                      className={`mkt-card-view ${
+                        canCancelAuction || canCancelListing
+                          ? "is-cancel"
+                          : saleKind === "auction"
+                            ? "is-auction"
+                            : "is-buy-now"
+                      }`}
+                      aria-label={`View ${card.label}.rise details`}
+                      title="View details"
                     >
-                      {saleKind === "auction" ? "Bid" : "Buy now"}
+                      <View size={20} aria-hidden="true" />
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleBuyListing(card.raw)}
-                      disabled={isOwnEntry || isBuyListingBusy}
-                      className="mkt-card-cta is-buy-now"
-                    >
-                      {isOwnEntry ? "Your listing" : isThisPurchasePending ? <InlineLoading label="Buying..." /> : "Buy now"}
-                    </button>
-                  )}
-                </div>
+                  </div>
+                </article>
               );
             })}
           </div>
@@ -1790,6 +1966,11 @@ function DomainsMarketplacePage() {
                 {detailSheet.auction.name}
                 <span className="ml-1 text-xl text-ink-faint">.rise</span>
               </>
+            ) : detailSheet.kind === "listing" ? (
+              <>
+                {detailSheet.listing.name}
+                <span className="ml-1 text-xl text-ink-faint">.rise</span>
+              </>
             ) : (
               detailSheet.reserved.fqdn
             )
@@ -1811,8 +1992,11 @@ function DomainsMarketplacePage() {
                           : "Ready to finalize"
                         : auctionRuntimeStatus(detailSheet.auction, nowUnix)
                 }`
+              : detailSheet.kind === "listing"
+                ? `Fixed-price sale · Seller ${shortSeller(detailSheet.listing.seller)}`
               : `${reservedSaleLabel(detailSheet.reserved)} · ${formatEthCompact(reservedPriceWei(detailSheet.reserved) ?? 0n)} ETH`
           }
+          className="mkt-market-dialog"
         >
           {detailSheet.kind === "auction" ? (() => {
             const auction = detailSheet.auction;
@@ -1831,65 +2015,90 @@ function DomainsMarketplacePage() {
             const isThisBidPending = isBidAuctionBusy && pendingBidAuctionKey === actionKey;
             const isThisSettlementPending =
               isSettleAuctionBusy && pendingSettlementAuctionKey === actionKey;
+            const canCancelAuction =
+              isOwnAuction &&
+              auction.bidCount === 0 &&
+              (runtimeStatus === "scheduled" || runtimeStatus === "active");
+            const isThisCancellationPending =
+              isCancelAuctionBusy && pendingCancellationKey === actionKey;
             const settlementLabel = auctionSettlementLabel(auction, detailSheet.source, address);
+            const timeLabel =
+              runtimeStatus === "scheduled"
+                ? `Starts in ${formatTimeLeft(auction.startTime, nowUnix)}`
+                : runtimeStatus === "active"
+                  ? `${formatTimeLeft(auction.endTime, nowUnix)} left`
+                  : "Bidding ended";
+            const guidance =
+              runtimeStatus === "ended"
+                ? auction.bidCount === 0
+                  ? "No bids were placed. Finalize the auction to close it and return the name when applicable."
+                  : "Bidding is closed. Finalize the auction to complete the name transfer."
+                : isOwnAuction && auction.bidCount === 0
+                  ? "No bids yet. You can leave the auction live or cancel it and return the name to your wallet."
+                  : auction.bidCount === 0
+                    ? "Be the first bidder by meeting the opening reserve."
+                    : "Each new bid must clear the current top bid by at least 5%.";
             return (
-              <>
-                <div className="eyebrow">Auction details</div>
-
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
-                  <div className="mkt-detail-stat">
-                    <div className="mkt-price-lbl">{auction.highestBid > 0n ? "Current bid" : "Reserve"}</div>
-                    <div className="mkt-price-eth mt-1">{formatEthCompact(currentBid)} ETH</div>
-                    <div className="mkt-price-usd-value">≈ {formatUsd(currentBidUsd)}</div>
+              <div className="mkt-detail-layout">
+                <div className="mkt-detail-hero">
+                  <div>
+                    <span className="mkt-detail-kicker">
+                      {auction.highestBid > 0n ? "Current bid" : "Opening reserve"}
+                    </span>
+                    <strong className="mkt-detail-price">{formatEthCompact(currentBid)} ETH</strong>
+                    <span className="mkt-detail-usd">≈ {formatUsd(currentBidUsd)}</span>
                   </div>
-                  <div className="mkt-detail-stat">
-                    <div className="mkt-price-lbl">Bid activity</div>
-                    <div className="mkt-price-eth mt-1">{auction.bidCount}</div>
-                    <div className="mkt-price-subtle">
-                      {auction.bidCount === 1 ? "1 bid placed" : `${auction.bidCount} bids placed`}
-                    </div>
+                  <span className={`mkt-detail-status is-${runtimeStatus}`}>
+                    {runtimeStatus === "active"
+                      ? "Live"
+                      : runtimeStatus === "scheduled"
+                        ? "Scheduled"
+                        : runtimeStatus === "ended"
+                          ? auction.bidCount === 0 ? "No bids" : "Ended"
+                          : runtimeStatus}
+                  </span>
+                </div>
+
+                <div className="mkt-detail-facts">
+                  <div className="mkt-detail-fact">
+                    <span>Bids</span>
+                    <strong>{auction.bidCount}</strong>
+                  </div>
+                  <div className="mkt-detail-fact">
+                    <span>Timing</span>
+                    <strong>{timeLabel}</strong>
+                  </div>
+                  <div className="mkt-detail-fact">
+                    <span>Leading wallet</span>
+                    <strong>{auction.highestBidder ? shortSeller(auction.highestBidder) : "None yet"}</strong>
                   </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-2">
-                  <div className="mkt-detail-stat">
-                    <div className="mkt-price-lbl">Lead wallet</div>
-                    <div className="mkt-price-meta mt-1">
-                      {auction.highestBidder ? shortSeller(auction.highestBidder) : "No bids yet"}
+                {runtimeStatus !== "ended" ? (
+                  <div className="mkt-detail-next-bid">
+                    <div>
+                      <span>Next valid bid</span>
+                      <strong>
+                        {detailMinimumNextBid ? `${formatEthCompact(detailMinimumNextBid)} ETH` : "Calculating..."}
+                      </strong>
                     </div>
+                    <span className="mkt-detail-next-usd">
+                      ≈ {detailMinimumNextBid ? formatUsd(nextBidUsd) : "USD loading"}
+                    </span>
                   </div>
-                  <div className="mkt-detail-stat">
-                    <div className="mkt-price-lbl">Time</div>
-                    <div className="mkt-price-meta mt-1">
-                      {runtimeStatus === "scheduled"
-                        ? `Starts ${formatTimeLeft(auction.startTime, nowUnix)}`
-                        : runtimeStatus === "active"
-                          ? formatTimeLeft(auction.endTime, nowUnix)
-                          : "Ended"}
-                    </div>
-                  </div>
-                </div>
+                ) : null}
 
-                <div className="mt-3 mkt-detail-stat">
-                  <div className="mkt-price-lbl">Next valid bid</div>
-                  <div className="mkt-price-eth mt-1">
-                    {detailMinimumNextBid ? `${formatEthCompact(detailMinimumNextBid)} ETH` : "Waiting to calculate"}
-                  </div>
-                  <div className="mkt-price-usd-value">
-                    ≈ {detailMinimumNextBid ? formatUsd(nextBidUsd) : "USD loading"}
-                  </div>
-                  <p className="mt-3 text-body-sm text-ink-muted">
-                    New bids must clear the current top by at least 5%. If late bids come in, the auction timer rolls forward using the Stage0 extension rules.
-                  </p>
-                </div>
+                <p className="mkt-detail-guidance">
+                  {guidance} Bids near the deadline extend the auction to prevent last-second sniping.
+                </p>
 
-                <div className="mt-6 grid gap-3">
+                <div className="mkt-detail-actions">
                   {canSettle ? (
                     <button
                       type="button"
                       onClick={() => handleSettleAuction(auction, detailSheet.source)}
                       disabled={isSettleAuctionBusy}
-                      className="btn-primary names-action-btn w-full disabled:opacity-60"
+                      className="mkt-detail-primary"
                     >
                       {isThisSettlementPending ? (
                         <InlineLoading label={auctionSettlementLoadingLabel(settlementLabel)} />
@@ -1897,17 +2106,26 @@ function DomainsMarketplacePage() {
                         settlementLabel
                       )}
                     </button>
+                  ) : canCancelAuction ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCancelAuction(auction, detailSheet.source)}
+                      disabled={isCancelAuctionBusy}
+                      className="mkt-detail-primary is-cancel"
+                    >
+                      {isThisCancellationPending ? <InlineLoading label="Cancelling..." /> : "Cancel auction"}
+                    </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => handleOpenBidModal(auction, detailSheet.source)}
                       disabled={!canBid || isBidAuctionBusy}
-                      className="btn-primary names-action-btn w-full disabled:opacity-60"
+                      className="mkt-detail-primary"
                     >
                       {runtimeStatus === "scheduled"
-                        ? "Bidding opens soon"
+                        ? `Bidding opens ${formatTimeLeft(auction.startTime, nowUnix)}`
                         : isOwnAuction
-                          ? "Your auction"
+                          ? "Auction in progress"
                           : isThisBidPending
                             ? <InlineLoading label="Submitting bid..." />
                             : "Place bid"}
@@ -1916,55 +2134,120 @@ function DomainsMarketplacePage() {
                   <button
                     type="button"
                     onClick={() => handleOpenWatchAuctionModal(auction, detailSheet.source)}
-                    className="btn-secondary names-action-btn w-full"
+                    className="mkt-detail-secondary"
                   >
-                    Watch by email
+                    Get auction updates
                   </button>
                 </div>
-              </>
-            );
-          })() : (
-            <>
-              <div className="mkt-detail-stat">
-                <div className="mkt-price-lbl">
-                  {detailSheet.reserved.saleMode === "buy_now" ? "Price" : "Opening reserve"}
-                </div>
-                <div className="mkt-price-eth mt-1">
-                  {(() => {
-                    const priceWei =
-                      detailSheet.reserved.saleMode === "buy_now"
-                        ? detailSheet.reserved.fixedPriceWei
-                        : detailSheet.reserved.reservePriceWei;
-                    return priceWei ? `${formatEthCompact(priceWei)} ETH` : "TBA";
-                  })()}
-                </div>
-                <div className="mkt-price-usd-value">
-                  {(() => {
-                    const priceWei =
-                      detailSheet.reserved.saleMode === "buy_now"
-                        ? detailSheet.reserved.fixedPriceWei
-                        : detailSheet.reserved.reservePriceWei;
-                    const usdValue = priceWei && ethUsd ? Number(formatEther(priceWei)) * ethUsd : null;
-                    return `≈ ${priceWei ? formatUsd(usdValue) : "Price pending"}`;
-                  })()}
-                </div>
-                <p className="mt-3 text-body-sm text-ink-muted">
-                  Buy this .rise name instantly at the price shown above.
-                </p>
               </div>
+            );
+          })() : detailSheet.kind === "listing" ? (() => {
+            const listing = detailSheet.listing;
+            const listingUsd = ethUsd ? Number(formatEther(listing.price)) * ethUsd : null;
+            const isOwnListing = address?.toLowerCase() === listing.seller.toLowerCase();
+            const key = listingActionKey(listing);
+            const isThisCancellationPending =
+              isCancelListingBusy && pendingCancellationKey === key;
+            const isThisPurchasePending =
+              isBuyListingBusy && pendingListingPurchaseId === listing.listingId.toString();
+            return (
+              <div className="mkt-detail-layout">
+                <div className="mkt-detail-hero">
+                  <div>
+                    <span className="mkt-detail-kicker">Fixed price</span>
+                    <strong className="mkt-detail-price">{formatEthCompact(listing.price)} ETH</strong>
+                    <span className="mkt-detail-usd">≈ {formatUsd(listingUsd)}</span>
+                  </div>
+                  <span className="mkt-detail-status is-active">Available</span>
+                </div>
 
-              <div className="mt-6 grid gap-3">
+                <div className="mkt-detail-facts">
+                  <div className="mkt-detail-fact">
+                    <span>Seller</span>
+                    <strong>{shortSeller(listing.seller)}</strong>
+                  </div>
+                  <div className="mkt-detail-fact">
+                    <span>Length</span>
+                    <strong>{listing.name.length} characters</strong>
+                  </div>
+                  <div className="mkt-detail-fact">
+                    <span>Delivery</span>
+                    <strong>Onchain transfer</strong>
+                  </div>
+                </div>
+
+                <p className="mkt-detail-guidance">
+                  {isOwnListing
+                    ? "Your name remains in marketplace escrow until it sells. You can cancel before a buyer completes the purchase."
+                    : "Buy at the listed price and the name transfers directly to your connected wallet."}
+                </p>
+
+                <div className="mkt-detail-actions">
+                  <button
+                    type="button"
+                    onClick={() => isOwnListing ? handleCancelListing(listing) : handleBuyListing(listing)}
+                    disabled={isOwnListing ? isCancelListingBusy : isBuyListingBusy}
+                    className={`mkt-detail-primary ${isOwnListing ? "is-cancel" : ""}`}
+                  >
+                    {isOwnListing
+                      ? isThisCancellationPending
+                        ? <InlineLoading label="Cancelling..." />
+                        : "Cancel sale"
+                      : isThisPurchasePending
+                        ? <InlineLoading label="Buying..." />
+                        : "Buy now"}
+                  </button>
+                </div>
+              </div>
+            );
+          })() : (() => {
+            const reserved = detailSheet.reserved;
+            const priceWei = reserved.saleMode === "buy_now" ? reserved.fixedPriceWei : reserved.reservePriceWei;
+            const usdValue = priceWei && ethUsd ? Number(formatEther(priceWei)) * ethUsd : null;
+            return (
+              <div className="mkt-detail-layout">
+                <div className="mkt-detail-hero">
+                  <div>
+                    <span className="mkt-detail-kicker">
+                      {reserved.saleMode === "buy_now" ? "Fixed price" : "Opening reserve"}
+                    </span>
+                    <strong className="mkt-detail-price">
+                      {priceWei ? `${formatEthCompact(priceWei)} ETH` : "TBA"}
+                    </strong>
+                    <span className="mkt-detail-usd">≈ {priceWei ? formatUsd(usdValue) : "Price pending"}</span>
+                  </div>
+                  <span className="mkt-detail-status is-active">Available</span>
+                </div>
+
+                <div className="mkt-detail-facts">
+                  <div className="mkt-detail-fact">
+                    <span>Length</span>
+                    <strong>{reserved.label.length} characters</strong>
+                  </div>
+                  <div className="mkt-detail-fact">
+                    <span>Sale</span>
+                    <strong>{reservedSaleLabel(reserved)}</strong>
+                  </div>
+                </div>
+
+                <p className="mkt-detail-guidance">
+                  {reserved.saleMode === "buy_now"
+                    ? "Complete the purchase to register this name directly to your connected wallet."
+                    : "Join the watchlist for an alert when bidding becomes available."}
+                </p>
+
+                <div className="mkt-detail-actions">
                 <button
                   type="button"
                   onClick={() =>
-                    detailSheet.reserved.saleMode === "buy_now"
-                      ? handleBuyReservedName(detailSheet.reserved)
-                      : handleOpenWatchReservedModal(detailSheet.reserved)
+                    reserved.saleMode === "buy_now"
+                      ? handleBuyReservedName(reserved)
+                      : handleOpenWatchReservedModal(reserved)
                   }
-                  disabled={detailSheet.reserved.saleMode === "buy_now" && (isFixedPremiumBusy || fixedPremiumQuote.isLoading)}
-                  className="btn-primary names-action-btn w-full disabled:opacity-60"
+                  disabled={reserved.saleMode === "buy_now" && (isFixedPremiumBusy || fixedPremiumQuote.isLoading)}
+                  className="mkt-detail-primary"
                 >
-                  {detailSheet.reserved.saleMode === "buy_now"
+                  {reserved.saleMode === "buy_now"
                     ? isFixedPremiumBusy
                       ? <InlineLoading label="Buying..." />
                       : fixedPremiumQuote.isLoading
@@ -1973,8 +2256,9 @@ function DomainsMarketplacePage() {
                     : "Bid"}
                 </button>
               </div>
-            </>
-          )}
+              </div>
+            );
+          })()}
         </ResponsiveDialog>
       ) : null}
 
@@ -2006,10 +2290,8 @@ function DomainsMarketplacePage() {
           }
           className="max-w-md"
         >
-          <div className="eyebrow">Email updates</div>
-
           {notifyModal.kind === "bid-auction" ? (
-            <div className="mkt-field mt-5">
+            <div className="mkt-field">
               <span>Bid amount (ETH)</span>
               <input value={bidAmountEth} onChange={(event) => setBidAmountEth(event.target.value)} inputMode="decimal" />
               <span className="mt-2 block text-xs text-ink-faint">

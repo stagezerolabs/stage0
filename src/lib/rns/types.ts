@@ -97,12 +97,20 @@ export type RnsBuyMarketplaceListingParams = {
   price: bigint;
 };
 
+export type RnsCancelMarketplaceListingParams = {
+  listingId: bigint;
+};
+
 export type RnsBidMarketplaceAuctionParams = {
   auctionId: bigint;
   amount: bigint;
 };
 
 export type RnsSettleMarketplaceAuctionParams = {
+  auctionId: bigint;
+};
+
+export type RnsCancelMarketplaceAuctionParams = {
   auctionId: bigint;
 };
 

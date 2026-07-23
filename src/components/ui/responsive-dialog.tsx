@@ -47,7 +47,7 @@ export function ResponsiveDialog({
   return createPortal(
     <div
       className={cn(
-        "fixed inset-0 z-50 flex px-3 transition-opacity duration-200",
+        "fixed inset-0 z-[70] flex px-3 transition-opacity duration-200",
         isDesktop ? "items-center justify-center bg-black/38 py-6 backdrop-blur-[4px]" : "items-end justify-center bg-black/22 pt-12 backdrop-blur-[2px]",
       )}
       onClick={() => onOpenChange(false)}

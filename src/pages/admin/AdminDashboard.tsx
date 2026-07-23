@@ -6,7 +6,7 @@ import { formatEther, formatUnits, isAddress, keccak256, parseEther, stringToByt
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { InlineLoading, Spinner } from '@/components/ui/spinner';
-import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink, Sparkles } from '@/components/ui/icons';
+import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink } from '@/components/ui/icons';
 import { RNSRegistrar } from '@/config';
 import {
   activateRnsAdminReservedName,
@@ -909,14 +909,9 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="glass-card rounded-3xl p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-accent-secondary/15 text-accent-secondary flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-display text-display-sm text-ink">Factory Activity</p>
-              <p className="text-body-sm text-ink-muted">Total deployments on this factory</p>
-            </div>
+          <div>
+            <p className="font-display text-display-sm text-ink">Factory Activity</p>
+            <p className="text-body-sm text-ink-muted">Total deployments on this factory</p>
           </div>
           <p className="font-display text-display-md text-ink font-mono">
             {isLoadingNFTs ? <Spinner size="xs" variant="dots" /> : Number(totalDeployments).toLocaleString()}
@@ -1056,20 +1051,20 @@ const AdminDashboard: React.FC = () => {
         open={isReservedInventoryOpen}
         onOpenChange={setIsReservedInventoryOpen}
         title="Reserved Inventory"
-        description="Manage which curated names surface in the marketplace and in what order."
-        className="max-w-[1120px]"
+        description="Set marketplace visibility, sale terms, and display priority for curated names."
+        className="reserved-inventory-dialog max-w-[1180px]"
       >
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="reserved-inventory-panel">
+          <div className="reserved-inventory-toolbar">
             <input
               value={reservedSearch}
               onChange={(event) => setReservedSearch(event.target.value)}
-              placeholder="Search reserved names or categories"
-              className="input-field"
+              placeholder="Search names or categories"
+              className="input-field reserved-inventory-search"
             />
-            <div className="rounded-2xl border border-border bg-canvas/50 px-4 py-3 text-body-sm text-ink-muted">
-              Lower numbers show first.
-            </div>
+            <p className="reserved-inventory-hint">
+              Priority 1 appears first. Publishing opens wallet confirmations.
+            </p>
           </div>
 
           {reservedError ? (
@@ -1078,29 +1073,24 @@ const AdminDashboard: React.FC = () => {
             </div>
           ) : null}
 
-          <div className="max-h-[34rem] overflow-auto rounded-3xl border border-border">
-            <div className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_170px_190px_110px_110px_150px] gap-3 border-b border-border bg-canvas-alt px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-ink-faint sticky top-0 z-10">
+          <div className="reserved-inventory-table">
+            <div className="reserved-inventory-head">
               <span>Name</span>
               <span>Category</span>
-              <span>Enabled</span>
-              <span>Sale Mode</span>
+              <span>Visible</span>
+              <span>Sale type</span>
               <span>Duration</span>
-              <span>Price (ETH)</span>
-              <span>
-                Priority{" "}
-                <span className="normal-case font-semibold tracking-normal text-[10px] text-ink-faint/90">
-                  (lower first)
-                </span>
-              </span>
-              <span>Publish</span>
+              <span>Price</span>
+              <span>Priority</span>
+              <span>Actions</span>
             </div>
 
             {isLoadingReserved ? (
-              <div className="px-4 py-6 text-body-sm text-ink-muted">
+              <div className="reserved-inventory-empty">
                 <InlineLoading label="Loading reserved names..." variant="dots" />
               </div>
             ) : filteredReservedNames.length === 0 ? (
-              <div className="px-4 py-6 text-body-sm text-ink-muted">No reserved names match this search.</div>
+              <div className="reserved-inventory-empty">No reserved names match this search.</div>
             ) : (
               filteredReservedNames.map((name) => {
                 const draft = reservedDrafts[name.id];
@@ -1113,18 +1103,26 @@ const AdminDashboard: React.FC = () => {
                       ? Number(formatEther(activePriceWei)) * rnsPricing.ethUsd
                       : null;
                 const isSaving = savingReservedIds.includes(name.id);
+                const hasLiveAuction = primaryAuctions.some(
+                  (auction) =>
+                    auction.name.toLowerCase() === name.label.toLowerCase() &&
+                    ['active', 'scheduled'].includes(auction.status),
+                );
+                const isPublishing = publishingReservedId === name.id;
 
                 return (
                   <div
                     key={name.id}
-                    className="grid grid-cols-[minmax(220px,1.2fr)_minmax(160px,0.9fr)_110px_170px_190px_110px_110px_150px] gap-3 border-b border-border/70 px-4 py-4 last:border-b-0 items-start"
+                    className="reserved-inventory-row"
                   >
-                    <div className="min-w-0">
-                      <p className="font-display text-body text-ink break-all">{name.fqdn}</p>
-                      <p className="mt-1 text-xs text-ink-muted">≈ {formatUsdValue(activePriceUsd)}</p>
+                    <div className="reserved-inventory-cell reserved-inventory-name" data-label="Name">
+                      <p>{name.fqdn}</p>
+                      <span>≈ {formatUsdValue(activePriceUsd)}</span>
                     </div>
-                    <div className="break-words text-body-sm text-ink-muted">{name.category.replace(/_/g, ' ')}</div>
-                    <label className="inline-flex items-center gap-2 text-body-sm text-ink">
+                    <div className="reserved-inventory-cell reserved-inventory-category" data-label="Category">
+                      {name.category.replace(/_/g, ' ')}
+                    </div>
+                    <label className="reserved-inventory-cell reserved-inventory-toggle" data-label="Visible">
                       <input
                         type="checkbox"
                         checked={draft?.enabled ?? name.enabled}
@@ -1133,20 +1131,23 @@ const AdminDashboard: React.FC = () => {
                         }
                         className="h-4 w-4 rounded border-border"
                       />
-                      <span>{draft?.enabled ?? name.enabled ? 'On' : 'Off'}</span>
+                      <span>{draft?.enabled ?? name.enabled ? 'Visible' : 'Hidden'}</span>
                     </label>
-                    <select
-                      value={draft?.saleMode ?? name.saleMode}
-                      onChange={(event) =>
-                        handleReservedDraftChange(name.id, 'saleMode', event.target.value as ReservedNameDraft['saleMode'])
-                      }
-                      className="input-field"
-                    >
-                      <option value="auction">Auction</option>
-                      <option value="buy_now">Fixed price (until sold)</option>
-                    </select>
-                    {(draft?.saleMode ?? name.saleMode) === 'auction' ? (
-                      <div className="grid grid-cols-[72px_minmax(100px,1fr)] gap-2">
+                    <div className="reserved-inventory-cell" data-label="Sale type">
+                      <select
+                        value={draft?.saleMode ?? name.saleMode}
+                        onChange={(event) =>
+                          handleReservedDraftChange(name.id, 'saleMode', event.target.value as ReservedNameDraft['saleMode'])
+                        }
+                        className="input-field reserved-inventory-input"
+                      >
+                        <option value="auction">Auction</option>
+                        <option value="buy_now">Fixed price</option>
+                      </select>
+                    </div>
+                    <div className="reserved-inventory-cell" data-label="Duration">
+                      {(draft?.saleMode ?? name.saleMode) === 'auction' ? (
+                        <div className="reserved-inventory-duration">
                         <input
                           type="number"
                           min="1"
@@ -1156,7 +1157,7 @@ const AdminDashboard: React.FC = () => {
                             handleReservedDraftChange(name.id, 'auctionDurationValue', event.target.value)
                           }
                           aria-label={`Auction duration for ${name.fqdn}`}
-                          className="input-field font-mono"
+                          className="input-field reserved-inventory-input font-mono"
                         />
                         <select
                           value={draft?.auctionDurationUnit ?? toAuctionDurationDraft(name.auctionDurationSeconds).auctionDurationUnit}
@@ -1168,7 +1169,7 @@ const AdminDashboard: React.FC = () => {
                             )
                           }
                           aria-label={`Auction duration unit for ${name.fqdn}`}
-                          className="input-field"
+                          className="input-field reserved-inventory-input"
                         >
                           <option value="days">Days</option>
                           <option value="weeks">Weeks</option>
@@ -1176,74 +1177,75 @@ const AdminDashboard: React.FC = () => {
                           <option value="years">Years</option>
                         </select>
                       </div>
-                    ) : (
-                      <div className="rounded-xl border border-border bg-canvas-alt px-3 py-2 text-body-sm font-semibold text-ink-muted">
-                        Until sold
-                      </div>
-                    )}
-                    <input
-                      value={draft?.priceEth ?? ''}
-                      onChange={(event) =>
-                        handleReservedDraftChange(name.id, 'priceEth', event.target.value)
-                      }
-                      placeholder="0.05"
-                      className="input-field font-mono"
-                    />
-                    <div className="space-y-2">
+                      ) : (
+                        <span className="reserved-inventory-until-sold">Until sold</span>
+                      )}
+                    </div>
+                    <div className="reserved-inventory-cell reserved-inventory-price" data-label="Price (ETH)">
+                      <input
+                        value={draft?.priceEth ?? ''}
+                        onChange={(event) =>
+                          handleReservedDraftChange(name.id, 'priceEth', event.target.value)
+                        }
+                        placeholder="0.05"
+                        className="input-field reserved-inventory-input font-mono"
+                      />
+                      <span>ETH</span>
+                    </div>
+                    <div className="reserved-inventory-cell" data-label="Priority">
                       <input
                         value={draft?.displayOrder ?? String(name.displayOrder)}
                         onChange={(event) =>
                           handleReservedDraftChange(name.id, 'displayOrder', event.target.value)
                         }
                         placeholder="0"
-                        className="input-field font-mono"
+                        className="input-field reserved-inventory-input font-mono"
                       />
-                      <button
-                        type="button"
-                        onClick={() => void handleSaveReservedName(name)}
-                        disabled={!isRnsOwner || isSaving}
-                        className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {isSaving ? <InlineLoading label="Saving..." /> : 'Save'}
-                      </button>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2 text-xs text-ink-muted">
-                        <span>{name.activatedAt ? 'Published' : 'Draft'}</span>
+                    <div className="reserved-inventory-cell reserved-inventory-actions" data-label="Actions">
+                      <div className="reserved-inventory-status">
+                        <span className={name.activatedAt ? 'is-published' : 'is-unpublished'}>
+                          {name.activatedAt ? 'Published' : 'Unpublished'}
+                        </span>
                         {name.primaryAuctionId !== null ? (
-                          <span className="font-mono">Auction #{name.primaryAuctionId.toString()}</span>
+                          <small>Auction #{name.primaryAuctionId.toString()}</small>
                         ) : null}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void handlePublishReservedName(name)}
-                        disabled={
-                          !isRnsOwner ||
-                          publishingReservedId !== null ||
-                          isSettingRnsPolicy ||
-                          isLaunchingPrimaryAuction
-                        }
-                        className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {publishingReservedId === name.id ? (
-                          <InlineLoading
-                            label={
-                              pendingReservedPublish?.stage === 'auction'
-                                ? 'Launching...'
-                                : 'Publishing...'
-                            }
-                          />
-                        ) : (draft?.saleMode ?? name.saleMode) === 'auction' ? (
-                          'Publish auction'
-                        ) : (
-                          'Publish fixed sale'
-                        )}
-                      </button>
-                      <p className="text-xs text-ink-muted">
-                        {(draft?.saleMode ?? name.saleMode) === 'auction'
-                          ? 'Requires policy and auction signatures.'
-                          : 'Requires one policy signature.'}
-                      </p>
+                      <div className="reserved-inventory-buttons">
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveReservedName(name)}
+                          disabled={!isRnsOwner || isSaving}
+                          className="reserved-inventory-save disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {isSaving ? <InlineLoading label="Saving..." /> : 'Save changes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handlePublishReservedName(name)}
+                          disabled={
+                            !isRnsOwner ||
+                            publishingReservedId !== null ||
+                            isSettingRnsPolicy ||
+                            isLaunchingPrimaryAuction ||
+                            ((draft?.saleMode ?? name.saleMode) === 'auction' && hasLiveAuction)
+                          }
+                          className="reserved-inventory-publish disabled:opacity-60 disabled:cursor-not-allowed"
+                          title={hasLiveAuction ? 'This name already has a live or scheduled auction.' : undefined}
+                        >
+                          {isPublishing ? (
+                            <InlineLoading
+                              label={pendingReservedPublish?.stage === 'auction' ? 'Launching...' : 'Publishing...'}
+                            />
+                          ) : hasLiveAuction ? (
+                            'Auction live'
+                          ) : name.activatedAt ? (
+                            'Publish again'
+                          ) : (
+                            'Publish'
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

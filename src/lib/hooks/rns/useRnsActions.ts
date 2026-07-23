@@ -6,7 +6,9 @@ import type {
   RnsCreateMarketplaceAuctionParams,
   RnsCreateMarketplaceListingParams,
   RnsBuyMarketplaceListingParams,
+  RnsCancelMarketplaceListingParams,
   RnsBidMarketplaceAuctionParams,
+  RnsCancelMarketplaceAuctionParams,
   RnsBidPrimaryAuctionParams,
   RnsCreatePrimaryAuctionParams,
   RnsRegisterParams,
@@ -212,6 +214,25 @@ export function useRnsBuyMarketplaceListing() {
   return { ...write, buyListing };
 }
 
+export function useRnsCancelMarketplaceListing() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const cancelListing = useCallback(
+    (params: RnsCancelMarketplaceListingParams) => {
+      write.writeContract({
+        address: marketplace,
+        abi: RNSMarketplaceEscrow,
+        functionName: "cancelListing",
+        args: [params.listingId],
+      });
+    },
+    [marketplace, write],
+  );
+
+  return { ...write, cancelListing };
+}
+
 export function useRnsBidMarketplaceAuction() {
   const { marketplace } = useRnsContracts();
   const write = useRnsWrite();
@@ -269,6 +290,25 @@ export function useRnsSettleMarketplaceAuction() {
   );
 
   return { ...write, settleAuction };
+}
+
+export function useRnsCancelMarketplaceAuction() {
+  const { marketplace } = useRnsContracts();
+  const write = useRnsWrite();
+
+  const cancelAuction = useCallback(
+    (params: RnsCancelMarketplaceAuctionParams) => {
+      write.writeContract({
+        address: marketplace,
+        abi: RNSMarketplaceEscrow,
+        functionName: "cancelAuction",
+        args: [params.auctionId],
+      });
+    },
+    [marketplace, write],
+  );
+
+  return { ...write, cancelAuction };
 }
 
 export function useRnsSettlePrimaryAuction() {

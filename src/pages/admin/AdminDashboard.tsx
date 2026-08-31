@@ -1100,7 +1100,7 @@ const AdminDashboard: React.FC = () => {
                     onClick={() => handleReservedNetworkChange(network.chainId)}
                     className={isSelected ? 'is-selected' : undefined}
                   >
-                    <img src="/rise-network.svg" alt="" aria-hidden="true" />
+                    <img src="/rise-network.png" alt="" aria-hidden="true" />
                     <span>{network.label}</span>
                     <small>{network.chainId}</small>
                   </button>

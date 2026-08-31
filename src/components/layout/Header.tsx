@@ -260,7 +260,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
               aria-label="Default network: RISE Mainnet"
               title={`Default network · Chain ${riseMainnet.id}`}
             >
-              <img src="/rise-network.svg" alt="" className="h-4 w-4 rounded-full" />
+              <img src="/rise-network.png" alt="" className="h-4 w-4 rounded-full" />
               <span>RISE Mainnet</span>
             </div>
           )}
@@ -376,7 +376,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                           >
                             <img
                               alt={chain.name ?? 'Chain icon'}
-                              src={chain.iconUrl ?? '/rise-network.svg'}
+                              src={chain.iconUrl ?? '/rise-network.png'}
                               className="w-4 h-4 rounded-full"
                             />
                             <span className="hidden sm:inline text-body-sm">{chain.name}</span>
@@ -477,7 +477,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                   className="flex w-full items-center gap-3 rounded-xl border border-border bg-canvas-alt/50 px-4 py-3 text-body font-medium text-ink-muted"
                   aria-label="Default network: RISE Mainnet"
                 >
-                  <img src="/rise-network.svg" alt="" className="h-5 w-5 rounded-full" />
+                  <img src="/rise-network.png" alt="" className="h-5 w-5 rounded-full" />
                   <span className="flex flex-col items-start">
                     <span className="text-ink">RISE Mainnet</span>
                     <span className="text-[10px] font-normal text-ink-faint">Default network · Chain {riseMainnet.id}</span>
@@ -499,7 +499,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                     <>
                       <img
                         alt={chainInfo.name ?? 'Chain icon'}
-                        src={chainInfo.iconUrl ?? '/rise-network.svg'}
+                        src={chainInfo.iconUrl ?? '/rise-network.png'}
                         className="w-5 h-5 rounded-full"
                       />
                       {chainInfo.name}

@@ -36,7 +36,7 @@ const RISE_MAINNET_RPC_URL =
 export const riseMainnet = defineChain({
   id: 4153,
   name: "RISE Mainnet",
-  iconUrl: "/rise-network.svg",
+  iconUrl: "/rise-network.png",
   iconBackground: "#0B0E11",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {

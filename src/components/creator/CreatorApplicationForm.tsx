@@ -6,9 +6,9 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Coins,
   Image as ImageIcon,
   Plus,
-  Rocket,
   ShieldCheck,
   Trash2,
   Upload,
@@ -122,8 +122,8 @@ export default function CreatorApplicationForm({
   const isRejected = existingApplication?.status === 'rejected';
   const showReceipt = isPending && !editingPending;
   const title = type === 'nft' ? 'NFT creator application' : 'Token launch application';
-  const eyebrow = type === 'nft' ? 'Create an NFT' : 'Token Launch';
-  const Icon = type === 'nft' ? ImageIcon : Rocket;
+  const eyebrow = type === 'nft' ? 'Create an NFT · Creator access' : null;
+  const Icon = type === 'nft' ? ImageIcon : Coins;
 
   useEffect(() => {
     if (address && !founderAddressInput) {
@@ -303,10 +303,10 @@ export default function CreatorApplicationForm({
       <header className="creator-application-header">
         <div className="creator-application-mark"><Icon className="h-6 w-6" /></div>
         <div>
-          <p className="eyebrow">{eyebrow} · Creator access</p>
+          {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
           <h1 className="ds-h1 mt-2">{title}</h1>
           <p className="mt-3 max-w-2xl text-ink-muted">
-            Tell us what you’re building. This keeps Stage0 launches curated while giving serious teams a fast path to ship on RISE Mainnet.
+            Tell us what you’re building to get approved to launch on RISE Mainnet.
           </p>
         </div>
       </header>

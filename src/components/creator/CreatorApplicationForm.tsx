@@ -122,7 +122,6 @@ export default function CreatorApplicationForm({
   const isRejected = existingApplication?.status === 'rejected';
   const showReceipt = isPending && !editingPending;
   const title = type === 'nft' ? 'NFT creator application' : 'Token launch application';
-  const eyebrow = type === 'nft' ? 'Create an NFT · Creator access' : null;
   const Icon = type === 'nft' ? ImageIcon : Coins;
 
   useEffect(() => {
@@ -285,7 +284,7 @@ export default function CreatorApplicationForm({
           <p className="eyebrow">Application received</p>
           <h1 className="ds-h1">Thanks — we’ve got {existingApplication.projectName}.</h1>
           <p className="max-w-xl text-center text-ink-muted">
-            The Stage0 team has been notified by Slack and email. Once approved, this page automatically becomes your {type === 'nft' ? 'NFT collection' : 'token launch'} builder.
+            Your application is now with the Stage0 team for review. Once approved, this page automatically becomes your {type === 'nft' ? 'NFT collection' : 'token launch'} builder.
           </p>
           <div className="rounded-2xl border border-border bg-canvas/50 px-5 py-4 text-sm text-ink-muted">
             Submitted {new Date(existingApplication.submittedAt).toLocaleString()} · Status: <strong className="text-status-upcoming">Pending review</strong>
@@ -303,8 +302,7 @@ export default function CreatorApplicationForm({
       <header className="creator-application-header">
         <div className="creator-application-mark"><Icon className="h-6 w-6" /></div>
         <div>
-          {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-          <h1 className="ds-h1 mt-2">{title}</h1>
+          <h1 className="ds-h1">{title}</h1>
           <p className="mt-3 max-w-2xl text-ink-muted">
             Tell us what you’re building to get approved to launch on RISE Mainnet.
           </p>
@@ -440,7 +438,7 @@ export default function CreatorApplicationForm({
             <div className="creator-review-item"><span>Team</span><strong>{team.length ? `${team.length + 1} people` : 'Solo founder'}</strong></div>
           </div>
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-canvas/40 p-4"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1 h-4 w-4 accent-[rgb(var(--color-accent))]" /><span className="text-sm leading-6 text-ink-muted">I confirm these details are accurate and I control the founder wallet listed above.</span></label>
-          <div className="rounded-2xl bg-accent/10 p-4 text-sm text-ink-muted"><div className="flex gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-accent" /><p>Submitting stores the application in Stage0, sends it to the internal Slack channel, and emails the Stage0 project account for review.</p></div></div>
+          <div className="rounded-2xl bg-accent/10 p-4 text-sm text-ink-muted"><div className="flex gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-accent" /><p>Your application will be reviewed by the Stage0 team before creator access is granted.</p></div></div>
           <div className="flex items-center justify-between gap-3"><button type="button" className="btn-ghost inline-flex items-center gap-2" onClick={() => setStep(1)} disabled={isSubmitting}><ArrowLeft className="h-4 w-4" /> Back</button><button type="button" className="btn-primary min-w-44" onClick={handleSubmit} disabled={!confirmed || isSubmitting}>{isSubmitting ? <InlineLoading label="Sign & submit" /> : 'Sign & submit application'}</button></div>
         </section>
       ) : null}

@@ -29,6 +29,7 @@ import {
 } from '@/lib/rns/constants';
 import { useFactoryOwner, useFeeRecipient, useProceedsFeeBps } from '@/lib/utils/admin';
 import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
+import CreatorApprovalsPanel from '@/components/admin/CreatorApprovalsPanel';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -916,6 +917,10 @@ const AdminDashboard: React.FC = () => {
           </p>
         </button>
       </motion.section>
+
+      <motion.div variants={itemVariants}>
+        <CreatorApprovalsPanel />
+      </motion.div>
 
       <motion.section variants={itemVariants} className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">

@@ -3,6 +3,7 @@ import Layout from './components/layout/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 import MainnetGuard from './components/MainnetGuard';
+import CreatorAccessGate from './components/creator/CreatorAccessGate';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -48,7 +49,14 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
           <Route element={<PrivateRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/presales/manage/:address" element={<ManagePresalePage />} />
-            <Route path="/create/nft" element={<CreateNFTPage />} />
+            <Route
+              path="/create/nft"
+              element={<CreatorAccessGate type="nft"><CreateNFTPage /></CreatorAccessGate>}
+            />
+            <Route
+              path="/create/presale"
+              element={<CreatorAccessGate type="presale"><CreatePresalePage /></CreatorAccessGate>}
+            />
             <Route path="/nfts/manage/:address" element={<ManageNFTPage />} />
             <Route path="/locks/:id" element={<LockDetailPage />} />
             <Route path="/tools" element={<Tools />} />
@@ -61,7 +69,6 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
             {/* Admin-only tool access */}
             <Route element={<AdminRoute />}>
               <Route path="/create/token" element={<CreateTokenPage />} />
-              <Route path="/create/presale" element={<CreatePresalePage />} />
               <Route path="/tools/token-locker" element={<TokenLockerPage />} />
               <Route path="/tools/airdrop" element={<AirdropPage />} />
             </Route>

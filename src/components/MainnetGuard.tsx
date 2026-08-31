@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { useAccount, useChainId, useSwitchChain } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import { riseMainnet } from '@/config';
+import { useRiseNetworkSwitch } from '@/lib/hooks/useRiseNetworkSwitch';
 
 type MainnetGuardProps = {
   children: ReactNode;
@@ -9,7 +10,7 @@ type MainnetGuardProps = {
 export default function MainnetGuard({ children }: MainnetGuardProps) {
   const { isConnected } = useAccount();
   const chainId = useChainId();
-  const { switchChain, isPending, error } = useSwitchChain();
+  const { switchToRise, isSwitching, error } = useRiseNetworkSwitch();
 
   if (!isConnected || chainId === riseMainnet.id) {
     return children;
@@ -36,11 +37,11 @@ export default function MainnetGuard({ children }: MainnetGuardProps) {
       </p>
       <button
         type="button"
-        onClick={() => switchChain({ chainId: riseMainnet.id })}
-        disabled={isPending}
+        onClick={() => void switchToRise().catch(() => undefined)}
+        disabled={isSwitching}
         className="mt-6 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-accent-foreground transition hover:bg-accent-hover disabled:cursor-wait disabled:opacity-60"
       >
-        {isPending ? 'Switching network…' : 'Switch to RISE Mainnet'}
+        {isSwitching ? 'Switching network…' : 'Switch to RISE Mainnet'}
       </button>
       {error && <p className="mt-3 text-xs text-status-error">{error.message}</p>}
     </section>

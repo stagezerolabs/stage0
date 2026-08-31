@@ -9,6 +9,8 @@ import { RISE_CONNECTOR_ID, riseMainnet } from '@/config';
 import { useIsAdmin } from '@/lib/utils/admin';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import type { Address } from 'viem';
+import { toast } from 'sonner';
+import { useRiseNetworkSwitch } from '@/lib/hooks/useRiseNetworkSwitch';
 
 type HeaderProps = {
   themeMode: 'dark' | 'light';
@@ -38,6 +40,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const { connect, isPending: isRiseConnectPending } = useConnect();
   const availableConnectors = useConnectors();
   const riseConnector = availableConnectors.find((connector) => connector.id === RISE_CONNECTOR_ID);
+  const { switchToRise, isSwitching: isRiseSwitching } = useRiseNetworkSwitch();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -111,8 +114,14 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
   const handleMobileChainSwitch = useCallback(() => {
     closeMobileMenu();
+    if (chainInfo?.unsupported) {
+      void switchToRise().catch((error) => {
+        toast.error(error instanceof Error ? error.message : 'Could not switch to RISE Mainnet.');
+      });
+      return;
+    }
     openChainModalRef.current?.();
-  }, [closeMobileMenu]);
+  }, [chainInfo?.unsupported, closeMobileMenu, switchToRise]);
 
   const handleMobileWalletAction = useCallback(() => {
     closeMobileMenu();
@@ -350,13 +359,19 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                       return (
                         <>
                           <button
-                            onClick={openChainModal}
+                            onClick={() => void switchToRise().catch((error) => {
+                              toast.error(error instanceof Error ? error.message : 'Could not switch to RISE Mainnet.');
+                            })}
+                            disabled={isRiseSwitching}
                             className="hidden md:inline-flex btn-secondary text-status-error border-status-error"
                           >
-                            Wrong network
+                            {isRiseSwitching ? 'Switching…' : 'Switch to RISE Mainnet'}
                           </button>
                           <button
-                            onClick={openChainModal}
+                            onClick={() => void switchToRise().catch((error) => {
+                              toast.error(error instanceof Error ? error.message : 'Could not switch to RISE Mainnet.');
+                            })}
+                            disabled={isRiseSwitching}
                             className="md:hidden btn-ghost p-2 text-status-error"
                             aria-label="Wrong network. Switch network"
                             title="Switch network"
@@ -494,7 +509,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                     }`}
                 >
                   {chainInfo.unsupported ? (
-                    'Switch Network'
+                    isRiseSwitching ? 'Switching to RISE Mainnet…' : 'Switch to RISE Mainnet'
                   ) : (
                     <>
                       <img

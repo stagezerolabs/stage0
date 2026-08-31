@@ -679,9 +679,9 @@ const CreateNFTPage: React.FC = () => {
                 </p>
               </div>
               <ol className="list-decimal pl-5 space-y-2 text-body-sm text-ink-muted">
-                <li>Open `Manage Collection` and confirm public sale price, wallet limit, and required sale end.</li>
+                <li>Review the deployed public sale price, wallet limit, and sale end on the collection page.</li>
                 <li>Upload whitelist wallets before the whitelist window starts if you enabled allowlist minting.</li>
-                <li>Set or confirm your payout wallet and token metadata base URI.</li>
+                <li>Use Manage Collection to monitor proceeds and withdraw raised funds.</li>
                 <li>Share the collection page or explorer link with your community.</li>
               </ol>
               <div className="flex flex-wrap gap-2">

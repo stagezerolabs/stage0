@@ -9,7 +9,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from 'wagmi';
-import { formatEther, isAddress, type Address } from 'viem';
+import { formatEther, isAddress, type Address, type ContractFunctionParameters } from 'viem';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -175,12 +175,6 @@ const NFTDetailPage: React.FC = () => {
       {
         abi: NFTCollectionContract,
         address: collectionAddress,
-        functionName: 'mintedBy',
-        args: [userAddress],
-      },
-      {
-        abi: NFTCollectionContract,
-        address: collectionAddress,
         functionName: 'mintedPerWallet',
         args: [userAddress],
       },
@@ -194,7 +188,7 @@ const NFTDetailPage: React.FC = () => {
   }, [collectionAddress, userAddress]);
 
   const { data: collectionData, isLoading: isCollectionLoading, refetch } = useReadContracts({
-    contracts: queries as readonly any[],
+    contracts: queries as readonly ContractFunctionParameters[],
     query: {
       enabled: queries.length > 0,
       refetchInterval: 10000,
@@ -203,7 +197,7 @@ const NFTDetailPage: React.FC = () => {
   });
 
   const { data: userStateData, refetch: refetchUserState } = useReadContracts({
-    contracts: userStateQueries as readonly any[],
+    contracts: userStateQueries as readonly ContractFunctionParameters[],
     query: {
       enabled: userStateQueries.length > 0,
       refetchInterval: 10000,
@@ -375,12 +369,7 @@ const NFTDetailPage: React.FC = () => {
   const userMinted = useMemo(() => {
     if (!userStateData || userStateData.length === 0) return 0n;
 
-    const mintedBy = userStateData[0];
-    const mintedPerWallet = userStateData[1];
-
-    if (mintedBy?.status === 'success' && typeof mintedBy.result === 'bigint') {
-      return mintedBy.result;
-    }
+    const mintedPerWallet = userStateData[0];
     if (mintedPerWallet?.status === 'success' && typeof mintedPerWallet.result === 'bigint') {
       return mintedPerWallet.result;
     }
@@ -388,7 +377,7 @@ const NFTDetailPage: React.FC = () => {
   }, [userStateData]);
 
   const isUserWhitelisted = useMemo(() => {
-    const whitelistEntry = userStateData?.[2];
+    const whitelistEntry = userStateData?.[1];
     return whitelistEntry?.status === 'success' && Boolean(whitelistEntry.result);
   }, [userStateData]);
 
@@ -588,7 +577,7 @@ const NFTDetailPage: React.FC = () => {
       mono: true,
     },
     { label: 'Standard', value: 'ERC-721A' },
-    { label: 'Network', value: 'RISE Testnet' },
+    { label: 'Network', value: 'RISE Mainnet' },
     { label: 'Public mint price', value: `${formatEther(collection.mintPrice)} ETH`, mono: true },
     {
       label: 'Whitelist mint price',

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { type Address } from 'viem';
+import { type Address, type ContractFunctionParameters } from 'viem';
 import { useReadContracts } from 'wagmi';
 import { NFTCollectionContract } from '@/config';
 import { useNFTDeployments, type NFTDeploymentWithMetadata } from '@/lib/hooks/useNFTDeployments';
@@ -41,12 +41,6 @@ export function useUserNFTHoldings(userAddress?: Address, enabled = true) {
       {
         abi: NFTCollectionContract,
         address: deployment.address,
-        functionName: 'mintedBy',
-        args: [userAddress],
-      },
-      {
-        abi: NFTCollectionContract,
-        address: deployment.address,
         functionName: 'mintedPerWallet',
         args: [userAddress],
       },
@@ -54,7 +48,7 @@ export function useUserNFTHoldings(userAddress?: Address, enabled = true) {
   }, [deployments, userAddress]);
 
   const { data: holdingResults, isLoading: isHoldingsLoading } = useReadContracts({
-    contracts: holdingQueries as readonly any[],
+    contracts: holdingQueries as readonly ContractFunctionParameters[],
     query: {
       enabled: holdingQueries.length > 0,
       staleTime: QUERY_STALE_TIME,
@@ -69,11 +63,9 @@ export function useUserNFTHoldings(userAddress?: Address, enabled = true) {
 
     return deployments
       .map((deployment, index) => {
-        const base = index * 3;
+        const base = index * 2;
         const ownedCount = readBigintResult(holdingResults?.[base]) ?? 0n;
-        const mintedViaOldName = readBigintResult(holdingResults?.[base + 1]);
-        const mintedViaNewName = readBigintResult(holdingResults?.[base + 2]);
-        const mintedCount = mintedViaOldName ?? mintedViaNewName ?? ownedCount;
+        const mintedCount = readBigintResult(holdingResults?.[base + 1]) ?? ownedCount;
 
         return {
           ...deployment,

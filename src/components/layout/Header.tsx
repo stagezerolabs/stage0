@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount, useConnect, useConnectors } from 'wagmi';
 import { AlertTriangle, ChevronDown, Menu, Moon, Sun, Wallet, X } from '@/components/ui/icons';
 import { InlineLoading } from '@/components/ui/spinner';
-import { RISE_CONNECTOR_ID } from '@/config';
+import { RISE_CONNECTOR_ID, riseMainnet } from '@/config';
 import { useIsAdmin } from '@/lib/utils/admin';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import type { Address } from 'viem';
@@ -20,7 +20,8 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpenForPath, setMobileMenuOpenForPath] = useState<string | null>(null);
   const isMobileMenuOpen = mobileMenuOpenForPath === location.pathname;
-  const [namesDrawerOpen, setNamesDrawerOpen] = useState(false);
+  const [namesDrawerOpenForPath, setNamesDrawerOpenForPath] = useState<string | null>(null);
+  const namesDrawerOpen = namesDrawerOpenForPath === location.pathname;
   const [chainInfo, setChainInfo] = useState<{
     name?: string;
     iconUrl?: string;
@@ -47,21 +48,17 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   }, []);
 
   useEffect(() => {
-    setNamesDrawerOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
     if (!namesDrawerOpen) return undefined;
 
     const handlePointerDown = (event: MouseEvent) => {
       if (!namesNavRef.current?.contains(event.target as Node)) {
-        setNamesDrawerOpen(false);
+        setNamesDrawerOpenForPath(null);
       }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setNamesDrawerOpen(false);
+        setNamesDrawerOpenForPath(null);
       }
     };
 
@@ -77,6 +74,16 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const closeMobileMenu = useCallback(() => {
     setMobileMenuOpenForPath(null);
   }, []);
+
+  const closeNamesDrawer = useCallback(() => {
+    setNamesDrawerOpenForPath(null);
+  }, []);
+
+  const toggleNamesDrawer = useCallback(() => {
+    setNamesDrawerOpenForPath((openPath) =>
+      openPath === location.pathname ? null : location.pathname,
+    );
+  }, [location.pathname]);
 
   const publicNavItems = [
     { path: '/presales', label: 'Launchpad' },
@@ -159,7 +166,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                 <div key={item.path} ref={namesNavRef} className="relative">
                   <button
                     type="button"
-                    onClick={() => setNamesDrawerOpen((open) => !open)}
+                    onClick={toggleNamesDrawer}
                     aria-expanded={namesDrawerOpen}
                     aria-haspopup="menu"
                     className="relative inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium tracking-tight transition-colors duration-300"
@@ -198,7 +205,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                             <Link
                               key={link.path}
                               to={link.path}
-                              onClick={() => setNamesDrawerOpen(false)}
+                              onClick={closeNamesDrawer}
                               className={`block rounded-xl px-3.5 py-3 transition-colors ${linkActive
                                 ? 'bg-accent/10 text-ink'
                                 : 'text-ink-muted hover:bg-canvas/60 hover:text-ink'
@@ -247,6 +254,17 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
         {/* Right side: Theme + Connect + Mobile menu button */}
         <div className="flex items-center gap-3">
+          {!isConnected && (
+            <div
+              className="hidden lg:inline-flex items-center gap-2 rounded-full border border-border bg-canvas-alt/70 px-3 py-2 text-[12px] font-semibold text-ink-muted"
+              aria-label="Default network: RISE Mainnet"
+              title={`Default network · Chain ${riseMainnet.id}`}
+            >
+              <img src="/rise-network.svg" alt="" className="h-4 w-4 rounded-full" />
+              <span>RISE Mainnet</span>
+            </div>
+          )}
+
           <button
             onClick={onToggleTheme}
             className={`hidden md:inline-flex btn-ghost p-2 ${themeMode === 'dark' ? 'hover:text-[#FF8A00]' : 'hover:text-[#04DF83]'}`}
@@ -356,13 +374,11 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                             onClick={openChainModal}
                             className="btn-ghost flex items-center gap-2"
                           >
-                            {chain.hasIcon && chain.iconUrl && (
-                              <img
-                                alt={chain.name ?? 'Chain icon'}
-                                src={chain.iconUrl}
-                                className="w-4 h-4 rounded-full"
-                              />
-                            )}
+                            <img
+                              alt={chain.name ?? 'Chain icon'}
+                              src={chain.iconUrl ?? '/rise-network.svg'}
+                              className="w-4 h-4 rounded-full"
+                            />
                             <span className="hidden sm:inline text-body-sm">{chain.name}</span>
                           </button>
 
@@ -456,6 +472,19 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                 </button>
               )}
 
+              {!isConnected && (
+                <div
+                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-canvas-alt/50 px-4 py-3 text-body font-medium text-ink-muted"
+                  aria-label="Default network: RISE Mainnet"
+                >
+                  <img src="/rise-network.svg" alt="" className="h-5 w-5 rounded-full" />
+                  <span className="flex flex-col items-start">
+                    <span className="text-ink">RISE Mainnet</span>
+                    <span className="text-[10px] font-normal text-ink-faint">Default network · Chain {riseMainnet.id}</span>
+                  </span>
+                </div>
+              )}
+
               {isConnected && chainInfo && (
                 <button
                   onClick={handleMobileChainSwitch}
@@ -468,13 +497,11 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                     'Switch Network'
                   ) : (
                     <>
-                      {chainInfo.hasIcon && chainInfo.iconUrl && (
-                        <img
-                          alt={chainInfo.name ?? 'Chain icon'}
-                          src={chainInfo.iconUrl}
-                          className="w-5 h-5 rounded-full"
-                        />
-                      )}
+                      <img
+                        alt={chainInfo.name ?? 'Chain icon'}
+                        src={chainInfo.iconUrl ?? '/rise-network.svg'}
+                        className="w-5 h-5 rounded-full"
+                      />
                       {chainInfo.name}
                     </>
                   )}
@@ -492,7 +519,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                     <div key={item.path} className="rounded-xl">
                       <button
                         type="button"
-                        onClick={() => setNamesDrawerOpen((open) => !open)}
+                        onClick={toggleNamesDrawer}
                         className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-body font-medium transition-colors duration-200 ${isActive
                           ? 'bg-canvas-alt text-ink'
                           : 'text-ink-muted hover:text-ink hover:bg-canvas-alt/50'

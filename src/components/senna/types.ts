@@ -13,7 +13,7 @@ export interface SennaActionDraft {
   actionType: SennaActionType;
   targetRoute: string;
   requiredWallet?: 'evm' | null;
-  requiredChain?: 'rise_testnet' | null;
+  requiredChain?: 'rise_mainnet' | null;
   prefill: Record<string, string>;
   summary: string;
   warnings?: string[];

@@ -1,6 +1,4 @@
-const SENNA_API_URL =
-  (import.meta.env.VITE_SENNA_CHAT_API_URL as string | undefined)?.replace(/\/$/, "") ||
-  "http://localhost:8788";
+import { SENNA_API_URL } from "./base-url";
 
 export type NFTMetadataValidationResponse = {
   ok: true;
@@ -34,4 +32,3 @@ export async function validateNFTMetadata(input: {
 
   return payload;
 }
-

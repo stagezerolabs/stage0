@@ -1,5 +1,5 @@
 import { DOMAIN_SUFFIX, formatDomainDisplay, normalizeRnsLabel } from "@/lib/rns/utils";
-import { riseTestnet } from "@/config";
+import { riseMainnet } from "@/config";
 import { useRnsOwner } from "@/lib/hooks/rns/useRnsRegistry";
 import { useRnsExpiry } from "@/lib/hooks/rns/useRnsRegistrar";
 import { useRnsApiDomainsForOwner } from "@/lib/hooks/rns/useRnsApi";
@@ -42,7 +42,7 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     error: apiError,
     isLoading: isApiLoading,
     refetch: refetchApi,
-  } = useRnsApiDomainsForOwner(typedAddress, riseTestnet.id, { enabled: Boolean(address) });
+  } = useRnsApiDomainsForOwner(typedAddress, riseMainnet.id, { enabled: Boolean(address) });
 
   const {
     data: subgraphDomains,

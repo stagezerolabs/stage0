@@ -1,4 +1,10 @@
-# Rise Launchpad Goldsky Indexer
+# RISE Launchpad Goldsky Indexer
+
+> Mainnet status: Stage0 now targets RISE Mainnet (chain ID `4153`), but Goldsky's
+> supported-network catalog currently lists only `rise-sepolia`. This manifest is
+> intentionally retained as a testnet manifest and must not be deployed as the
+> mainnet indexer. The mainnet frontend leaves its Goldsky endpoint blank and
+> uses direct on-chain reads until Goldsky adds RISE Mainnet support.
 
 This subgraph indexes:
 - Presale lifecycle data from `PresaleFactory` + dynamic `LaunchpadPresale` instances
@@ -6,6 +12,7 @@ This subgraph indexes:
 
 ## Networks and contracts
 
+- Scope: legacy testnet indexer
 - Network: `rise-sepolia`
 - PresaleFactory: `0x67064a9236050D3d947d7F5Bd3448BD4b5D947FC`
 - NFTFactory: `0xCEA1A715927408216B838DcAcd90Dff025Ab0b2D`
@@ -18,6 +25,10 @@ npm install
 npm run codegen
 npm run build
 ```
+
+Contract ABIs are generated from the Foundry artifacts in the smart-contracts
+repository. Run `npm run sync:abis` from the Stage0 repository root after every
+contract change.
 
 ## Deploy to Goldsky
 

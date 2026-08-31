@@ -3,6 +3,8 @@ import { RNSRegistrar } from "@/lib/rns/abis";
 import { fetchRnsPriceQuote } from "@/lib/api/rns";
 import {
   RNS_DEFAULT_REGISTRATION_DURATION,
+  RNS_LABEL_POLICY_FIXED_PREMIUM,
+  RNS_LABEL_POLICY_OPEN,
   RNS_QUERY_GC_TIME,
   RNS_QUERY_STALE_TIME,
 } from "@/lib/rns/constants";
@@ -35,6 +37,33 @@ export function useRnsAvailable(label: string, options: UseRnsRegistrarOptions =
 
   return {
     available: data === true,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+export function useRnsEffectivePolicy(label: string, options: UseRnsRegistrarOptions = {}) {
+  const { registrar } = useRnsContracts();
+  const name = normalizeRnsLabel(label);
+  const enabled = (options.enabled ?? true) && Boolean(name);
+
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: registrar,
+    abi: RNSRegistrar,
+    functionName: "effectivePolicy",
+    args: [name],
+    query: {
+      enabled,
+      staleTime: RNS_QUERY_STALE_TIME,
+      gcTime: RNS_QUERY_GC_TIME,
+    },
+  });
+  const policy = data === undefined ? undefined : Number(data);
+
+  return {
+    policy,
+    isReserved: policy !== undefined && policy !== RNS_LABEL_POLICY_OPEN,
     isLoading,
     error,
     refetch,
@@ -156,6 +185,26 @@ export function useRnsRegistrationQuote(
       gcTime: RNS_QUERY_GC_TIME,
     },
   });
+  const {
+    data: policy,
+    isLoading: isPolicyLoading,
+    error: policyError,
+    refetch: refetchPolicy,
+  } = useReadContract({
+    address: registrar,
+    abi: RNSRegistrar,
+    functionName: "effectivePolicy",
+    args: [name],
+    query: {
+      enabled: enabled && action !== "renew",
+      staleTime: RNS_QUERY_STALE_TIME,
+      gcTime: RNS_QUERY_GC_TIME,
+    },
+  });
+  const policyAllowsAction =
+    action === "renew" ||
+    (action === "register" && Number(policy) === RNS_LABEL_POLICY_OPEN) ||
+    (action === "fixed_premium_register" && Number(policy) === RNS_LABEL_POLICY_FIXED_PREMIUM);
 
   const quote = useQuery({
     queryKey: ["rns", "quote", action, chainId, address, name, duration.toString()],
@@ -167,7 +216,11 @@ export function useRnsRegistrationQuote(
         chainId,
         duration,
       }),
-    enabled: enabled && Boolean(address) && (action === "renew" || available === true),
+    enabled:
+      enabled &&
+      Boolean(address) &&
+      policyAllowsAction &&
+      (action === "renew" || available === true),
     staleTime: 45_000,
     gcTime: RNS_QUERY_GC_TIME,
   });
@@ -175,15 +228,18 @@ export function useRnsRegistrationQuote(
   return {
     name,
     duration,
-    available: available === true,
+    available: available === true && (action === "renew" || policyAllowsAction),
+    policy: policy === undefined ? undefined : Number(policy),
+    isReserved:
+      action !== "renew" && policy !== undefined && Number(policy) !== RNS_LABEL_POLICY_OPEN,
     price: quote.data?.price ?? 0n,
     signedQuote: quote.data?.signedQuote,
     signature: quote.data?.signature,
     display: quote.data?.display,
-    isLoading: isAvailabilityLoading || quote.isLoading,
-    error: availabilityError ?? quote.error,
+    isLoading: isAvailabilityLoading || (action !== "renew" && isPolicyLoading) || quote.isLoading,
+    error: availabilityError ?? policyError ?? quote.error,
     refetch: async () => {
-      await Promise.all([refetchAvailability(), quote.refetch()]);
+      await Promise.all([refetchAvailability(), refetchPolicy(), quote.refetch()]);
     },
   };
 }

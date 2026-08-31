@@ -14,7 +14,9 @@ import {
   erc20Abi,
   getNativeTokenLabel,
   getStakingContractAddress,
+  riseMainnet,
 } from '@/config';
+import { fetchRnsPricing } from '@/lib/api/rns';
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useNFTDeployments } from '@/lib/hooks/useNFTDeployments';
 import { useOffchainTokenImages } from '@/lib/hooks/useOffchainProjectImages';
@@ -35,6 +37,7 @@ import {
   Wallet,
 } from '@/components/ui/icons';
 import { InlineLoading, Spinner } from '@/components/ui/spinner';
+import { useQuery } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
@@ -80,6 +83,15 @@ function formatLockAmount(amount: string): string {
 function shortenAddress(addr?: string): string {
   if (!addr) return '—';
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function formatUsd(value: number): string {
+  return value.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function getRnsMarketplaceLabel(domain: {
@@ -140,6 +152,21 @@ const Dashboard: React.FC = () => {
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
+  });
+
+  const {
+    data: ethUsdPrice,
+    isLoading: isEthUsdPriceLoading,
+    isError: isEthUsdPriceError,
+  } = useQuery({
+    queryKey: ['market-price', 'eth-usd', riseMainnet.id],
+    queryFn: async () => (await fetchRnsPricing({ chainId: riseMainnet.id })).ethUsd,
+    enabled: isConnected && chainId === riseMainnet.id,
+    staleTime: 60_000,
+    gcTime: DASHBOARD_QUERY_GC_TIME,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   const { presales, isLoading: isPresalesLoading } = useLaunchpadPresales('all');
@@ -319,6 +346,16 @@ const Dashboard: React.FC = () => {
     ? `${Number(balance.formatted).toLocaleString(undefined, { maximumFractionDigits: 4 })}`
     : '0';
   const balanceSymbol = balance?.symbol ?? nativeToken;
+  const balanceUsd = balance && ethUsdPrice
+    ? Number(balance.formatted) * ethUsdPrice
+    : null;
+  const balanceUsdDisplay = !isConnected
+    ? '≈ $0.00'
+    : isBalanceLoading || isEthUsdPriceLoading
+      ? 'USD value loading…'
+      : isEthUsdPriceError || balanceUsd === null || !Number.isFinite(balanceUsd)
+        ? 'USD value unavailable'
+        : `≈ ${formatUsd(balanceUsd)}`;
 
   const totalAllocations = allocations.length + nftPurchaseAllocations.length + (hasStakedAllocation ? 1 : 0);
   const createdAssetsCount = createdTokenList.length + createdPresales.length + myNFTDeployments.length;
@@ -354,6 +391,9 @@ const Dashboard: React.FC = () => {
                   {stakingSymbol} staked
                 </div>
               )}
+              <small className="wallet-portfolio-usd" aria-live="polite">
+                {balanceUsdDisplay}
+              </small>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span className="eyebrow">Native balance</span>

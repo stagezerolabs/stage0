@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useAccount, useChainId, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { maxUint256, parseUnits } from 'viem';
-import { TokenLocker, erc20Abi, getContractAddresses, riseTestnet } from '@/config';
+import { TokenLocker, erc20Abi, getContractAddresses, riseMainnet } from '@/config';
 import { useRnsAddressInput } from '@/lib/hooks/rns';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import type { SennaActionDraft, SignerState } from '../types';
@@ -10,10 +10,10 @@ export function useLockTokenSigner(draft: SennaActionDraft): SignerState {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
-  const onWrongChain = chainId !== riseTestnet.id;
+  const onWrongChain = chainId !== riseMainnet.id;
   const contracts = getContractAddresses(chainId);
 
-  const tokenResolution = useRnsAddressInput(draft.prefill.token || '', riseTestnet.id);
+  const tokenResolution = useRnsAddressInput(draft.prefill.token || '', riseMainnet.id);
   const tokenAddress = tokenResolution.address ?? undefined;
   const durationDays = Number.parseInt(draft.prefill.duration || '0', 10);
   const lockName = draft.prefill.name || 'Token Lock';
@@ -142,7 +142,7 @@ export function useLockTokenSigner(draft: SennaActionDraft): SignerState {
     ready = false;
   } else if (onWrongChain) {
     phase = 'needs_chain';
-    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Testnet';
+    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Mainnet';
     busy = switching;
   } else if (approvePending) {
     phase = 'awaiting_signature';
@@ -189,7 +189,7 @@ export function useLockTokenSigner(draft: SennaActionDraft): SignerState {
     }
     if (!isConnected) return;
     if (onWrongChain) {
-      switchChain({ chainId: riseTestnet.id });
+      switchChain({ chainId: riseMainnet.id });
       return;
     }
     if (!ready) return;

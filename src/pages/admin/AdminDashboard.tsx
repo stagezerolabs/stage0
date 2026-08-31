@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { useAccount, useBalance, useReadContract } from 'wagmi';
+import { useAccount, useBalance, useReadContract, useSignMessage } from 'wagmi';
 import { formatEther, formatUnits, isAddress, keccak256, parseEther, stringToBytes, type Address, type Hex } from 'viem';
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { InlineLoading, Spinner } from '@/components/ui/spinner';
-import { ArrowUpRight, Copy, Coins, Users, Settings, ExternalLink } from '@/components/ui/icons';
+import { ArrowUpRight, Copy, Coins, Settings, ExternalLink } from '@/components/ui/icons';
 import { RNSRegistrar } from '@/config';
 import {
   activateRnsAdminReservedName,
@@ -23,6 +23,10 @@ import { useRnsCreatePrimaryAuction, useRnsSetLabelPolicy } from '@/lib/hooks/rn
 import { useLaunchpadPresales } from '@/lib/hooks/useLaunchpadPresales';
 import { useSetFeeRecipient, useSetNFTFactoryProceedsFeeBps } from '@/lib/hooks/useAdminActions';
 import { useTrackedWriteContract } from '@/lib/hooks/useTrackedWriteContract';
+import {
+  RNS_LABEL_POLICY_AUCTION_ONLY,
+  RNS_LABEL_POLICY_FIXED_PREMIUM,
+} from '@/lib/rns/constants';
 import { useFactoryOwner, useFeeRecipient, useProceedsFeeBps } from '@/lib/utils/admin';
 import { useUserNFTs } from '@/lib/hooks/useUserNFTs';
 
@@ -59,6 +63,7 @@ type ReservedNameDraft = {
 };
 
 type PendingReservedPublish = {
+  chainId: number;
   id: number;
   label: string;
   fqdn: string;
@@ -68,12 +73,18 @@ type PendingReservedPublish = {
   stage: 'policy' | 'auction';
 };
 
+type ReservedInventoryChainId = 4153 | 11155931;
+
+const RISE_MAINNET_CHAIN_ID: ReservedInventoryChainId = 4153;
+const RISE_TESTNET_CHAIN_ID: ReservedInventoryChainId = 11155931;
+const RESERVED_INVENTORY_NETWORKS = [
+  { chainId: RISE_MAINNET_CHAIN_ID, label: 'Mainnet', networkName: 'RISE Mainnet' },
+  { chainId: RISE_TESTNET_CHAIN_ID, label: 'Testnet', networkName: 'RISE Testnet' },
+] as const;
+
 const RNS_DAY_SECONDS = 24n * 60n * 60n;
 const RNS_YEAR_SECONDS = 365n * 24n * 60n * 60n;
 const RNS_MAX_AUCTION_DURATION_SECONDS = 10n * RNS_YEAR_SECONDS;
-const RNS_LABEL_POLICY_AUCTION_ONLY = 2;
-const RNS_LABEL_POLICY_FIXED_PREMIUM = 3;
-
 function toAuctionDurationDraft(seconds: bigint): Pick<ReservedNameDraft, 'auctionDurationValue' | 'auctionDurationUnit'> {
   if (seconds >= RNS_YEAR_SECONDS && seconds % RNS_YEAR_SECONDS === 0n) {
     return { auctionDurationValue: String(seconds / RNS_YEAR_SECONDS), auctionDurationUnit: 'years' };
@@ -118,6 +129,7 @@ function formatEditableEth(value: bigint | null | undefined) {
 
 const AdminDashboard: React.FC = () => {
   const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const { chainId, nftFactory, nftFactoryLens, rnsRegistrar, explorerUrl } = useChainContracts();
   const { totalDeployments, isLoading: isLoadingNFTs } = useUserNFTs();
   const { factoryOwner, isLoading: isLoadingOwner } = useFactoryOwner('nft');
@@ -138,6 +150,9 @@ const AdminDashboard: React.FC = () => {
   const [newRnsTreasury, setNewRnsTreasury] = useState('');
   const [rnsAdminAction, setRnsAdminAction] = useState<'withdraw' | 'setTreasury' | null>(null);
   const [rnsPricing, setRnsPricing] = useState<RnsPricingSummary | null>(null);
+  const [reservedChainId, setReservedChainId] = useState<ReservedInventoryChainId>(
+    RISE_MAINNET_CHAIN_ID,
+  );
   const [reservedNames, setReservedNames] = useState<RnsReservedNameSummary[]>([]);
   const [primaryAuctions, setPrimaryAuctions] = useState<RnsPrimaryAuctionSummary[]>([]);
   const [reservedDrafts, setReservedDrafts] = useState<Record<number, ReservedNameDraft>>({});
@@ -170,6 +185,15 @@ const AdminDashboard: React.FC = () => {
   } = useRnsCreatePrimaryAuction();
   const isSettingRnsPolicy = isSetRnsPolicyPending || isSetRnsPolicyConfirming;
   const isLaunchingPrimaryAuction = isLaunchPrimaryAuctionPending || isLaunchPrimaryAuctionConfirming;
+  const selectedReservedNetwork = RESERVED_INVENTORY_NETWORKS.find(
+    (network) => network.chainId === reservedChainId,
+  ) ?? RESERVED_INVENTORY_NETWORKS[0];
+  const isMainnetReservedInventory = reservedChainId === RISE_MAINNET_CHAIN_ID;
+  const isReservedInventoryBusy =
+    savingReservedIds.length > 0 ||
+    publishingReservedId !== null ||
+    isSettingRnsPolicy ||
+    isLaunchingPrimaryAuction;
 
   const {
     setFeeRecipient,
@@ -323,7 +347,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     void activateRnsAdminReservedName({
-      chainId,
+      chainId: pendingReservedPublish.chainId,
       id: pendingReservedPublish.id,
       txHash: setRnsPolicyHash as Hex,
     })
@@ -343,7 +367,6 @@ const AdminDashboard: React.FC = () => {
         setPendingReservedPublish(null);
       });
   }, [
-    chainId,
     createPrimaryAuction,
     isSetRnsPolicySuccess,
     pendingReservedPublish,
@@ -376,7 +399,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     void activateRnsAdminReservedName({
-      chainId,
+      chainId: pendingReservedPublish.chainId,
       id: pendingReservedPublish.id,
       txHash: launchPrimaryAuctionHash as Hex,
     })
@@ -386,7 +409,10 @@ const AdminDashboard: React.FC = () => {
             current.map((entry) => (entry.id === activated.id ? activated : entry)),
           );
         }
-        void fetchRnsPrimaryAuctions({ chainId, limit: 200 }).then(setPrimaryAuctions);
+        void fetchRnsPrimaryAuctions({
+          chainId: pendingReservedPublish.chainId,
+          limit: 200,
+        }).then(setPrimaryAuctions);
         toast.success(`${pendingReservedPublish.fqdn} auction is live.`);
       })
       .catch((error) => {
@@ -397,7 +423,6 @@ const AdminDashboard: React.FC = () => {
         setPendingReservedPublish(null);
       });
   }, [
-    chainId,
     isLaunchPrimaryAuctionSuccess,
     launchPrimaryAuctionHash,
     pendingReservedPublish,
@@ -472,7 +497,10 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     setIsLoadingReserved(true);
-    fetchRnsAdminReservedNames({ chainId })
+    setReservedNames([]);
+    setReservedDrafts({});
+    setReservedError(null);
+    fetchRnsAdminReservedNames({ chainId: reservedChainId })
       .then((next) => {
         if (cancelled) return;
         setReservedNames(next);
@@ -508,7 +536,7 @@ const AdminDashboard: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [chainId]);
+  }, [reservedChainId]);
 
   const enabledReservedCount = reservedNames.filter((name) => name.enabled).length;
   const filteredReservedNames = reservedNames.filter((name) => {
@@ -520,6 +548,12 @@ const AdminDashboard: React.FC = () => {
       name.fqdn.toLowerCase().includes(needle)
     );
   });
+
+  const handleReservedNetworkChange = (nextChainId: ReservedInventoryChainId) => {
+    if (isReservedInventoryBusy || nextChainId === reservedChainId) return;
+    setReservedChainId(nextChainId);
+    setReservedSearch('');
+  };
 
   const handleCopy = (value: string) => {
     if (!value) return;
@@ -574,7 +608,7 @@ const AdminDashboard: React.FC = () => {
     setSavingReservedIds((current) => [...current, name.id]);
     try {
       const updated = await upsertRnsAdminReservedName({
-        chainId,
+        chainId: name.chainId,
         label: name.label,
         category: name.category,
         enabled: draft.enabled,
@@ -583,6 +617,8 @@ const AdminDashboard: React.FC = () => {
         fixedPriceWei: draft.saleMode === 'buy_now' ? parsedPrice : null,
         auctionDurationSeconds: auctionDurationSeconds ?? name.auctionDurationSeconds,
         displayOrder,
+        adminAddress: address as Address,
+        signMessage: signMessageAsync,
       });
 
       setReservedNames((current) =>
@@ -618,6 +654,10 @@ const AdminDashboard: React.FC = () => {
     };
 
   const handlePublishReservedName = async (name: RnsReservedNameSummary) => {
+    if (name.chainId !== RISE_MAINNET_CHAIN_ID) {
+      toast.error('On-chain publishing is available only for RISE Mainnet in this build.');
+      return;
+    }
     if (!isRnsOwner) {
       toast.error('Connected wallet is not the RNS owner.');
       return;
@@ -668,7 +708,7 @@ const AdminDashboard: React.FC = () => {
     setPublishingReservedId(name.id);
     try {
       const updated = await upsertRnsAdminReservedName({
-        chainId,
+        chainId: name.chainId,
         label: name.label,
         category: name.category,
         enabled: true,
@@ -677,12 +717,15 @@ const AdminDashboard: React.FC = () => {
         fixedPriceWei: draft.saleMode === 'buy_now' ? price : null,
         auctionDurationSeconds: auctionDurationSeconds ?? name.auctionDurationSeconds,
         displayOrder,
+        adminAddress: address as Address,
+        signMessage: signMessageAsync,
       });
 
       setReservedNames((current) =>
         current.map((entry) => (entry.id === updated.id ? updated : entry)),
       );
       setPendingReservedPublish({
+        chainId: updated.chainId,
         id: updated.id,
         label: updated.label,
         fqdn: updated.fqdn,
@@ -796,7 +839,7 @@ const AdminDashboard: React.FC = () => {
         <div className="eyebrow">Admin</div>
         <h1 className="ds-h1 mt-2">Stage0 Admin</h1>
         <p className="text-body text-ink-muted max-w-3xl mt-3">
-          Manage launches, whitelisted creators, and NFT launchpad fee defaults from one place.
+          Manage launches, domain inventory, and NFT launchpad fee defaults from one place.
         </p>
       </motion.section>
 
@@ -833,7 +876,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       </motion.section>
 
-      <motion.section variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <motion.section variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Link to="/admin/presales" className="tool-surface-card p-6 group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -843,21 +886,6 @@ const AdminDashboard: React.FC = () => {
               <div>
                 <p className="text-body font-medium text-ink">Manage Launches</p>
                 <p className="text-body-sm text-ink-muted">Edit fees and status</p>
-              </div>
-            </div>
-            <ArrowUpRight className="w-4 h-4 text-ink-muted group-hover:text-ink" />
-          </div>
-        </Link>
-
-        <Link to="/admin/whitelist" className="tool-surface-card p-6 group">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-ink/10 text-ink flex items-center justify-center">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-body font-medium text-ink">Whitelist Creators</p>
-                <p className="text-body-sm text-ink-muted">Add or remove access</p>
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-ink-muted group-hover:text-ink" />
@@ -877,7 +905,7 @@ const AdminDashboard: React.FC = () => {
               <div>
                 <p className="text-body font-medium text-ink">Domain Marketplace</p>
                 <p className="text-body-sm text-ink-muted">
-                  {enabledReservedCount} enabled of {reservedNames.length} curated names
+                  {selectedReservedNetwork.label}: {enabledReservedCount} enabled of {reservedNames.length} curated names
                 </p>
               </div>
             </div>
@@ -1055,6 +1083,40 @@ const AdminDashboard: React.FC = () => {
         className="reserved-inventory-dialog max-w-[1180px]"
       >
         <div className="reserved-inventory-panel">
+          <div className="reserved-inventory-network-bar">
+            <div
+              className="reserved-inventory-network-selector"
+              role="group"
+              aria-label="Reserved inventory network"
+            >
+              {RESERVED_INVENTORY_NETWORKS.map((network) => {
+                const isSelected = network.chainId === reservedChainId;
+                return (
+                  <button
+                    key={network.chainId}
+                    type="button"
+                    aria-pressed={isSelected}
+                    disabled={isReservedInventoryBusy}
+                    onClick={() => handleReservedNetworkChange(network.chainId)}
+                    className={isSelected ? 'is-selected' : undefined}
+                  >
+                    <img src="/rise-network.svg" alt="" aria-hidden="true" />
+                    <span>{network.label}</span>
+                    <small>{network.chainId}</small>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="reserved-inventory-network-context">
+              <strong>{selectedReservedNetwork.networkName}</strong>
+              <span>
+                {isMainnetReservedInventory
+                  ? 'Publishing creates transactions on RISE Mainnet.'
+                  : 'Legacy inventory view; on-chain publishing is disabled in this mainnet build.'}
+              </span>
+            </p>
+          </div>
+
           <div className="reserved-inventory-toolbar">
             <input
               value={reservedSearch}
@@ -1063,7 +1125,9 @@ const AdminDashboard: React.FC = () => {
               className="input-field reserved-inventory-search"
             />
             <p className="reserved-inventory-hint">
-              Priority 1 appears first. Publishing opens wallet confirmations.
+              {isMainnetReservedInventory
+                ? 'Priority 1 appears first. Publishing opens wallet confirmations.'
+                : 'Priority 1 appears first. Saves remain scoped to testnet records.'}
             </p>
           </div>
 
@@ -1090,7 +1154,11 @@ const AdminDashboard: React.FC = () => {
                 <InlineLoading label="Loading reserved names..." variant="dots" />
               </div>
             ) : filteredReservedNames.length === 0 ? (
-              <div className="reserved-inventory-empty">No reserved names match this search.</div>
+              <div className="reserved-inventory-empty">
+                {reservedSearch.trim()
+                  ? 'No reserved names match this search.'
+                  : `No reserved names are configured for ${selectedReservedNetwork.networkName}.`}
+              </div>
             ) : (
               filteredReservedNames.map((name) => {
                 const draft = reservedDrafts[name.id];
@@ -1103,16 +1171,18 @@ const AdminDashboard: React.FC = () => {
                       ? Number(formatEther(activePriceWei)) * rnsPricing.ethUsd
                       : null;
                 const isSaving = savingReservedIds.includes(name.id);
-                const hasLiveAuction = primaryAuctions.some(
-                  (auction) =>
-                    auction.name.toLowerCase() === name.label.toLowerCase() &&
-                    ['active', 'scheduled'].includes(auction.status),
-                );
+                const hasLiveAuction =
+                  isMainnetReservedInventory &&
+                  primaryAuctions.some(
+                    (auction) =>
+                      auction.name.toLowerCase() === name.label.toLowerCase() &&
+                      ['active', 'scheduled'].includes(auction.status),
+                  );
                 const isPublishing = publishingReservedId === name.id;
 
                 return (
                   <div
-                    key={name.id}
+                    key={`${name.chainId}:${name.id}`}
                     className="reserved-inventory-row"
                   >
                     <div className="reserved-inventory-cell reserved-inventory-name" data-label="Name">
@@ -1224,6 +1294,7 @@ const AdminDashboard: React.FC = () => {
                           type="button"
                           onClick={() => void handlePublishReservedName(name)}
                           disabled={
+                            !isMainnetReservedInventory ||
                             !isRnsOwner ||
                             publishingReservedId !== null ||
                             isSettingRnsPolicy ||
@@ -1231,9 +1302,17 @@ const AdminDashboard: React.FC = () => {
                             ((draft?.saleMode ?? name.saleMode) === 'auction' && hasLiveAuction)
                           }
                           className="reserved-inventory-publish disabled:opacity-60 disabled:cursor-not-allowed"
-                          title={hasLiveAuction ? 'This name already has a live or scheduled auction.' : undefined}
+                          title={
+                            !isMainnetReservedInventory
+                              ? 'Testnet inventory is database-only in the mainnet application build.'
+                              : hasLiveAuction
+                                ? 'This name already has a live or scheduled auction.'
+                                : undefined
+                          }
                         >
-                          {isPublishing ? (
+                          {!isMainnetReservedInventory ? (
+                            'Mainnet only'
+                          ) : isPublishing ? (
                             <InlineLoading
                               label={pendingReservedPublish?.stage === 'auction' ? 'Launching...' : 'Publishing...'}
                             />

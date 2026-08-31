@@ -3,12 +3,10 @@ import { motion } from 'framer-motion';
 import { useAccount, useChainId, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { isAddress, parseUnits, type Address } from 'viem';
 import { PresaleFactory, erc20Abi, getContractAddresses } from '@/config';
-import { useWhitelistedCreator } from '@/lib/hooks/useWhitelistedCreator';
 import {
   Rocket,
   CheckCircle2,
   AlertTriangle,
-  ShieldAlert,
   ToggleLeft,
   ToggleRight,
   ExternalLink,
@@ -66,8 +64,6 @@ const CreatePresalePage: React.FC = () => {
   const chainId = useChainId();
   const contracts = getContractAddresses(chainId);
   const [searchParams] = useSearchParams();
-
-  const { isWhitelisted, isLoading: isCheckingWhitelist } = useWhitelistedCreator(userAddress);
 
   const querySaleToken = useMemo(() => {
     const tokenAddress = searchParams.get('token')?.trim();
@@ -299,40 +295,6 @@ const CreatePresalePage: React.FC = () => {
 
   const projectImagePreviewSrc = projectImagePreview;
 
-  // Not whitelisted
-  if (isConnected && !isCheckingWhitelist && isWhitelisted === false) {
-    return (
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="max-w-2xl mx-auto space-y-8"
-      >
-        <motion.section variants={itemVariants} className="space-y-2">
-          <h1 className="font-display text-display-lg text-ink">Create Launch</h1>
-        </motion.section>
-        <motion.div
-          variants={itemVariants}
-          className="glass-card rounded-3xl p-8 text-center space-y-6"
-        >
-          <div className="w-16 h-16 rounded-full bg-status-upcoming-bg text-status-upcoming mx-auto flex items-center justify-center">
-            <ShieldAlert className="w-8 h-8" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="font-display text-display-md text-ink">Not Whitelisted</h2>
-            <p className="text-body text-ink-muted max-w-md mx-auto">
-              Your wallet is not whitelisted to create launches. Please contact the Stage0 team
-              to request creator access.
-            </p>
-          </div>
-          <Link to="/presales" className="btn-secondary inline-flex items-center gap-2">
-            Browse Launchpad
-          </Link>
-        </motion.div>
-      </motion.div>
-    );
-  }
-
   // Success
   if (isSuccess && createdPresaleAddress) {
     return (
@@ -397,12 +359,6 @@ const CreatePresalePage: React.FC = () => {
           Launch your token sale on Stage0. Configure your launch parameters below.
         </p>
       </motion.section>
-
-      {isCheckingWhitelist && (
-        <motion.div variants={itemVariants} className="flex items-center gap-2 text-ink-muted">
-          <InlineLoading label="Checking whitelist status..." variant="dots" />
-        </motion.div>
-      )}
 
       {/* Form */}
       <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-6">

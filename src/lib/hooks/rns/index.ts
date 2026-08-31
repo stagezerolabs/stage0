@@ -9,6 +9,7 @@ export {
 export { useRnsResolvedAddr, useRnsText } from "./useRnsResolver";
 export {
   useRnsAvailable,
+  useRnsEffectivePolicy,
   useRnsFee,
   useRnsRentPrice,
   useRnsExpiry,

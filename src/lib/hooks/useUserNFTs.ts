@@ -29,13 +29,13 @@ type ParsedCollectionMetrics = {
 
 function normalizeCollectionMetrics(raw: RawCollectionInfo): ParsedCollectionMetrics | null {
   const address = (raw.nft ?? raw[0]) as Address | undefined;
-  const maxSupply = (raw.maxSupply ?? raw[6]) as bigint | undefined;
-  const totalMinted = (raw.totalMinted ?? raw[7]) as bigint | undefined;
-  const mintPrice = (raw.mintPrice ?? raw[9]) as bigint | undefined;
-  const saleStart = (raw.saleStart ?? raw[11]) as bigint | undefined;
-  const saleEnd = (raw.saleEnd ?? raw[12]) as bigint | undefined;
-  const whitelistEnabled = (raw.whitelistEnabled ?? raw[13]) as boolean | undefined;
-  const whitelistStart = (raw.whitelistStart ?? raw[14]) as bigint | undefined;
+  const maxSupply = (raw.maxSupply ?? raw[7]) as bigint | undefined;
+  const totalMinted = (raw.totalMinted ?? raw[8]) as bigint | undefined;
+  const mintPrice = (raw.mintPrice ?? raw[10]) as bigint | undefined;
+  const saleStart = (raw.saleStart ?? raw[12]) as bigint | undefined;
+  const saleEnd = (raw.saleEnd ?? raw[13]) as bigint | undefined;
+  const whitelistEnabled = (raw.whitelistEnabled ?? raw[14]) as boolean | undefined;
+  const whitelistStart = (raw.whitelistStart ?? raw[15]) as bigint | undefined;
 
   if (
     !address ||

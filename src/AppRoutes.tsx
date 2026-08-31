@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
+import MainnetGuard from './components/MainnetGuard';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -21,7 +22,6 @@ import Tools from './pages/Tools';
 import ProjectPage from './pages/ProjectPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminPresalesPage from './pages/admin/AdminPresalesPage';
-import AdminWhitelistPage from './pages/admin/AdminWhitelistPage';
 import TokensPage from './pages/TokensPage';
 import MyNFTsPage from './pages/MyNFTsPage';
 import MyNFTCollectionPage from './pages/MyNFTCollectionPage';
@@ -36,43 +36,44 @@ type AppRoutesProps = {
 const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
   return (
     <Layout themeMode={themeMode} onToggleTheme={onToggleTheme}>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/presales" element={<PresalesPage />} />
-        <Route path="/presales/:address" element={<PresaleDetailPage />} />
-        <Route path="/nfts/:address" element={<NFTDetailPage />} />
+      <MainnetGuard>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/presales" element={<PresalesPage />} />
+          <Route path="/presales/:address" element={<PresaleDetailPage />} />
+          <Route path="/nfts/:address" element={<NFTDetailPage />} />
 
-        {/* Private routes */}
-        <Route element={<PrivateRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/presales/manage/:address" element={<ManagePresalePage />} />
-          <Route path="/create/nft" element={<CreateNFTPage />} />
-          <Route path="/nfts/manage/:address" element={<ManageNFTPage />} />
-          <Route path="/locks/:id" element={<LockDetailPage />} />
-          <Route path="/tools" element={<Tools />} />
-          <Route path="/project/:address" element={<ProjectPage />} />
-          <Route path="/tokens" element={<TokensPage />} />
-          <Route path="/my-nfts" element={<MyNFTsPage />} />
-          <Route path="/my-nfts/:collectionAddress" element={<MyNFTCollectionPage />} />
-          <Route path="/domains" element={<DomainsPage />} />
-          <Route path="/domains/marketplace" element={<DomainsMarketplacePage />} />
-          {/* Admin-only tool access */}
-          <Route element={<AdminRoute />}>
-            <Route path="/create/token" element={<CreateTokenPage />} />
-            <Route path="/create/presale" element={<CreatePresalePage />} />
-            <Route path="/tools/token-locker" element={<TokenLockerPage />} />
-            <Route path="/tools/airdrop" element={<AirdropPage />} />
+          {/* Private routes */}
+          <Route element={<PrivateRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/presales/manage/:address" element={<ManagePresalePage />} />
+            <Route path="/create/nft" element={<CreateNFTPage />} />
+            <Route path="/nfts/manage/:address" element={<ManageNFTPage />} />
+            <Route path="/locks/:id" element={<LockDetailPage />} />
+            <Route path="/tools" element={<Tools />} />
+            <Route path="/project/:address" element={<ProjectPage />} />
+            <Route path="/tokens" element={<TokensPage />} />
+            <Route path="/my-nfts" element={<MyNFTsPage />} />
+            <Route path="/my-nfts/:collectionAddress" element={<MyNFTCollectionPage />} />
+            <Route path="/domains" element={<DomainsPage />} />
+            <Route path="/domains/marketplace" element={<DomainsMarketplacePage />} />
+            {/* Admin-only tool access */}
+            <Route element={<AdminRoute />}>
+              <Route path="/create/token" element={<CreateTokenPage />} />
+              <Route path="/create/presale" element={<CreatePresalePage />} />
+              <Route path="/tools/token-locker" element={<TokenLockerPage />} />
+              <Route path="/tools/airdrop" element={<AirdropPage />} />
+            </Route>
           </Route>
-        </Route>
 
-        {/* Admin routes */}
-        <Route element={<AdminRoute />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/presales" element={<AdminPresalesPage />} />
-          <Route path="/admin/whitelist" element={<AdminWhitelistPage />} />
-        </Route>
-      </Routes>
+          {/* Admin routes */}
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/presales" element={<AdminPresalesPage />} />
+          </Route>
+        </Routes>
+      </MainnetGuard>
     </Layout>
   );
 };

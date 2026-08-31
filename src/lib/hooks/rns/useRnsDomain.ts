@@ -2,6 +2,7 @@ import { DOMAIN_SUFFIX } from "@/lib/rns/utils";
 import { useRnsOwner, useRnsRecord } from "@/lib/hooks/rns/useRnsRegistry";
 import {
   useRnsAvailable,
+  useRnsEffectivePolicy,
   useRnsExpiry,
   useRnsRegistrationQuote,
 } from "@/lib/hooks/rns/useRnsRegistrar";
@@ -65,6 +66,12 @@ export function useRnsNameStatus(label: string, options: UseRnsDomainLookupOptio
 
   const { available, isLoading: isAvailableLoading, refetch: refetchAvailable } =
     useRnsAvailable(normalized, { enabled });
+  const {
+    policy,
+    isReserved,
+    isLoading: isPolicyLoading,
+    refetch: refetchPolicy,
+  } = useRnsEffectivePolicy(normalized, { enabled });
   const { owner, isLoading: isOwnerLoading, refetch: refetchOwner } = useRnsOwner(
     normalized,
     { enabled },
@@ -73,18 +80,21 @@ export function useRnsNameStatus(label: string, options: UseRnsDomainLookupOptio
   const isOwnedByUser = Boolean(
     address && owner && owner.toLowerCase() === address.toLowerCase(),
   );
-  const isTaken = !available && Boolean(owner);
+  const publiclyAvailable = available && !isReserved;
+  const isTaken = !publiclyAvailable && Boolean(owner);
 
   return {
     label: normalized,
     fqdn: toRnsFqdn(normalized),
-    available,
+    available: publiclyAvailable,
+    policy,
+    isReserved,
     owner,
     isOwnedByUser,
     isTaken,
-    isLoading: isAvailableLoading || isOwnerLoading,
+    isLoading: isAvailableLoading || isPolicyLoading || isOwnerLoading,
     refetch: async () => {
-      await Promise.all([refetchAvailable(), refetchOwner()]);
+      await Promise.all([refetchAvailable(), refetchPolicy(), refetchOwner()]);
     },
   };
 }

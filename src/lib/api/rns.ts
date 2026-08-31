@@ -2,10 +2,45 @@ import type { IndexedRnsDomain } from '@/lib/indexer/rns-goldsky';
 import { coerceAddress, normalizeRnsLookupName } from '@/lib/rns/address-resolution';
 import type { RnsRegistrationQuote, RnsSignedPriceQuote } from '@/lib/rns/types';
 import type { Address, Hex } from 'viem';
+import { SENNA_API_URL } from './base-url';
 
-const SENNA_API_URL =
-  (import.meta.env.VITE_SENNA_CHAT_API_URL as string | undefined)?.replace(/\/$/, '') ||
-  'http://localhost:8788';
+type RnsAdminSignMessage = (input: { message: string }) => Promise<Hex>;
+
+function getRnsAdminNetworkName(chainId: number) {
+  if (chainId === 4153) return 'RISE Mainnet';
+  if (chainId === 11155931) return 'RISE Testnet';
+  return 'RISE';
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(',')}]`;
+  }
+
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+    .join(',')}}`;
+}
+
+function buildRnsAdminAuthorizationMessage(input: {
+  chainId: number;
+  timestamp: number;
+  payload: unknown;
+}) {
+  return [
+    'Stage0 RNS admin authorization',
+    `Network: ${getRnsAdminNetworkName(input.chainId)} (${input.chainId})`,
+    'Action: upsert_reserved',
+    `Timestamp: ${input.timestamp}`,
+    `Payload: ${stableJson(input.payload)}`,
+  ].join('\n');
+}
 
 type ApiRnsName = {
   chainId: number;
@@ -742,7 +777,29 @@ export async function upsertRnsAdminReservedName(input: {
   auctionDurationSeconds?: bigint;
   notes?: string | null;
   displayOrder?: number;
+  adminAddress: Address;
+  signMessage: RnsAdminSignMessage;
 }) {
+  const adminPayload = {
+    chainId: input.chainId,
+    label: input.label,
+    category: input.category ?? null,
+    enabled: input.enabled ?? null,
+    saleMode: input.saleMode ?? null,
+    reservePriceWei: input.reservePriceWei?.toString() ?? null,
+    fixedPriceWei: input.fixedPriceWei?.toString() ?? null,
+    auctionDurationSeconds: input.auctionDurationSeconds?.toString() ?? null,
+    notes: input.notes ?? null,
+    displayOrder: input.displayOrder ?? null,
+  };
+  const timestamp = Date.now();
+  const signature = await input.signMessage({
+    message: buildRnsAdminAuthorizationMessage({
+      chainId: input.chainId,
+      timestamp,
+      payload: adminPayload,
+    }),
+  });
   const response = await fetch(`${SENNA_API_URL}/api/rns/admin/reserved`, {
     method: "POST",
     headers: {
@@ -759,6 +816,11 @@ export async function upsertRnsAdminReservedName(input: {
       auctionDurationSeconds: input.auctionDurationSeconds?.toString(),
       notes: input.notes ?? null,
       displayOrder: input.displayOrder,
+      auth: {
+        address: input.adminAddress,
+        timestamp,
+        signature,
+      },
     }),
   });
 

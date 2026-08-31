@@ -132,7 +132,7 @@ export const SennaSignCard: React.FC<{ draft: SennaActionDraft }> = ({ draft }) 
       <div className="senna-card-head">
         <div className="senna-card-badge">
           <span className="senna-card-dot" />
-          <span>RISE Testnet</span>
+          <span>RISE Mainnet</span>
         </div>
         <div className="senna-card-title">{TITLES[draft.actionType] || 'Action'}</div>
         <p className="senna-card-summary">{draft.summary}</p>

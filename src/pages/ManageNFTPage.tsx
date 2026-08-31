@@ -10,16 +10,14 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from 'wagmi';
-import { formatEther, isAddress, parseEther, type Address } from 'viem';
+import { formatEther, isAddress, parseEther, type Address, type ContractFunctionParameters } from 'viem';
 import { toast } from 'sonner';
 import { ArrowLeft, ExternalLink, Wallet } from '@/components/ui/icons';
 import { NFT_COLLECTION_IMAGES, NFTCollectionContract, getExplorerUrl } from '@/config';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
 import { isWhitelistLocked } from '@/lib/utils/nft-sales';
-import { normalizeBaseURI, normalizeContractURI } from '@/lib/utils/ipfs';
 import FallbackImage from '@/components/ui/fallback-image';
-import RnsAddressInput from '@/components/rns/RnsAddressInput';
 import { resolveRnsAddressInput } from '@/lib/api/rns';
 import { InlineLoading, LoadingState } from '@/components/ui/spinner';
 
@@ -59,14 +57,9 @@ const ManageNFTPage: React.FC = () => {
     ? NFT_COLLECTION_IMAGES[collectionAddress.toLowerCase()]
     : undefined;
 
-  const [payoutWalletInput, setPayoutWalletInput] = useState('');
-  const [payoutResolvedAddress, setPayoutResolvedAddress] = useState<Address | null>(null);
-  const [baseURIInput, setBaseURIInput] = useState('');
-  const [contractURIInput, setContractURIInput] = useState('');
   const [withdrawInput, setWithdrawInput] = useState('');
   const [whitelistWalletsInput, setWhitelistWalletsInput] = useState('');
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [initialisedFromChain, setInitialisedFromChain] = useState(false);
   const [resolvedCollectionImage, setResolvedCollectionImage] = useState<string | undefined>(fallbackCollectionImage);
 
   const {
@@ -92,7 +85,6 @@ const ManageNFTPage: React.FC = () => {
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistEnabled' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistStart' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'whitelistPrice' },
-      { abi: NFTCollectionContract, address: collectionAddress, functionName: 'payoutWallet' },
       { abi: NFTCollectionContract, address: collectionAddress, functionName: 'contractURI' },
     ] as const;
   }, [collectionAddress]);
@@ -103,7 +95,7 @@ const ManageNFTPage: React.FC = () => {
     error: collectionReadError,
     refetch: refetchCollection,
   } = useReadContracts({
-    contracts: collectionQueries as readonly any[],
+    contracts: collectionQueries as readonly ContractFunctionParameters[],
     query: {
       enabled: collectionQueries.length > 0,
       refetchOnWindowFocus: true,
@@ -129,7 +121,7 @@ const ManageNFTPage: React.FC = () => {
     if (
       !collectionAddress ||
       !collectionResults ||
-      collectionResults.length < 12 ||
+      collectionResults.length < 11 ||
       !hasSuccessfulCollectionRead
     ) {
       return null;
@@ -153,8 +145,7 @@ const ManageNFTPage: React.FC = () => {
       whitelistEnabled: readAt<boolean>(7, false),
       whitelistStart: readAt<bigint>(8, 0n),
       whitelistPrice: readAt<bigint>(9, 0n),
-      payoutWallet: readAt<Address | undefined>(10, undefined),
-      contractURI: readAt<string>(11, ''),
+      contractURI: readAt<string>(10, ''),
     };
   }, [collectionAddress, collectionResults, hasSuccessfulCollectionRead]);
 
@@ -162,13 +153,6 @@ const ManageNFTPage: React.FC = () => {
     if (!connectedAddress || !collection?.owner) return false;
     return connectedAddress.toLowerCase() === collection.owner.toLowerCase();
   }, [connectedAddress, collection?.owner]);
-
-  useEffect(() => {
-    if (!collection || initialisedFromChain) return;
-    setPayoutWalletInput(collection.payoutWallet ?? '');
-    setContractURIInput(collection.contractURI ?? '');
-    setInitialisedFromChain(true);
-  }, [collection, initialisedFromChain]);
 
   useEffect(() => {
     if (!writeError) return;
@@ -269,53 +253,6 @@ const ManageNFTPage: React.FC = () => {
     });
   };
 
-  const handleSetBaseURI = () => {
-    if (!collectionAddress) return;
-    const normalizedBaseUri = normalizeBaseURI(baseURIInput.trim());
-    if (!normalizedBaseUri) {
-      toast.error('Base URI cannot be empty.');
-      return;
-    }
-    setPendingAction('setBaseURI');
-    writeContract({
-      abi: NFTCollectionContract,
-      address: collectionAddress,
-      functionName: 'setBaseURI',
-      args: [normalizedBaseUri],
-    });
-  };
-
-  const handleSetContractURI = () => {
-    if (!collectionAddress) return;
-    const normalized = contractURIInput.trim() ? normalizeContractURI(contractURIInput.trim()) : '';
-    if (contractURIInput.trim() && !normalized) {
-      toast.error('Enter a valid contract URI (for example ipfs://CID).');
-      return;
-    }
-    setPendingAction('setContractURI');
-    writeContract({
-      abi: NFTCollectionContract,
-      address: collectionAddress,
-      functionName: 'setContractURI',
-      args: [normalized],
-    });
-  };
-
-  const handleSetPayoutWallet = () => {
-    if (!collectionAddress) return;
-    if (!payoutResolvedAddress) {
-      toast.error('Enter a valid payout wallet address or .rise name.');
-      return;
-    }
-    setPendingAction('setPayoutWallet');
-    writeContract({
-      abi: NFTCollectionContract,
-      address: collectionAddress,
-      functionName: 'setPayoutWallet',
-      args: [payoutResolvedAddress],
-    });
-  };
-
   const handleWithdrawRaised = () => {
     if (!collectionAddress) return;
     let amount = 0n;
@@ -364,7 +301,7 @@ const ManageNFTPage: React.FC = () => {
         <motion.div variants={itemVariants} className="glass-card rounded-3xl p-8 text-center space-y-4">
           <h1 className="font-display text-display-md text-ink">Failed to Load Collection</h1>
           <p className="text-body text-ink-muted">
-            Could not fetch data for this collection. Ensure the address is correct and your wallet is on RISE Testnet.
+            Could not fetch data for this collection. Ensure the address is correct and your wallet is on RISE Mainnet.
           </p>
           {collectionReadError && (
             <p className="text-body-sm text-status-error">
@@ -510,7 +447,7 @@ const ManageNFTPage: React.FC = () => {
       {!isOwner && (
         <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6">
           <p className="text-body text-ink-muted">
-            Connected wallet is not the collection owner. You can view this collection, but only the owner can update settings.
+            Connected wallet is not the collection owner. You can view this collection, but only the owner can manage the whitelist or withdraw raised funds.
           </p>
         </motion.section>
       )}
@@ -554,52 +491,6 @@ const ManageNFTPage: React.FC = () => {
                 ) : (
                   'Remove Wallets'
                 )}
-              </button>
-            </div>
-          </motion.section>
-
-          <motion.section variants={itemVariants} className="glass-card rounded-3xl p-6 space-y-5">
-            <h2 className="font-display text-display-sm text-ink">Collection Settings</h2>
-
-            <div className="space-y-2">
-              <label className="text-body-sm text-ink-muted font-medium">Base URI</label>
-              <input
-                value={baseURIInput}
-                onChange={(e) => setBaseURIInput(e.target.value)}
-                placeholder="ipfs://.../"
-                className="input-field w-full"
-              />
-              <button onClick={handleSetBaseURI} disabled={isBusy} className="btn-secondary inline-flex disabled:opacity-60">
-                {pendingAction === 'setBaseURI' && isBusy ? <InlineLoading label="Updating..." /> : 'Update Base URI'}
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-body-sm text-ink-muted font-medium">Contract URI</label>
-              <input
-                value={contractURIInput}
-                onChange={(e) => setContractURIInput(e.target.value)}
-                placeholder="CID, ipfs://..., or https://..."
-                className="input-field w-full"
-              />
-              <p className="text-xs text-ink-faint">
-                Accepts collection metadata URIs or direct image URIs. CIDs and gateway links are normalized automatically.
-              </p>
-              <button onClick={handleSetContractURI} disabled={isBusy} className="btn-secondary inline-flex disabled:opacity-60">
-                {pendingAction === 'setContractURI' && isBusy ? <InlineLoading label="Updating..." /> : 'Update Contract URI'}
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <RnsAddressInput
-                label="Payout Wallet"
-                value={payoutWalletInput}
-                onChange={setPayoutWalletInput}
-                onResolvedAddressChange={setPayoutResolvedAddress}
-                placeholder="0x... or name.rise"
-              />
-              <button onClick={handleSetPayoutWallet} disabled={isBusy} className="btn-secondary inline-flex disabled:opacity-60">
-                {pendingAction === 'setPayoutWallet' && isBusy ? <InlineLoading label="Updating..." /> : 'Update Payout Wallet'}
               </button>
             </div>
           </motion.section>

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { decodeEventLog, parseUnits, type Address } from 'viem';
-import { TokenFactory, getContractAddresses, riseTestnet } from '@/config';
+import { TokenFactory, getContractAddresses, riseMainnet } from '@/config';
 import { useRnsAddressInput } from '@/lib/hooks/rns';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
 import type { SennaActionDraft, SignerState } from '../types';
@@ -29,13 +29,13 @@ export function useCreateTokenSigner(draft: SennaActionDraft): SignerState {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
-  const onWrongChain = chainId !== riseTestnet.id;
+  const onWrongChain = chainId !== riseMainnet.id;
   const contracts = getContractAddresses(chainId);
 
   const tokenType = normalizeType(draft.prefill.tokenType);
   const decimals = Number.parseInt(draft.prefill.decimals || '18', 10);
   const recipientInput = draft.prefill.initialRecipient || address || '';
-  const recipientResolution = useRnsAddressInput(recipientInput, riseTestnet.id);
+  const recipientResolution = useRnsAddressInput(recipientInput, riseMainnet.id);
   const recipient = recipientResolution.address;
 
   const supplyValid = useMemo(() => {
@@ -92,7 +92,7 @@ export function useCreateTokenSigner(draft: SennaActionDraft): SignerState {
   const primary = () => {
     if (!isConnected) return;
     if (onWrongChain) {
-      switchChain({ chainId: riseTestnet.id });
+      switchChain({ chainId: riseMainnet.id });
       return;
     }
     if (!supplyValid) return;
@@ -132,7 +132,7 @@ export function useCreateTokenSigner(draft: SennaActionDraft): SignerState {
     ready = false;
   } else if (onWrongChain) {
     phase = 'needs_chain';
-    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Testnet';
+    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Mainnet';
     busy = switching;
   } else if (writePending) {
     phase = 'awaiting_signature';

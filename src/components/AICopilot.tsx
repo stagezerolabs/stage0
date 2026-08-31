@@ -7,6 +7,7 @@ import QuickActionMenu, { type QuickAction } from '@/components/senna/QuickActio
 import SuggestionStrip from '@/components/senna/SuggestionStrip';
 import VoiceMic from '@/components/senna/VoiceMic';
 import type { SennaActionDraft, SennaActionType } from '@/components/senna/types';
+import { SENNA_API_URL } from '@/lib/api/base-url';
 
 type SennaRole = 'user' | 'assistant';
 
@@ -50,9 +51,6 @@ const DEFAULT_SUGGESTIONS = [
   'Buy a .rise name',
 ];
 
-const SENNA_API_URL =
-  (import.meta.env.VITE_SENNA_CHAT_API_URL as string | undefined)?.replace(/\/$/, '') ||
-  'http://localhost:8788';
 const SENNA_NOTIFICATION_DELAY_MS = 17000;
 const SENNA_NOTIFICATION_POP_DURATION_MS = 5200;
 

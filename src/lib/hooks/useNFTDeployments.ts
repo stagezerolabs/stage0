@@ -6,6 +6,7 @@ import { NFTFactoryLens } from '@/config';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useOffchainCollectionImages } from '@/lib/hooks/useOffchainProjectImages';
 import {
+  normalizeBaseURI,
   normalizeContractURI,
 } from '@/lib/utils/ipfs';
 import { resolveCollectionDisplayMetadata } from '@/lib/utils/nft-metadata';
@@ -42,6 +43,7 @@ export interface NFTDeploymentWithMetadata {
   name: string;
   symbol: string;
   contractURI: string;
+  baseURI: string;
   maxSupply: bigint;
   totalMinted: bigint;
   remaining: bigint;
@@ -70,6 +72,7 @@ interface CollectionInfo {
   name: string;
   symbol: string;
   contractURI: string;
+  baseURI: string;
   maxSupply: bigint;
   totalMinted: bigint;
   remaining: bigint;
@@ -111,6 +114,7 @@ function toDeployment(info: CollectionInfo): NFTDeploymentWithMetadata {
     name: info.name || 'NFT Collection',
     symbol: info.symbol || 'NFT',
     contractURI: normalizeContractURI(info.contractURI || ''),
+    baseURI: normalizeBaseURI(info.baseURI || ''),
     maxSupply: info.maxSupply,
     totalMinted: info.totalMinted,
     remaining: info.remaining,
@@ -140,20 +144,21 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
   const name = (raw.name ?? raw[3]) as string | undefined;
   const symbol = (raw.symbol ?? raw[4]) as string | undefined;
   const contractURI = (raw.contractURI ?? raw[5]) as string | undefined;
-  const maxSupply = (raw.maxSupply ?? raw[6]) as bigint | undefined;
-  const totalMinted = (raw.totalMinted ?? raw[7]) as bigint | undefined;
-  const remaining = (raw.remaining ?? raw[8]) as bigint | undefined;
-  const mintPrice = (raw.mintPrice ?? raw[9]) as bigint | undefined;
-  const walletLimitRaw = (raw.walletLimit ?? raw[10]) as bigint | number | undefined;
-  const saleStart = (raw.saleStart ?? raw[11]) as bigint | undefined;
-  const saleEnd = (raw.saleEnd ?? raw[12]) as bigint | undefined;
-  const whitelistEnabled = (raw.whitelistEnabled ?? raw[13]) as boolean | undefined;
-  const whitelistStart = (raw.whitelistStart ?? raw[14]) as bigint | undefined;
-  const whitelistPrice = (raw.whitelistPrice ?? raw[15]) as bigint | undefined;
-  const owner = (raw.owner ?? raw[16]) as Address | undefined;
-  const payoutWallet = (raw.payoutWallet ?? raw[17]) as Address | undefined;
-  const feeRecipient = (raw.feeRecipient ?? raw[18]) as Address | undefined;
-  const proceedsFeeBps = (raw.proceedsFeeBps ?? raw[19]) as bigint | undefined;
+  const baseURI = (raw.baseURI ?? raw[6]) as string | undefined;
+  const maxSupply = (raw.maxSupply ?? raw[7]) as bigint | undefined;
+  const totalMinted = (raw.totalMinted ?? raw[8]) as bigint | undefined;
+  const remaining = (raw.remaining ?? raw[9]) as bigint | undefined;
+  const mintPrice = (raw.mintPrice ?? raw[10]) as bigint | undefined;
+  const walletLimitRaw = (raw.walletLimit ?? raw[11]) as bigint | number | undefined;
+  const saleStart = (raw.saleStart ?? raw[12]) as bigint | undefined;
+  const saleEnd = (raw.saleEnd ?? raw[13]) as bigint | undefined;
+  const whitelistEnabled = (raw.whitelistEnabled ?? raw[14]) as boolean | undefined;
+  const whitelistStart = (raw.whitelistStart ?? raw[15]) as bigint | undefined;
+  const whitelistPrice = (raw.whitelistPrice ?? raw[16]) as bigint | undefined;
+  const owner = (raw.owner ?? raw[17]) as Address | undefined;
+  const payoutWallet = (raw.payoutWallet ?? raw[18]) as Address | undefined;
+  const feeRecipient = (raw.feeRecipient ?? raw[19]) as Address | undefined;
+  const proceedsFeeBps = (raw.proceedsFeeBps ?? raw[20]) as bigint | undefined;
 
   if (
     !nft ||
@@ -162,6 +167,7 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     typeof name !== 'string' ||
     typeof symbol !== 'string' ||
     typeof contractURI !== 'string' ||
+    typeof baseURI !== 'string' ||
     maxSupply === undefined ||
     totalMinted === undefined ||
     remaining === undefined ||
@@ -187,6 +193,7 @@ function normalizeCollectionInfo(raw: RawCollectionInfo): CollectionInfo | null 
     name,
     symbol,
     contractURI,
+    baseURI,
     maxSupply,
     totalMinted,
     remaining,
@@ -209,6 +216,7 @@ function getMetadataCacheKey(deployment: NFTDeploymentWithMetadata): string {
     METADATA_CACHE_VERSION,
     deployment.address.toLowerCase(),
     deployment.contractURI,
+    deployment.baseURI,
     deployment.totalMinted.toString(),
   ].join(':');
 }
@@ -330,6 +338,7 @@ export function useNFTDeployments(options: UseNFTDeploymentsOptions = {}) {
 
       resolveCollectionDisplayMetadata({
         contractUri: deployment.contractURI,
+        baseUri: deployment.baseURI,
         collectionAddress: deployment.address,
         totalMinted: deployment.totalMinted,
         publicClient,

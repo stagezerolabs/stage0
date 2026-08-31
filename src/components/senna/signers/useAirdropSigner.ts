@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useChainId, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { parseUnits, type Address } from 'viem';
-import { AirdropMultiSender, erc20Abi, getContractAddresses, riseTestnet } from '@/config';
+import { AirdropMultiSender, erc20Abi, getContractAddresses, riseMainnet } from '@/config';
 import { resolveRnsAddressInput } from '@/lib/api/rns';
 import { useRnsAddressInput } from '@/lib/hooks/rns';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
@@ -32,11 +32,11 @@ export function useAirdropSigner(draft: SennaActionDraft): SignerState {
   const { isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
-  const onWrongChain = chainId !== riseTestnet.id;
+  const onWrongChain = chainId !== riseMainnet.id;
   const contracts = getContractAddresses(chainId);
 
   const isNative = (draft.prefill.nativeToken || 'false') === 'true';
-  const tokenResolution = useRnsAddressInput(draft.prefill.token || '', riseTestnet.id, {
+  const tokenResolution = useRnsAddressInput(draft.prefill.token || '', riseMainnet.id, {
     enabled: !isNative,
   });
   const tokenAddress = !isNative ? tokenResolution.address ?? undefined : undefined;
@@ -67,7 +67,7 @@ export function useAirdropSigner(draft: SennaActionDraft): SignerState {
             ...recipient,
             address: await resolveRnsAddressInput({
               value: recipient.input,
-              chainId: riseTestnet.id,
+              chainId: riseMainnet.id,
             }),
           })),
         );
@@ -236,7 +236,7 @@ export function useAirdropSigner(draft: SennaActionDraft): SignerState {
     ready = false;
   } else if (onWrongChain) {
     phase = 'needs_chain';
-    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Testnet';
+    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Mainnet';
     busy = switching;
   } else if (approvePending) {
     phase = 'awaiting_signature';
@@ -285,7 +285,7 @@ export function useAirdropSigner(draft: SennaActionDraft): SignerState {
     }
     if (!isConnected) return;
     if (onWrongChain) {
-      switchChain({ chainId: riseTestnet.id });
+      switchChain({ chainId: riseMainnet.id });
       return;
     }
     if (!ready) return;

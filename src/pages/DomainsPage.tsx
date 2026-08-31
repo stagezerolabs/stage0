@@ -19,7 +19,7 @@ import {
   Wallet,
 } from "@/components/ui/icons";
 import { InlineLoading, Spinner } from "@/components/ui/spinner";
-import { getExplorerUrl, riseTestnet } from "@/config";
+import { getExplorerUrl, riseMainnet } from "@/config";
 import {
   formatDomainDisplay,
   normalizeDomainName,
@@ -36,10 +36,7 @@ import {
   useRnsRenew,
 } from "@/lib/hooks/rns";
 import { RNSResolver } from "@/lib/rns/abis";
-import {
-  RESERVED_NAMES,
-  RNS_DEFAULT_REGISTRATION_DURATION,
-} from "@/lib/rns/constants";
+import { RNS_DEFAULT_REGISTRATION_DURATION } from "@/lib/rns/constants";
 import { setPrimaryLabel } from "@/lib/rns/primary-label";
 import { saveRecentRegistration } from "@/lib/rns/recent-registration";
 import { rnsNamehash } from "@/lib/rns/utils";
@@ -65,7 +62,7 @@ const itemVariants = {
   },
 };
 
-const SUGGESTIONS = ["stage0", "risehub", "antigravity", "testnet", "builder"];
+const SUGGESTIONS = ["stage0", "risehub", "antigravity", "mainnet", "builder"];
 
 const REGISTRATION_PERIODS = [
   { years: 1, label: "Starter" },
@@ -429,7 +426,7 @@ const OwnedNameCard: React.FC<{
 const DomainsPage: React.FC = () => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const isCorrectChain = chainId === riseTestnet.id;
+  const isCorrectChain = chainId === riseMainnet.id;
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const explorerUrl = getExplorerUrl(chainId);
   const { resolver: resolverAddress } = useRnsContracts();
@@ -437,7 +434,7 @@ const DomainsPage: React.FC = () => {
 
   const { data: balanceData } = useBalance({
     address,
-    chainId: riseTestnet.id,
+    chainId: riseMainnet.id,
     query: { enabled: isConnected && Boolean(address) },
   });
 
@@ -517,19 +514,12 @@ const DomainsPage: React.FC = () => {
     available: onChainAvailable,
     owner: onChainOwner,
     isTaken: onChainIsTaken,
+    isReserved,
     isLoading: isStatusLoading,
     refetch: refetchStatus,
   } = useRnsNameStatus(normalized, { enabled: nameStatusEnabled });
 
-  const isReserved = useMemo(() => {
-    if (!normalized) return false;
-    return RESERVED_NAMES.has(normalized);
-  }, [normalized]);
-
-  const available = useMemo(() => {
-    if (isReserved) return false;
-    return onChainAvailable;
-  }, [isReserved, onChainAvailable]);
+  const available = onChainAvailable;
 
   const takenBy = useMemo(() => {
     if (isReserved) return "0x0000000000000000000000000000000000000000";
@@ -627,7 +617,7 @@ const DomainsPage: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
 
-    void fetchRnsPricing({ chainId: riseTestnet.id })
+    void fetchRnsPricing({ chainId: riseMainnet.id })
       .then((next) => {
         if (!cancelled) setPricing(next);
       })
@@ -635,7 +625,7 @@ const DomainsPage: React.FC = () => {
         if (!cancelled) setPricing(null);
       });
 
-    void fetchRnsPrimaryAuctions({ chainId: riseTestnet.id, limit: 100 })
+    void fetchRnsPrimaryAuctions({ chainId: riseMainnet.id, limit: 100 })
       .then((auctions) => {
         if (cancelled) return;
         setShortNameAuctions(
@@ -654,7 +644,7 @@ const DomainsPage: React.FC = () => {
         if (!cancelled) setShortNameAuctions([]);
       });
 
-    void fetchRnsMarketplaceReserved({ chainId: riseTestnet.id })
+    void fetchRnsMarketplaceReserved({ chainId: riseMainnet.id })
       .then((names) => {
         if (cancelled) return;
         setReservedShortNames(
@@ -878,7 +868,7 @@ const DomainsPage: React.FC = () => {
       return (
         <button
           type="button"
-          onClick={() => switchChain({ chainId: riseTestnet.id })}
+          onClick={() => switchChain({ chainId: riseMainnet.id })}
           disabled={isSwitchingChain}
           className="btn-secondary names-action-btn text-status-error border-status-error disabled:opacity-60"
         >
@@ -1250,7 +1240,7 @@ const DomainsPage: React.FC = () => {
                               <div className="nm-bd-total-usd">
                                 {registerUsdTotal
                                   ? `≈ ${registerUsdTotal}${registerDisplay?.discountBps ? ' after discount' : ''}`
-                                  : "Paid on RISE Testnet"}
+                                  : "Paid on RISE Mainnet"}
                               </div>
                             </div>
                           </div>

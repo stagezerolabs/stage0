@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
-import { riseTestnet } from '@/config';
+import { riseMainnet } from '@/config';
 import { fetchRnsNameResolution } from '@/lib/api/rns';
 import {
   useRnsNameStatus,
   useRnsRegister,
   useRnsRegistrationQuote,
 } from '@/lib/hooks/rns';
-import { RESERVED_NAMES } from '@/lib/rns/constants';
 import { saveRecentRegistration } from '@/lib/rns/recent-registration';
 import { normalizeRnsLabel, rnsNamehash } from '@/lib/rns/utils';
 import { getFriendlyTxErrorMessage } from '@/lib/utils/tx-errors';
@@ -19,13 +18,12 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
   const queryClient = useQueryClient();
-  const onWrongChain = chainId !== riseTestnet.id;
+  const onWrongChain = chainId !== riseMainnet.id;
 
   const requestedName = normalizeRnsLabel(draft.prefill.name || '');
-  const reserved = RESERVED_NAMES.has(requestedName);
 
-  const { available, isLoading: statusLoading } = useRnsNameStatus(requestedName, {
-    enabled: Boolean(requestedName) && !reserved,
+  const { available, isReserved: reserved, isLoading: statusLoading } = useRnsNameStatus(requestedName, {
+    enabled: Boolean(requestedName),
   });
 
   const {
@@ -60,7 +58,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     } catch {
       // localStorage may be unavailable in some browser modes; safe to ignore.
     }
-    void fetchRnsNameResolution({ name: requestedName, chainId: riseTestnet.id }).catch(() => {
+    void fetchRnsNameResolution({ name: requestedName, chainId: riseMainnet.id }).catch(() => {
       // The normal indexer will still catch up; this only accelerates Senna's DB repair.
     });
     queryClient.invalidateQueries({ queryKey: ['rns', 'api', 'domains', 'owner'] });
@@ -85,7 +83,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     primaryLabel = 'Connect Wallet';
   } else if (onWrongChain) {
     phase = 'needs_chain';
-    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Testnet';
+    primaryLabel = switching ? 'Switching to RISE…' : 'Switch to RISE Mainnet';
     busy = switching;
   } else if (quoteLoading) {
     primaryLabel = 'Preparing quote…';
@@ -114,7 +112,7 @@ export function useBuyNameSigner(draft: SennaActionDraft): SignerState {
     }
     if (!isConnected) return;
     if (onWrongChain) {
-      switchChain({ chainId: riseTestnet.id });
+      switchChain({ chainId: riseMainnet.id });
       return;
     }
     if (!ready) return;

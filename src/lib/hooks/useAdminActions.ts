@@ -39,50 +39,6 @@ function useContractWriteState() {
 }
 
 /**
- * Hook for factory owner to manage whitelisted creators.
- */
-export function useSetWhitelistedCreator() {
-  const { presaleFactory } = useChainContracts();
-  const contractState = useContractWriteState();
-
-  const addWhitelistedCreator = (creatorAddress: Address) => {
-    contractState.writeContract({
-      address: presaleFactory,
-      abi: PresaleFactory,
-      functionName: 'setWhitelistedCreator',
-      args: [creatorAddress, true],
-    });
-  };
-
-  return {
-    addWhitelistedCreator,
-    ...contractState,
-  };
-}
-
-/**
- * Hook for factory owner to remove whitelisted creators.
- */
-export function useRemoveWhitelistedCreator() {
-  const { presaleFactory } = useChainContracts();
-  const contractState = useContractWriteState();
-
-  const removeWhitelistedCreator = (creatorAddress: Address) => {
-    contractState.writeContract({
-      address: presaleFactory,
-      abi: PresaleFactory,
-      functionName: 'setWhitelistedCreator',
-      args: [creatorAddress, false],
-    });
-  };
-
-  return {
-    removeWhitelistedCreator,
-    ...contractState,
-  };
-}
-
-/**
  * Hook for factory owner to update a factory fee recipient.
  */
 export function useSetFeeRecipient(target: FactoryTarget = 'presale') {

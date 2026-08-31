@@ -1,11 +1,8 @@
 import type { Address } from 'viem';
+import { SENNA_API_URL } from './base-url';
 
 export const STAGE0_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 export const STAGE0_IMAGE_ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
-
-const SENNA_API_URL =
-  (import.meta.env.VITE_SENNA_CHAT_API_URL as string | undefined)?.replace(/\/$/, '') ||
-  'http://localhost:8788';
 
 export type OffchainProjectImage = {
   imageUrl?: string;

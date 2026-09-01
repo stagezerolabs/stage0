@@ -22,6 +22,7 @@ import {
   CreatorAdminSessionRequiredError,
   fetchAdminCreatorApplications,
   fetchCreatorAccess,
+  restoreCreatorAdminSession,
   setAdminCreatorApproval,
   type CreatorAccess,
   type CreatorApplication,
@@ -103,6 +104,8 @@ export default function CreatorApprovalsPanel() {
     try {
       if (authenticate) {
         await createCreatorAdminSession({ chainId, adminAddress: address, signMessage: signMessageAsync });
+      } else {
+        await restoreCreatorAdminSession();
       }
       const next = await fetchAdminCreatorApplications({ chainId });
       setApplications(next);
@@ -208,9 +211,9 @@ export default function CreatorApprovalsPanel() {
           className="btn-secondary inline-flex items-center gap-2 self-start md:self-auto"
         >
           {isLoading
-            ? <InlineLoading label={sessionRequired ? 'Unlocking' : 'Loading'} />
+            ? <InlineLoading label={sessionRequired ? 'Verifying' : 'Loading'} />
             : sessionRequired
-              ? <><Unlock className="h-4 w-4" /> Unlock applications</>
+              ? <><Unlock className="h-4 w-4" /> Verify admin</>
               : <><RefreshCcw className="h-4 w-4" /> {hasLoaded ? 'Refresh applications' : 'Load applications'}</>}
         </button>
       </div>
@@ -291,7 +294,7 @@ export default function CreatorApprovalsPanel() {
       ) : (
         <div className="rounded-3xl border border-dashed border-border p-8 text-center text-sm text-ink-muted">
           {sessionRequired
-            ? 'Unlock a private admin session to review applications. This is an off-chain signature with no transaction or gas.'
+            ? 'Admin verification is required to protect applicant details and approval controls.'
             : 'Loading applications from the Stage0 database…'}
         </div>
       )}

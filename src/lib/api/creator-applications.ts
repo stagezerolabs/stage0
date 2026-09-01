@@ -220,9 +220,18 @@ export async function submitCreatorApplication(input: CreatorApplicationInput & 
 
 export class CreatorAdminSessionRequiredError extends Error {
   constructor() {
-    super('Unlock your Stage0 admin session to continue.');
+    super('Admin verification is required.');
     this.name = 'CreatorAdminSessionRequiredError';
   }
+}
+
+export async function restoreCreatorAdminSession() {
+  const response = await fetch(`${SENNA_API_URL}/api/admin/creator/session-upgrade`, {
+    method: 'POST',
+    cache: 'no-store',
+    credentials: 'include',
+  });
+  return response.ok;
 }
 
 export async function createCreatorAdminSession(input: {

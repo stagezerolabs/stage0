@@ -12,6 +12,7 @@ const Footer: React.FC<FooterProps> = ({ themeMode }) => {
 
   const footerLinks = [
     { label: 'Documentation', href: 'https://stagezerolabs.gitbook.io/stagezero-docs/' },
+    { label: 'Developers', href: 'https://developers.stage0.xyz/' },
     { label: 'Terms', href: 'https://stagezerolabs.gitbook.io/stagezero-docs/platform/terms-of-service' },
     { label: 'Privacy', href: 'https://stagezerolabs.gitbook.io/stagezero-docs/platform/privacy-policy' },
   ];

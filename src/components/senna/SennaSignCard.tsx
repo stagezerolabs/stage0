@@ -67,10 +67,65 @@ function formatPrefill(draft: SennaActionDraft): Array<[string, string]> {
   if (draft.actionType === 'buy_name') {
     return [
       ['Name', p.name ? `${p.name}.rise` : '—'],
-      ['Duration', '1 year'],
     ];
   }
   return Object.entries(p).slice(0, 6).map(([k, v]) => [k, v || '—']);
+}
+
+function NameRegistrationQuote({ signer }: { signer: SignerState['nameRegistration'] }) {
+  if (!signer) return null;
+  const statusLabel = signer.availability === 'checking'
+    ? 'Checking availability…'
+    : signer.availability === 'available'
+      ? 'Available'
+      : signer.availability === 'reserved'
+        ? 'Reserved'
+        : 'Already registered';
+
+  return (
+    <section className="senna-name-quote" aria-label={`${signer.name}.rise registration quote`}>
+      <div className="senna-name-status" data-status={signer.availability}>
+        <span>{signer.name}.rise</span>
+        <strong>{statusLabel}</strong>
+      </div>
+
+      {signer.availability === 'available' ? (
+        <>
+          <div className="senna-name-period-head">
+            <span>Registration period</span>
+            <small>Select one to prepare the exact quote</small>
+          </div>
+          <div className="senna-name-periods">
+            {signer.options.map((option) => {
+              const selected = signer.durationYears === option.years;
+              return (
+                <button
+                  key={option.years}
+                  type="button"
+                  className="senna-name-period"
+                  data-selected={selected}
+                  onClick={() => signer.setDurationYears(option.years)}
+                >
+                  <span><strong>{option.years}</strong> yr</span>
+                  <small>{option.label}</small>
+                  <b>{selected && signer.selectedPriceEth ? signer.selectedPriceEth : option.priceEth ?? 'Loading…'}</b>
+                  <em>{selected && signer.selectedTotalUsd ? `≈ ${signer.selectedTotalUsd}` : option.totalUsd ? `≈ ${option.totalUsd}` : ' '}</em>
+                  {option.discountPercent > 0 ? <i>{option.discountPercent}% off</i> : null}
+                </button>
+              );
+            })}
+          </div>
+          {signer.durationYears !== null ? (
+            <div className="senna-name-total">
+              <span>Total for {signer.durationYears} year{signer.durationYears === 1 ? '' : 's'}</span>
+              <strong>{signer.quoteLoading ? 'Preparing exact price…' : signer.selectedPriceEth ?? 'Price unavailable'}</strong>
+              {signer.selectedTotalUsd ? <small>≈ {signer.selectedTotalUsd} · gas shown in wallet</small> : null}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
 }
 
 function short(addr: string | undefined): string {
@@ -139,6 +194,8 @@ export const SennaSignCard: React.FC<{ draft: SennaActionDraft }> = ({ draft }) 
       </div>
 
       <PrefillTable draft={draft} />
+
+      {signer?.nameRegistration ? <NameRegistrationQuote signer={signer.nameRegistration} /> : null}
 
       {isSignable && signer && (
         <>

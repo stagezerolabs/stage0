@@ -3078,6 +3078,52 @@
 .senna-card-row dt { color: rgb(var(--color-ink-faint)); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; font-size: 10px; }
 .senna-card-row dd { color: rgb(var(--color-ink)); font-weight: 500; margin: 0; word-break: break-all; }
 
+.senna-name-quote {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 11px; border-radius: 14px;
+  border: 1px solid rgb(var(--color-border));
+  background: rgb(var(--color-canvas) / 0.45);
+}
+.senna-name-status {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 11px;
+}
+.senna-name-status span { color: rgb(var(--color-ink)); font-weight: 600; }
+.senna-name-status strong { color: rgb(var(--color-ink-muted)); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.senna-name-status[data-status='available'] strong { color: rgb(var(--color-status-live)); }
+.senna-name-status[data-status='taken'] strong,
+.senna-name-status[data-status='reserved'] strong { color: rgb(var(--color-status-error)); }
+.senna-name-period-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.senna-name-period-head span { color: rgb(var(--color-ink)); font-size: 11px; font-weight: 600; }
+.senna-name-period-head small { color: rgb(var(--color-ink-faint)); font-size: 9px; text-align: right; }
+.senna-name-periods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.senna-name-period {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  min-width: 0; padding: 9px; border-radius: 11px; cursor: pointer;
+  border: 1px solid rgb(var(--color-border));
+  background: rgb(var(--color-canvas-alt) / 0.65);
+  color: rgb(var(--color-ink)); text-align: left;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.senna-name-period:hover { transform: translateY(-1px); border-color: rgb(var(--color-border-strong)); }
+.senna-name-period[data-selected='true'] { border-color: rgb(var(--color-accent) / 0.65); background: rgb(var(--color-accent) / 0.09); }
+.senna-name-period > span { font-size: 11px; }
+.senna-name-period > span strong { font-size: 15px; }
+.senna-name-period > small { color: rgb(var(--color-ink-faint)); font-size: 9px; }
+.senna-name-period > b { margin-top: 5px; color: rgb(var(--color-ink)); font-size: 10px; font-weight: 650; }
+.senna-name-period > em { min-height: 12px; color: rgb(var(--color-ink-muted)); font-size: 9px; font-style: normal; }
+.senna-name-period > i {
+  position: absolute; top: 7px; right: 7px;
+  color: rgb(var(--color-accent)); font-size: 8px; font-style: normal; font-weight: 700;
+}
+.senna-name-total {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: baseline;
+  padding-top: 9px; border-top: 1px solid rgb(var(--color-border));
+}
+.senna-name-total span { color: rgb(var(--color-ink-muted)); font-size: 10px; }
+.senna-name-total strong { color: rgb(var(--color-ink)); font-size: 11px; text-align: right; }
+.senna-name-total small { grid-column: 1 / -1; color: rgb(var(--color-ink-faint)); font-size: 9px; text-align: right; }
+
 .senna-card-steps {
   display: flex; align-items: center; gap: 6px;
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;

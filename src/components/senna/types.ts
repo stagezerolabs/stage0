@@ -50,4 +50,21 @@ export interface SignerState {
   primary: () => void;
   /** Whether the primary action is gated by an open wallet/sign. */
   busy: boolean;
+  /** Availability, duration, and quote controls for a .rise registration. */
+  nameRegistration?: {
+    name: string;
+    availability: 'checking' | 'available' | 'taken' | 'reserved';
+    durationYears: number | null;
+    setDurationYears: (years: number) => void;
+    options: Array<{
+      years: number;
+      label: string;
+      priceEth: string | null;
+      totalUsd: string | null;
+      discountPercent: number;
+    }>;
+    selectedPriceEth: string | null;
+    selectedTotalUsd: string | null;
+    quoteLoading: boolean;
+  };
 }

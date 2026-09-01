@@ -114,7 +114,7 @@ const PresalesPage: React.FC = () => {
         status: p.status as UnifiedLaunch['status'],
         name: p.saleTokenName ?? saleSymbol,
         symbol: saleSymbol,
-        description: 'Onchain token launch — audited contracts and transparent vesting.',
+        description: 'A transparent onchain launch with verifiable contracts and vesting.',
         cover: p.logo,
         progress,
         priceLabel: `1 ${paymentSymbol} = ${formatRate(p.rate)} ${saleSymbol}`,

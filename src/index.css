@@ -4788,6 +4788,70 @@
   gap: 20px;
 }
 
+.mkt-owned-summary {
+  border-radius: 16px;
+  cursor: pointer;
+  list-style: none;
+  outline: none;
+}
+
+.mkt-owned-summary::-webkit-details-marker {
+  display: none;
+}
+
+.mkt-owned-summary:focus-visible {
+  box-shadow: 0 0 0 3px rgb(var(--color-accent) / 0.18);
+}
+
+.mkt-owned-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 999px;
+  color: rgb(var(--color-ink-muted));
+  background: rgb(var(--color-canvas) / 0.56);
+  font-size: 11px;
+  font-weight: 800;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+
+.mkt-owned-summary:hover .mkt-owned-toggle {
+  border-color: rgb(var(--color-accent) / 0.42);
+  color: rgb(var(--color-ink));
+  background: rgb(var(--color-accent) / 0.07);
+}
+
+.mkt-owned-toggle-open {
+  display: none;
+}
+
+.mkt-owned-toggle-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 220ms ease;
+}
+
+.mkt-owned-disclosure[open] .mkt-owned-toggle-closed {
+  display: none;
+}
+
+.mkt-owned-disclosure[open] .mkt-owned-toggle-open {
+  display: inline;
+}
+
+.mkt-owned-disclosure[open] .mkt-owned-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.mkt-owned-disclosure-body {
+  padding-top: 2px;
+}
+
 .mkt-owned-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -6830,6 +6894,17 @@
 
   .mkt-owned-heading {
     align-items: flex-end;
+  }
+
+  .mkt-owned-summary {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mkt-owned-toggle {
+    width: 100%;
+    min-height: 44px;
   }
 
   .mkt-card {

@@ -3406,6 +3406,80 @@
   flex-wrap: wrap;
 }
 
+.names-developer-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 16px;
+  border: 1px solid rgb(var(--color-accent) / 0.24);
+  border-radius: 18px;
+  background:
+    linear-gradient(100deg, rgb(var(--color-accent) / 0.11), transparent 52%),
+    rgb(var(--color-canvas-alt) / 0.78);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.names-developer-cta-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.names-developer-cta-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 5px;
+  border: 1px solid rgb(var(--color-border) / 0.8);
+  border-radius: 11px;
+  background: rgb(var(--color-canvas) / 0.72);
+}
+
+.names-developer-cta-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.names-developer-cta-label {
+  color: rgb(var(--color-ink));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.names-developer-cta p {
+  margin: 2px 0 0;
+  color: rgb(var(--color-ink-muted));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.names-developer-cta-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: rgb(var(--color-accent-foreground));
+  background: rgb(var(--color-accent));
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.names-developer-cta-link:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
 .names-subnav {
   display: inline-flex;
   align-items: center;
@@ -6237,6 +6311,16 @@
 @media (max-width: 760px) {
   .names-hero {
     align-items: flex-start;
+  }
+
+  .names-developer-cta {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .names-developer-cta-link {
+    width: 100%;
   }
 
   .names-subnav {

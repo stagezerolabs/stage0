@@ -3056,10 +3056,9 @@
   color: rgb(var(--color-accent));
   font-weight: 600;
 }
-.senna-card-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: rgb(var(--color-status-live, var(--color-accent)));
-  box-shadow: 0 0 0 3px rgb(var(--color-accent) / 0.15);
+.senna-card-network-logo {
+  width: 14px; height: 14px; border-radius: 50%;
+  object-fit: contain;
 }
 .senna-card-title { font-weight: 600; font-size: 14px; color: rgb(var(--color-ink)); }
 .senna-card-summary { font-size: 12px; color: rgb(var(--color-ink-muted)); margin: 0; line-height: 1.4; }

@@ -151,21 +151,6 @@ function creatorApplicationMessage(input: { chainId: number; timestamp: number; 
   ].join('\n');
 }
 
-function creatorAdminMessage(input: {
-  action: 'list_creator_applications' | 'set_creator_approval';
-  chainId: number;
-  timestamp: number;
-  payload: unknown;
-}) {
-  return [
-    'Stage0 creator access administration',
-    `Network: RISE Mainnet (${input.chainId})`,
-    `Action: ${input.action}`,
-    `Timestamp: ${input.timestamp}`,
-    `Payload: ${stableJson(input.payload)}`,
-  ].join('\n');
-}
-
 function errorDetail(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== 'object') return fallback;
   const detail = (payload as { detail?: unknown }).detail;
@@ -233,38 +218,80 @@ export async function submitCreatorApplication(input: CreatorApplicationInput & 
   return responsePayload.application;
 }
 
-export async function fetchAdminCreatorApplications(input: {
+export class CreatorAdminSessionRequiredError extends Error {
+  constructor() {
+    super('Unlock your Stage0 admin session to continue.');
+    this.name = 'CreatorAdminSessionRequiredError';
+  }
+}
+
+export async function createCreatorAdminSession(input: {
   chainId: number;
   adminAddress: Address;
   signMessage: SignMessage;
+}) {
+  const params = new URLSearchParams({
+    chainId: String(input.chainId),
+    address: input.adminAddress,
+  });
+  const challengeResponse = await fetch(`${SENNA_API_URL}/api/admin/creator-session/challenge?${params.toString()}`, {
+    cache: 'no-store',
+    credentials: 'include',
+  });
+  const challengePayload = await challengeResponse.json().catch(() => null) as {
+    challenge?: {
+      id: string;
+      chainId: number;
+      address: Address;
+      expiresAt: string;
+      message: string;
+    };
+  } | null;
+  if (!challengeResponse.ok || !challengePayload?.challenge) {
+    throw new Error(errorDetail(challengePayload, 'Could not start the admin session.'));
+  }
+
+  const signature = await input.signMessage({ message: challengePayload.challenge.message });
+  const sessionResponse = await fetch(`${SENNA_API_URL}/api/admin/creator-session`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      chainId: input.chainId,
+      address: input.adminAddress,
+      challengeId: challengePayload.challenge.id,
+      signature,
+    }),
+  });
+  const sessionPayload = await sessionResponse.json().catch(() => null) as {
+    ok?: boolean;
+    expiresAt?: string;
+  } | null;
+  if (!sessionResponse.ok || !sessionPayload?.ok) {
+    throw new Error(errorDetail(sessionPayload, 'Could not unlock the admin session.'));
+  }
+  return sessionPayload;
+}
+
+export async function fetchAdminCreatorApplications(input: {
+  chainId: number;
   status?: CreatorApplicationStatus;
   limit?: number;
 }): Promise<CreatorApplication[]> {
   const limit = input.limit ?? 100;
-  const payload = { chainId: input.chainId, status: input.status ?? null, limit };
-  const timestamp = Date.now();
-  const signature = await input.signMessage({
-    message: creatorAdminMessage({
-      action: 'list_creator_applications',
-      chainId: input.chainId,
-      timestamp,
-      payload,
-    }),
-  });
   const params = new URLSearchParams({
     chainId: String(input.chainId),
     limit: String(limit),
-    address: input.adminAddress,
-    timestamp: String(timestamp),
-    signature,
   });
   if (input.status) params.set('status', input.status);
   const response = await fetch(`${SENNA_API_URL}/api/admin/creator-applications?${params.toString()}`, {
     cache: 'no-store',
+    credentials: 'include',
   });
   const responsePayload = await response.json().catch(() => null) as {
     applications?: CreatorApplication[];
   } | null;
+  if (response.status === 401) throw new CreatorAdminSessionRequiredError();
   if (!response.ok || !responsePayload?.applications) {
     throw new Error(errorDetail(responsePayload, 'Could not load creator applications.'));
   }
@@ -273,13 +300,11 @@ export async function fetchAdminCreatorApplications(input: {
 
 export async function setAdminCreatorApproval(input: {
   chainId: number;
-  adminAddress: Address;
   applicationType: CreatorApplicationType;
   walletAddress: Address;
   approved: boolean;
   applicationId?: string | null;
   notes?: string | null;
-  signMessage: SignMessage;
 }) {
   const payload = {
     chainId: input.chainId,
@@ -289,24 +314,14 @@ export async function setAdminCreatorApproval(input: {
     applicationId: input.applicationId ?? null,
     notes: input.notes?.trim() || null,
   };
-  const timestamp = Date.now();
-  const signature = await input.signMessage({
-    message: creatorAdminMessage({
-      action: 'set_creator_approval',
-      chainId: input.chainId,
-      timestamp,
-      payload,
-    }),
-  });
   const response = await fetch(`${SENNA_API_URL}/api/admin/creator-approvals`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      ...payload,
-      auth: { address: input.adminAddress, timestamp, signature },
-    }),
+    credentials: 'include',
+    body: JSON.stringify(payload),
   });
   const responsePayload = await response.json().catch(() => null);
+  if (response.status === 401) throw new CreatorAdminSessionRequiredError();
   if (!response.ok) {
     throw new Error(errorDetail(responsePayload, 'Could not update creator access.'));
   }

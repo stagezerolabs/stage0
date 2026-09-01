@@ -184,7 +184,8 @@ export const useLaunchpadPresaleStore = create<LaunchpadPresaleStore>()(
 
       invalidatePresale: (address) =>
         set((state) => {
-          const { [address.toLowerCase()]: _, ...rest } = state.presales;
+          const rest = { ...state.presales };
+          delete rest[address.toLowerCase()];
           return { presales: rest };
         }),
 
@@ -222,7 +223,8 @@ export const useLaunchpadPresaleStore = create<LaunchpadPresaleStore>()(
         set((state) => {
           const userCache = state.userPresaleData[userAddress.toLowerCase()];
           if (!userCache) return state;
-          const { [presaleAddress.toLowerCase()]: _, ...rest } = userCache;
+          const rest = { ...userCache };
+          delete rest[presaleAddress.toLowerCase()];
           return {
             userPresaleData: {
               ...state.userPresaleData,
@@ -263,12 +265,14 @@ export const useLaunchpadPresaleStore = create<LaunchpadPresaleStore>()(
 
       clearUserCache: (userAddress) =>
         set((state) => {
-          const { [userAddress.toLowerCase()]: _, ...rest } = state.userPresaleData;
+          const rest = { ...state.userPresaleData };
+          delete rest[userAddress.toLowerCase()];
           return { userPresaleData: rest };
         }),
     }),
     {
-      name: 'launchpad-presale-storage',
+      // Keep persisted launch data isolated from the legacy RISE Testnet cache.
+      name: 'launchpad-presale-storage-4153',
       // Custom storage to handle BigInt serialization
       storage: {
         getItem: (name) => {

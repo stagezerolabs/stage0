@@ -936,30 +936,6 @@ const DomainsPage: React.FC = () => {
         <NamesSubnav />
       </motion.section>
 
-      <motion.aside variants={itemVariants} className="names-developer-cta">
-        <div className="names-developer-cta-copy">
-          <span className="names-developer-cta-icon" aria-hidden="true">
-            <img src="/rise-network.png" alt="" />
-          </span>
-          <div>
-            <div className="names-developer-cta-label">Building on RISE?</div>
-            <p>
-              Bring <span className="font-mono text-accent">.rise</span> names
-              into your wallet, app, or community product.
-            </p>
-          </div>
-        </div>
-        <a
-          href="https://developers.stage0.xyz/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="names-developer-cta-link"
-        >
-          View integration docs
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      </motion.aside>
-
       {!isConnected ? (
         <motion.div
           variants={itemVariants}
@@ -1518,6 +1494,30 @@ const DomainsPage: React.FC = () => {
           </aside>
         </div>
       )}
+
+      <motion.aside variants={itemVariants} className="names-developer-cta">
+        <div className="names-developer-cta-copy">
+          <span className="names-developer-cta-icon" aria-hidden="true">
+            <img src="/rise-network.png" alt="" />
+          </span>
+          <div>
+            <div className="names-developer-cta-label">Building on RISE?</div>
+            <p>
+              Bring <span className="font-mono text-accent">.rise</span> names
+              into your wallet, app, or community product.
+            </p>
+          </div>
+        </div>
+        <a
+          href="https://developers.stage0.xyz/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="names-developer-cta-link"
+        >
+          View integration docs
+          <ExternalLink className="h-4 w-4" />
+        </a>
+      </motion.aside>
     </motion.div>
   );
 };

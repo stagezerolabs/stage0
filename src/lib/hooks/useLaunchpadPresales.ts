@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useChainContracts } from '@/lib/hooks/useChainContracts';
 import { useChainId, usePublicClient, useReadContract, useReadContracts } from 'wagmi';
-import { erc20Abi, parseAbiItem, type Abi, type Address, type PublicClient } from 'viem';
+import { erc20Abi, isAddress, parseAbiItem, zeroAddress, type Abi, type Address, type PublicClient } from 'viem';
 import { PresaleFactoryContract, LaunchpadPresaleContract, getNativeTokenLabel } from '@/config';
 import { fetchIndexedPresales, isGoldskyIndexerConfigured } from '@/lib/indexer/goldsky';
 import {
@@ -174,11 +174,15 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
 
   // Extract addresses from results
   const presaleAddresses = useMemo(() => {
+    if (totalPresales === 0n) return [];
     if (!addressResults) return cachedAddresses || [];
     return addressResults
       .map((r) => r.result as Address | undefined)
-      .filter((addr): addr is Address => !!addr);
-  }, [addressResults, cachedAddresses]);
+      .filter(
+        (addr): addr is Address =>
+          Boolean(addr && isAddress(addr) && addr.toLowerCase() !== zeroAddress),
+      );
+  }, [addressResults, cachedAddresses, totalPresales]);
 
   const unknownWhitelistCount = useMemo(() => {
     if (useIndexer) return 0;
@@ -212,19 +216,24 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
 
   // Update cache when addresses are fetched
   useEffect(() => {
-    if (presaleAddresses.length > 0 && !isLoadingAddresses && addressResults) {
-      // Only update if we have new data from the blockchain
-      const currentCache = getPresaleAddresses();
-      const hasChanged = !currentCache ||
-        currentCache.length !== presaleAddresses.length ||
-        currentCache.some((addr, i) => addr !== presaleAddresses[i]);
+    if (isLoadingTotal || isLoadingAddresses) return;
 
-      if (hasChanged) {
-        setPresaleAddresses(presaleAddresses);
-      }
+    const hasAuthoritativeResult = totalPresales === 0n || Boolean(addressResults);
+    if (!hasAuthoritativeResult) return;
+
+    const currentCache = getPresaleAddresses() ?? [];
+    const hasChanged =
+      currentCache.length !== presaleAddresses.length ||
+      currentCache.some(
+        (addr, index) =>
+          addr.toLowerCase() !== presaleAddresses[index]?.toLowerCase(),
+      );
+
+    if (hasChanged || totalPresales === 0n) {
+      setPresaleAddresses(presaleAddresses);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addressResults, isLoadingAddresses]);
+  }, [addressResults, isLoadingAddresses, isLoadingTotal, totalPresales]);
 
   useEffect(() => {
     if (shouldFetchAddresses && (isLoadingTotal || isLoadingAddresses)) {
@@ -294,6 +303,18 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
       const baseIdx = i * FIELDS_PER_PRESALE;
       const addr = addressesToFetch[i];
       const whitelistKey = addr.toLowerCase();
+      const results = presaleDataResults.slice(
+        baseIdx,
+        baseIdx + FIELDS_PER_PRESALE,
+      );
+
+      // Never turn failed contract reads into a zero-filled launch card.
+      if (
+        results.length !== FIELDS_PER_PRESALE ||
+        results.some((result) => result.status !== 'success')
+      ) {
+        continue;
+      }
 
       const presale: PresaleData = {
         address: addr,
@@ -413,7 +434,7 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
   // Get all presales with status and progress
   const allPresales = useMemo((): PresaleWithStatus[] => {
     return presaleAddresses.map((addr) => {
-      const cached = getPresale(addr);
+      const cached = presaleCache[addr.toLowerCase()]?.data;
       if (!cached) return null;
 
       const status = getPresaleStatus(cached);
@@ -427,7 +448,7 @@ export function useLaunchpadPresales(filter: LaunchpadPresaleFilter = 'all', for
         progress: Math.min(progress, 100),
       };
     }).filter((p): p is PresaleWithStatus => p !== null);
-  }, [presaleAddresses, getPresale, getPresaleStatus, presaleCache]);
+  }, [presaleAddresses, getPresaleStatus, presaleCache]);
 
   // Filter presales by status
   const filteredPresales = useMemo(() => {
@@ -491,7 +512,27 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
   const cachedPresale = presaleAddress ? getPresale(presaleAddress) : null;
   const [requiresWhitelist, setRequiresWhitelist] = useState<boolean | undefined>(cachedPresale?.requiresWhitelist);
 
-  const shouldFetch = Boolean(presaleAddress);
+  const isValidPresaleAddress = Boolean(
+    presaleAddress && isAddress(presaleAddress),
+  );
+  const {
+    data: presaleBytecode,
+    isLoading: isLoadingPresaleBytecode,
+    isFetched: isPresaleBytecodeFetched,
+    isError: isPresaleBytecodeError,
+  } = useQuery({
+    queryKey: ['presale-bytecode', chainId, presaleAddress],
+    queryFn: () => publicClient!.getCode({ address: presaleAddress! }),
+    enabled: Boolean(publicClient && isValidPresaleAddress),
+    staleTime: QUERY_STALE_TIME,
+    gcTime: QUERY_GC_TIME,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
+  const hasPresaleBytecode = Boolean(
+    presaleBytecode && presaleBytecode !== '0x',
+  );
+  const shouldFetch = isValidPresaleAddress && hasPresaleBytecode;
 
   useEffect(() => {
     if (cachedPresale?.requiresWhitelist !== undefined) {
@@ -500,7 +541,7 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
   }, [cachedPresale?.requiresWhitelist]);
 
   useEffect(() => {
-    if (!publicClient || !presaleAddress) return;
+    if (!publicClient || !presaleAddress || !hasPresaleBytecode) return;
     if (requiresWhitelist !== undefined) return;
 
     let cancelled = false;
@@ -521,7 +562,13 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
     return () => {
       cancelled = true;
     };
-  }, [presaleFactory, publicClient, presaleAddress, requiresWhitelist]);
+  }, [
+    hasPresaleBytecode,
+    presaleFactory,
+    publicClient,
+    presaleAddress,
+    requiresWhitelist,
+  ]);
 
   // Fetch presale data
   const presaleDataQueries = useMemo(() => {
@@ -567,7 +614,7 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
 
   // Parse presale data
   const presaleData = useMemo((): PresaleData | null => {
-    if (!presaleAddress) return null;
+    if (!presaleAddress || !hasPresaleBytecode) return null;
     if (!presaleDataResults || presaleDataResults.length === 0) {
       return cachedPresale;
     }
@@ -599,7 +646,13 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
       refundsEnabled: (presaleDataResults[15]?.result ?? cachedPresale?.refundsEnabled ?? false) as boolean,
       owner: (presaleDataResults[16]?.result ?? cachedPresale?.owner) as Address,
     };
-  }, [presaleAddress, presaleDataResults, cachedPresale, requiresWhitelist]);
+  }, [
+    presaleAddress,
+    presaleDataResults,
+    cachedPresale,
+    requiresWhitelist,
+    hasPresaleBytecode,
+  ]);
 
   // Fetch token info
   const tokenAddresses = useMemo(() => {
@@ -676,7 +729,14 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
       status,
       progress: Math.min(progress, 100),
     };
-  }, [presaleData, tokenInfoResults, tokenAddresses, getPresaleStatus, cachedPresale]);
+  }, [
+    presaleData,
+    tokenInfoResults,
+    tokenAddresses,
+    getPresaleStatus,
+    cachedPresale,
+    chainId,
+  ]);
 
   // Track last update to prevent unnecessary cache writes
   const lastUpdateRef = useRef<{ address: string; timestamp: number } | null>(null);
@@ -704,7 +764,14 @@ export function useLaunchpadPresale(presaleAddress: Address | undefined, forceRe
 
   return {
     presale: completePresale,
-    isLoading: isLoadingPresaleData || isLoadingTokenInfo,
+    isLoading:
+      isLoadingPresaleBytecode ||
+      (hasPresaleBytecode && (isLoadingPresaleData || isLoadingTokenInfo)),
+    isInvalid:
+      !isValidPresaleAddress ||
+      (isPresaleBytecodeFetched &&
+        !isPresaleBytecodeError &&
+        !hasPresaleBytecode),
     refetch: refetchPresale,
   };
 }

@@ -134,10 +134,10 @@ const PresaleDetailPage: React.FC = () => {
   const chainId = useChainId();
   const explorerUrl = getExplorerUrl(chainId);
 
-  const { presale, isLoading, refetch } = useLaunchpadPresale(presaleAddress);
+  const { presale, isLoading, isInvalid, refetch } = useLaunchpadPresale(presaleAddress);
   const getPresaleStatus = useLaunchpadPresaleStore((state) => state.getPresaleStatus);
   const { contribution, purchasedTokens } = useUserPresaleContribution(
-    presaleAddress,
+    presale ? presaleAddress : undefined,
     userAddress
   );
 
@@ -276,9 +276,39 @@ const PresaleDetailPage: React.FC = () => {
     });
   };
 
-  if (isLoading || !presale) {
+  if (isLoading) {
     return (
       <LoadingState label="Loading launch details" />
+    );
+  }
+
+  if (isInvalid || !presale) {
+    return (
+      <div className="space-y-8">
+        <Link
+          to="/presales"
+          className="inline-flex items-center gap-2 text-body text-ink-muted hover:text-ink transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Launchpad
+        </Link>
+        <section className="page-hero-card flex flex-col items-center text-center gap-4 py-12">
+          <div className="w-12 h-12 rounded-2xl bg-status-error-bg text-status-error flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="font-display text-display-md text-ink">
+              Launch not found
+            </h1>
+            <p className="text-body text-ink-muted mt-2 max-w-md">
+              This address is not a deployed Stage0 launch on RISE Mainnet.
+            </p>
+          </div>
+          <Link to="/presales" className="btn-primary">
+            Browse launches
+          </Link>
+        </section>
+      </div>
     );
   }
 

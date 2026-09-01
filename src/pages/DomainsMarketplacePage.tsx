@@ -1481,8 +1481,8 @@ function DomainsMarketplacePage() {
               </p>
             </div>
             <span className="mkt-owned-toggle" aria-hidden="true">
-              <span className="mkt-owned-toggle-closed">Open form</span>
-              <span className="mkt-owned-toggle-open">Close form</span>
+              <span className="mkt-owned-toggle-closed">Open</span>
+              <span className="mkt-owned-toggle-open">Close</span>
               <ChevronDown className="mkt-owned-toggle-icon" />
             </span>
           </summary>

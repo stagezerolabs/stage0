@@ -3555,6 +3555,12 @@
   background: rgb(var(--color-canvas) / 0.65);
 }
 
+.names-connect-icon-compact {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 14px;
+}
+
 .nm-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
@@ -4850,6 +4856,34 @@
 
 .mkt-owned-disclosure-body {
   padding-top: 2px;
+}
+
+.mkt-wallet-prompt {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid rgb(var(--color-border) / 0.82);
+  border-radius: 18px;
+  background: rgb(var(--color-canvas) / 0.48);
+}
+
+.mkt-wallet-prompt > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mkt-wallet-prompt-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  color: rgb(var(--color-accent));
+  background: rgb(var(--color-accent) / 0.1);
 }
 
 .mkt-owned-eyebrow {
@@ -6905,6 +6939,15 @@
   .mkt-owned-toggle {
     width: 100%;
     min-height: 44px;
+  }
+
+  .mkt-wallet-prompt {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mkt-wallet-prompt .names-action-btn {
+    width: 100%;
   }
 
   .mkt-card {

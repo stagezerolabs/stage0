@@ -90,10 +90,11 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
   const publicNavItems = [
     { path: '/presales', label: 'Launchpad' },
+    { path: '/domains', label: 'Names' },
   ];
 
   const namesNavLinks = [
-    { path: '/domains', label: 'My names', description: 'Search, register, and manage' },
+    { path: '/domains', label: 'Search names', description: 'Check availability and pricing' },
     { path: '/domains/marketplace', label: 'Marketplace', description: 'Browse domain names' },
   ];
 

@@ -1,5 +1,6 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
-import { ChevronDown, Search, View } from "@/components/ui/icons";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { ChevronDown, Search, View, Wallet } from "@/components/ui/icons";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { InlineLoading, LoadingState, Spinner } from "@/components/ui/spinner";
 import {
@@ -322,6 +323,7 @@ async function persistNotificationIntent(intent: PendingNotificationIntent | nul
 
 function DomainsMarketplacePage() {
   const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
   const { auctionHouse, chainId, marketplace } = useRnsContracts();
   const { allDomains } = useRnsOwnedLabel(address);
   const { isApproved, refetch: refetchApproval } = useRnsIsApproved(address, marketplace);
@@ -976,14 +978,22 @@ function DomainsMarketplacePage() {
     resetWithdrawPrimary();
   }, [withdrawPrimaryError, resetWithdrawPrimary]);
 
+  const requestWalletConnection = () => {
+    if (openConnectModal) {
+      openConnectModal();
+      return;
+    }
+    toast.error("Wallet connection is temporarily unavailable.");
+  };
+
   const handleOpenComposeModal = () => {
-    if (!selectedOwnedName || !selectedOwnedDomain) {
-      toast.error("Choose a .rise name first.");
+    if (!isConnected) {
+      requestWalletConnection();
       return;
     }
 
-    if (!isConnected) {
-      toast.error("Connect your wallet to list a domain.");
+    if (!selectedOwnedName || !selectedOwnedDomain) {
+      toast.error("Choose a .rise name first.");
       return;
     }
 
@@ -1019,7 +1029,7 @@ function DomainsMarketplacePage() {
 
   const handleOpenBidModal = (auction: AnyAuctionSummary, source: AuctionSource) => {
     if (!isConnected) {
-      toast.error("Connect your wallet to bid.");
+      requestWalletConnection();
       return;
     }
     setDetailSheet(null);
@@ -1041,18 +1051,32 @@ function DomainsMarketplacePage() {
   };
 
   const handleOpenWatchAuctionModal = (auction: AnyAuctionSummary, source: AuctionSource) => {
+    if (!isConnected) {
+      requestWalletConnection();
+      return;
+    }
     setDetailSheet(null);
     setNotifyEmail("");
     setNotifyModal({ kind: "watch-auction", source, auction });
   };
 
   const handleOpenWatchReservedModal = (reserved: RnsReservedNameSummary) => {
+    if (!isConnected) {
+      requestWalletConnection();
+      return;
+    }
     setDetailSheet(null);
     setNotifyEmail("");
     setNotifyModal({ kind: "watch-reserved", reserved });
   };
 
   const handleConfirmNotifyAction = () => {
+    if (!isConnected) {
+      setNotifyModal(null);
+      requestWalletConnection();
+      return;
+    }
+
     const email = notifyEmail.trim();
     const requiresEmail =
       notifyModal?.kind === "watch-auction" || notifyModal?.kind === "watch-reserved";
@@ -1200,7 +1224,7 @@ function DomainsMarketplacePage() {
 
   const handleBuyListing = (listing: RnsMarketplaceListingSummary) => {
     if (!isConnected) {
-      toast.error("Connect your wallet to buy a name.");
+      requestWalletConnection();
       return;
     }
     setPendingMarketActionName(listing.name);
@@ -1242,7 +1266,7 @@ function DomainsMarketplacePage() {
 
   const handleSettleAuction = (auction: AnyAuctionSummary, source: AuctionSource) => {
     if (!isConnected) {
-      toast.error("Connect your wallet to settle this auction.");
+      requestWalletConnection();
       return;
     }
     setPendingSettlementAuctionKey(auctionActionKey(source, auction));
@@ -1256,7 +1280,7 @@ function DomainsMarketplacePage() {
 
   const handleBuyReservedName = (reserved: RnsReservedNameSummary) => {
     if (!isConnected) {
-      toast.error("Connect your wallet to buy this name.");
+      requestWalletConnection();
       return;
     }
     if (!fixedPremiumQuote.signedQuote || !fixedPremiumQuote.signature) {
@@ -1646,7 +1670,32 @@ function DomainsMarketplacePage() {
                   </div>
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="mkt-wallet-prompt">
+                <span className="mkt-wallet-prompt-icon" aria-hidden="true">
+                  <Wallet className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-display text-xl text-ink">
+                    {isConnected ? "No names available to list" : "Connect to list a name"}
+                  </h3>
+                  <p className="text-body-sm text-ink-muted mt-1">
+                    {isConnected
+                      ? "Only .rise names held in your wallet can be listed."
+                      : "Connect the wallet holding your .rise names to set sale terms."}
+                  </p>
+                </div>
+                {!isConnected ? (
+                  <button
+                    type="button"
+                    onClick={requestWalletConnection}
+                    className="btn-primary names-action-btn"
+                  >
+                    Connect wallet
+                  </button>
+                ) : null}
+              </div>
+            )}
 
             {marketplacePendingReturns && marketplacePendingReturns > 0n ? (
               <button

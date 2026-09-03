@@ -1,4 +1,5 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   fetchRnsMarketplaceReserved,
   fetchRnsNameResolution,
@@ -425,6 +426,7 @@ const OwnedNameCard: React.FC<{
 
 const DomainsPage: React.FC = () => {
   const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
   const chainId = useChainId();
   const isCorrectChain = chainId === riseMainnet.id;
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
@@ -863,7 +865,28 @@ const DomainsPage: React.FC = () => {
     toast.success(`${formatDomainDisplay(label)} set as your primary name.`);
   };
 
+  const handleConnectWallet = () => {
+    if (openConnectModal) {
+      openConnectModal();
+      return;
+    }
+    toast.error("Wallet connection is temporarily unavailable.");
+  };
+
   const renderRegisterAction = () => {
+    if (!isConnected) {
+      return (
+        <button
+          type="button"
+          onClick={handleConnectWallet}
+          className="btn-primary names-action-btn"
+        >
+          <Wallet className="w-4 h-4" />
+          Connect wallet to register
+        </button>
+      );
+    }
+
     if (!isCorrectChain) {
       return (
         <button
@@ -936,24 +959,7 @@ const DomainsPage: React.FC = () => {
         <NamesSubnav />
       </motion.section>
 
-      {!isConnected ? (
-        <motion.div
-          variants={itemVariants}
-          className="rns-card names-connect-card"
-        >
-          <div className="names-connect-icon">
-            <Wallet className="w-6 h-6" />
-          </div>
-          <h3 className="font-display text-display-sm text-ink">
-            Connect your wallet
-          </h3>
-          <p className="text-body text-ink-muted max-w-sm mx-auto">
-            Connect your wallet to search, register, renew, and manage your RNS
-            names.
-          </p>
-        </motion.div>
-      ) : (
-        <div className="nm-layout">
+      <div className="nm-layout">
           <div className="names-main-column">
             <motion.section
               variants={itemVariants}
@@ -1383,7 +1389,29 @@ const DomainsPage: React.FC = () => {
           </div>
 
           <aside className="names-side-column">
-            {ownedLabel ? (
+            {!isConnected ? (
+              <motion.section
+                variants={itemVariants}
+                className="rns-card rns-card-pad names-empty-owned"
+              >
+                <div className="names-connect-icon names-connect-icon-compact">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <h3 className="font-display text-xl text-ink">
+                  Your names
+                </h3>
+                <p className="text-body-sm text-ink-muted mt-2">
+                  Connect your wallet to register and manage .rise names.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleConnectWallet}
+                  className="btn-primary names-action-btn mt-4 w-full"
+                >
+                  Connect wallet
+                </button>
+              </motion.section>
+            ) : ownedLabel ? (
               <motion.section
                 variants={itemVariants}
                 className="rns-card rns-card-pad nm-primary"
@@ -1492,8 +1520,7 @@ const DomainsPage: React.FC = () => {
               </div>
             </motion.section>
           </aside>
-        </div>
-      )}
+      </div>
 
       <motion.aside variants={itemVariants} className="names-developer-cta">
         <div className="names-developer-cta-copy">

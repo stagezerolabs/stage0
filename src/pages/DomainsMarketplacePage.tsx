@@ -629,6 +629,11 @@ function DomainsMarketplacePage() {
     args: currentBidAuctionId !== undefined ? [currentBidAuctionId] : undefined,
     query: { enabled: currentBidAuctionId !== undefined },
   });
+  const parsedBidAmountEth = Number(bidAmountEth);
+  const hasValidBidAmount = Number.isFinite(parsedBidAmountEth) && parsedBidAmountEth > 0;
+  const bidAmountUsd = hasValidBidAmount && ethUsd ? parsedBidAmountEth * ethUsd : null;
+  const minimumNextBidUsd =
+    minimumNextBid !== undefined && ethUsd ? Number(formatEther(minimumNextBid)) * ethUsd : null;
   const detailAuctionId = detailSheet?.kind === "auction" ? detailSheet.auction.auctionId : undefined;
   const detailAuctionSource = detailSheet?.kind === "auction" ? detailSheet.source : undefined;
   const { data: detailMinimumNextBid } = useReadContract({
@@ -2350,14 +2355,34 @@ function DomainsMarketplacePage() {
           className="max-w-md"
         >
           {notifyModal.kind === "bid-auction" ? (
-            <div className="mkt-field">
+            <label className="mkt-field">
               <span>Bid amount (ETH)</span>
               <input value={bidAmountEth} onChange={(event) => setBidAmountEth(event.target.value)} inputMode="decimal" />
-              <span className="mt-2 block text-xs text-ink-faint">
-                Minimum next bid:{" "}
-                {minimumNextBid !== undefined ? `${formatEthCompact(minimumNextBid)} ETH` : <Spinner size="xs" variant="dots" />}
+              <span className="mkt-bid-usd" aria-live="polite">
+                {hasValidBidAmount
+                  ? bidAmountUsd !== null
+                    ? `≈ ${formatUsd(bidAmountUsd)}`
+                    : "USD price loading"
+                  : "Enter an amount to see its USD value"}
               </span>
-            </div>
+              <span className="mkt-bid-minimum">
+                <span>Minimum next bid</span>
+                <span>
+                  <strong>
+                    {minimumNextBid !== undefined
+                      ? `${formatEthCompact(minimumNextBid)} ETH`
+                      : <Spinner size="xs" variant="dots" />}
+                  </strong>
+                  <small>
+                    {minimumNextBid === undefined
+                      ? "Checking minimum"
+                      : minimumNextBidUsd !== null
+                        ? `≈ ${formatUsd(minimumNextBidUsd)}`
+                        : "USD price loading"}
+                  </small>
+                </span>
+              </span>
+            </label>
           ) : null}
 
           <label className="mkt-field mt-5">

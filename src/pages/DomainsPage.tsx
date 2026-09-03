@@ -130,6 +130,7 @@ function estimateRegistrationTotals(
   const subtotalUsdCents = usdCentsPerYear * BigInt(years);
   const priceMultiplierBps = getPriceMultiplierBps(pricing, years);
   const totalUsdCents = (subtotalUsdCents * BigInt(priceMultiplierBps)) / 10_000n;
+  const discountUsdCents = subtotalUsdCents - totalUsdCents;
   const ethPriceMicros = BigInt(Math.round(pricing.ethUsd * Number(MICROS_PER_USD)));
   if (ethPriceMicros <= 0n) return null;
 
@@ -137,7 +138,10 @@ function estimateRegistrationTotals(
 
   return {
     priceWei,
+    subtotalUsd: Number(subtotalUsdCents) / 100,
     totalUsd: Number(totalUsdCents) / 100,
+    discountBps: Math.max(0, 10_000 - priceMultiplierBps),
+    discountUsd: Number(discountUsdCents) / 100,
   };
 }
 
@@ -610,9 +614,21 @@ const DomainsPage: React.FC = () => {
   const userBalance = balanceData?.value ?? 0n;
   const hasSufficientBalance =
     !balanceData || registerPrice === 0n || userBalance >= registerPrice;
-  const registerUsdTotal = formatUsdValue(registerDisplay?.totalUsd);
-  const registerUsdSubtotal = formatUsdValue(registerDisplay?.subtotalUsd);
-  const registerUsdDiscount = formatUsdValue(registerDisplay?.discountUsd);
+  const selectedRegistrationEstimate = registrationPeriodEstimates[selectedYears];
+  const displayedRegisterPrice = registerPrice > 0n
+    ? registerPrice
+    : selectedRegistrationEstimate?.priceWei ?? 0n;
+  const registerUsdTotal = formatUsdValue(
+    registerDisplay?.totalUsd ?? selectedRegistrationEstimate?.totalUsd,
+  );
+  const registerUsdSubtotal = formatUsdValue(
+    registerDisplay?.subtotalUsd ?? selectedRegistrationEstimate?.subtotalUsd,
+  );
+  const registerDiscountBps =
+    registerDisplay?.discountBps ?? selectedRegistrationEstimate?.discountBps ?? 0;
+  const registerUsdDiscount = formatUsdValue(
+    registerDisplay?.discountUsd ?? selectedRegistrationEstimate?.discountUsd,
+  );
   const renewUsdTotal = formatUsdValue(renewDisplay?.totalUsd);
   const ethUsd = pricing?.ethUsd ?? null;
 
@@ -1190,7 +1206,7 @@ const DomainsPage: React.FC = () => {
                                     if (isSelected) {
                                       return (
                                         <>
-                                          <span>{formatEthValue(registerPrice)}</span>
+                                          <span>{formatEthValue(displayedRegisterPrice)}</span>
                                           {registerUsdTotal ? <small>≈ {registerUsdTotal}</small> : null}
                                         </>
                                       );
@@ -1213,14 +1229,19 @@ const DomainsPage: React.FC = () => {
                           <div className="nm-bd-row">
                             <span>{selectedYears} year registration</span>
                             <b>
-                              {isRegisterQuoteLoading
+                              {isRegisterQuoteLoading && !selectedRegistrationEstimate
                                 ? <Spinner size="xs" variant="dots" />
-                                : registerUsdSubtotal ?? formatEthValue(registerPrice)}
+                                : registerUsdSubtotal ?? formatEthValue(displayedRegisterPrice)}
                             </b>
                           </div>
-                          {registerDisplay?.discountBps ? (
+                          {registerDiscountBps ? (
                             <div className="nm-bd-row">
-                              <span>{discountLabel(registerDisplay)}</span>
+                              <span>
+                                {discountLabel({
+                                  discountBps: registerDiscountBps,
+                                  discountPercent: `${registerDiscountBps / 100}`,
+                                })}
+                              </span>
                               <b className="text-accent-secondary">
                                 -{registerUsdDiscount ?? "$0.00"}
                               </b>
@@ -1235,9 +1256,9 @@ const DomainsPage: React.FC = () => {
                             <span>Total due now</span>
                             <div className="text-right">
                               <div className="nm-bd-total-eth">
-                                {isRegisterQuoteLoading
+                                {isRegisterQuoteLoading && !selectedRegistrationEstimate
                                   ? <Spinner size="xs" variant="dots" />
-                                  : formatEthValue(registerPrice).replace(
+                                  : formatEthValue(displayedRegisterPrice).replace(
                                       " ETH",
                                       "",
                                     )}
@@ -1245,7 +1266,7 @@ const DomainsPage: React.FC = () => {
                               </div>
                               <div className="nm-bd-total-usd">
                                 {registerUsdTotal
-                                  ? `≈ ${registerUsdTotal}${registerDisplay?.discountBps ? ' after discount' : ''}`
+                                  ? `≈ ${registerUsdTotal}${registerDiscountBps ? ' after discount' : ''}`
                                   : "Paid on RISE Mainnet"}
                               </div>
                             </div>

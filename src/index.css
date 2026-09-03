@@ -4765,6 +4765,52 @@
   background: rgb(var(--color-canvas) / 0.92);
 }
 
+.mkt-field .mkt-bid-usd {
+  color: rgb(var(--color-ink-muted));
+  font-family: 'Inconsolata', monospace;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.mkt-bid-minimum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+  padding: 12px 13px;
+  border: 1px solid rgb(var(--color-accent) / 0.18);
+  border-radius: 14px;
+  background: rgb(var(--color-accent) / 0.06);
+}
+
+.mkt-bid-minimum > span:last-child {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.mkt-bid-minimum strong,
+.mkt-bid-minimum small {
+  font-family: 'Inconsolata', monospace;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.mkt-bid-minimum strong {
+  color: rgb(var(--color-ink));
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.mkt-bid-minimum small {
+  color: rgb(var(--color-ink-muted));
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .mkt-field-grid {
   display: grid;
   grid-template-columns: 1fr 0.6fr;
@@ -7016,6 +7062,16 @@
 }
 
 @media (max-width: 480px) {
+  .mkt-bid-minimum {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .mkt-bid-minimum > span:last-child {
+    justify-items: start;
+  }
+
   .mkt-owned-heading {
     align-items: flex-start;
     flex-direction: column;

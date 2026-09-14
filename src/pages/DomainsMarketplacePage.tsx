@@ -1340,7 +1340,21 @@ function DomainsMarketplacePage() {
             </div>
             <span className="nm-tag nm-tag-auction">≤4 chars</span>
           </div>
-          {featuredShortCards.length > 0 ? (
+          {isLoadingMarket ? (
+            <div className="rns-card rns-card-pad mkt-empty-state">
+              <LoadingState
+                label="Loading short names"
+                description="Checking live listings and auctions."
+                compact
+                variant="dots"
+              />
+            </div>
+          ) : marketError ? (
+            <div className="rns-card rns-card-pad mkt-empty-state">
+              <h3 className="font-display text-2xl text-ink">Short names unavailable</h3>
+              <p className="text-body-sm text-ink-muted mt-2">Try refreshing the marketplace in a moment.</p>
+            </div>
+          ) : featuredShortCards.length > 0 ? (
             <div className="hot-grid mkt-featured-grid">
               {featuredShortCards.map((card) => {
                 const saleKind = cardSaleKind(card);

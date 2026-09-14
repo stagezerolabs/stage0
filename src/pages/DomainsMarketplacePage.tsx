@@ -1,4 +1,5 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
+import NameListingForm from "@/components/rns/NameListingForm";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { ChevronDown, Search, View, Wallet } from "@/components/ui/icons";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
@@ -496,8 +497,6 @@ function DomainsMarketplacePage() {
   );
 
   const ethUsd = pricing?.ethUsd ?? null;
-  const reserveUsd = Number(reserveEth) > 0 && ethUsd ? Number(reserveEth) * ethUsd : null;
-  const fixedPriceUsd = Number(fixedPriceEth) > 0 && ethUsd ? Number(fixedPriceEth) * ethUsd : null;
   const fixedReservedInView =
     detailSheet?.kind === "reserved" && detailSheet.reserved.saleMode === "buy_now"
       ? detailSheet.reserved
@@ -1511,16 +1510,13 @@ function DomainsMarketplacePage() {
         </div>
       </section>
 
-      <section className="rns-card rns-card-pad mkt-owned-panel mkt-owned-section">
+      <section className="rns-card rns-card-pad mkt-owned-panel mkt-owned-section mkt-listing-panel">
         <details className="mkt-owned-disclosure">
           <summary className="mkt-owned-heading mkt-owned-summary">
             <div>
-              <div className="mkt-owned-eyebrow">
-                Sell from your wallet
-              </div>
               <h2 className="font-display text-2xl text-ink">List a .rise name</h2>
               <p className="text-body-sm text-ink-muted mt-2">
-                Choose a name, pick a sale method, and set your terms.
+                Set your price or let buyers bid.
               </p>
             </div>
             <span className="mkt-owned-toggle" aria-hidden="true">
@@ -1532,163 +1528,29 @@ function DomainsMarketplacePage() {
 
           <div className="mkt-owned-disclosure-body">
             {ownedNames.length > 0 ? (
-              <div className="mkt-owned-content">
-                <div className="mkt-owned-selector">
-                  <div className="nm-list mkt-owned-list">
-                    {ownedNames.map((domain) => {
-                      const isSelected = domain.label === selectedOwnedName;
-                      return (
-                        <button
-                          key={domain.node}
-                          type="button"
-                          className={`nm-row mkt-owned-row ${isSelected ? "is-selected" : ""}`}
-                          onClick={() => setSelectedOwnedName(domain.label)}
-                          aria-pressed={isSelected}
-                        >
-                          <span className="mkt-owned-name-wrap">
-                            <span className="nm-row-name">
-                              <b>{domain.label}</b>
-                              <span className="tld">.rise</span>
-                            </span>
-                          </span>
-                          <span className="nm-tier">{isSelected ? "Selected" : "Owned"}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="mkt-auction-form">
-                  <div className="mkt-selected-sale">
-                    <div className="mkt-selected-sale-copy">
-                      <strong>{selectedOwnedName}.rise</strong>
-                    </div>
-                  </div>
-
-                  <div className="mkt-form-block">
-                    <div className="mkt-form-block-head">
-                      <div className="nm-suggest-label">Sale method</div>
-                      <span>How should buyers purchase it?</span>
-                    </div>
-                    <div className="mkt-sale-methods">
-                      <button
-                        type="button"
-                        className={`mkt-sale-method ${saleMethod === "auction" ? "is-active" : ""}`}
-                        onClick={() => setSaleMethod("auction")}
-                        aria-pressed={saleMethod === "auction"}
-                      >
-                        <span className="mkt-sale-method-copy">
-                          <strong>Auction</strong>
-                          <small>Let buyers compete</small>
-                        </span>
-                        <span className="mkt-sale-method-check" aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        className={`mkt-sale-method ${saleMethod === "buy-now" ? "is-active" : ""}`}
-                        onClick={() => setSaleMethod("buy-now")}
-                        aria-pressed={saleMethod === "buy-now"}
-                      >
-                        <span className="mkt-sale-method-copy">
-                          <strong>Fixed price</strong>
-                          <small>Sell instantly at your price</small>
-                        </span>
-                        <span className="mkt-sale-method-check" aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mkt-form-block">
-                    {saleMethod === "auction" ? (
-                      <>
-                        <div className="mkt-field-grid">
-                          <label className="mkt-field">
-                            <span>Opening reserve</span>
-                            <div className="mkt-input-shell">
-                              <input
-                                aria-label="Opening reserve in ETH"
-                                value={reserveEth}
-                                onChange={(event) => setReserveEth(event.target.value)}
-                                inputMode="decimal"
-                              />
-                              <b>ETH</b>
-                            </div>
-                          </label>
-                          <label className="mkt-field">
-                            <span>Duration</span>
-                            <div className="mkt-input-shell">
-                              <input
-                                aria-label="Auction duration in days"
-                                value={auctionDays}
-                                onChange={(event) => setAuctionDays(event.target.value)}
-                                inputMode="numeric"
-                              />
-                              <b>Days</b>
-                            </div>
-                          </label>
-                        </div>
-                        <div className="mkt-listing-summary">
-                          <div>
-                            <span>Reserve · 5% bid step</span>
-                            <strong>{formatUsd(reserveUsd)}</strong>
-                          </div>
-                          <p>The highest valid bid wins when the auction ends.</p>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <label className="mkt-field">
-                          <span>Fixed price</span>
-                          <div className="mkt-input-shell">
-                            <input
-                              aria-label="Fixed price in ETH"
-                              value={fixedPriceEth}
-                              onChange={(event) => setFixedPriceEth(event.target.value)}
-                              inputMode="decimal"
-                            />
-                            <b>ETH</b>
-                          </div>
-                        </label>
-                        <div className="mkt-listing-summary">
-                          <div>
-                            <span>Buyer pays</span>
-                            <strong>{formatUsd(fixedPriceUsd)}</strong>
-                          </div>
-                          <p>The first buyer can purchase immediately at this amount.</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="mkt-listing-action">
-                    {!isApproved ? (
-                      <button
-                        type="button"
-                        onClick={approve}
-                        disabled={isApprovalBusy}
-                        className="btn-secondary names-action-btn w-full disabled:opacity-60"
-                      >
-                        {isApprovalBusy ? <InlineLoading label="Approving..." /> : "Approve marketplace"}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleOpenComposeModal}
-                        disabled={(saleMethod === "auction" ? isCreateAuctionBusy : isCreateListingBusy) || !selectedOwnedName}
-                        className="btn-primary names-action-btn w-full disabled:opacity-60"
-                      >
-                        {saleMethod === "auction"
-                          ? isCreateAuctionBusy
-                            ? <InlineLoading label="Creating auction..." />
-                            : "Start auction"
-                          : isCreateListingBusy
-                            ? <InlineLoading label="Creating listing..." />
-                            : "List now"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <NameListingForm
+                names={ownedNames}
+                value={{
+                  name: selectedOwnedName,
+                  method: saleMethod,
+                  reserveEth,
+                  durationDays: auctionDays,
+                  fixedPriceEth,
+                }}
+                onChange={(patch) => {
+                  if (patch.name !== undefined) setSelectedOwnedName(patch.name);
+                  if (patch.method !== undefined) setSaleMethod(patch.method);
+                  if (patch.reserveEth !== undefined) setReserveEth(patch.reserveEth);
+                  if (patch.durationDays !== undefined) setAuctionDays(patch.durationDays);
+                  if (patch.fixedPriceEth !== undefined) setFixedPriceEth(patch.fixedPriceEth);
+                }}
+                ethUsd={ethUsd}
+                isApproved={isApproved}
+                isApprovalBusy={isApprovalBusy}
+                isSubmitting={saleMethod === "auction" ? isCreateAuctionBusy : isCreateListingBusy}
+                onApprove={approve}
+                onSubmit={handleOpenComposeModal}
+              />
             ) : (
               <div className="mkt-wallet-prompt">
                 <span className="mkt-wallet-prompt-icon" aria-hidden="true">

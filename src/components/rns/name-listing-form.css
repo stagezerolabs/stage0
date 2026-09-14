@@ -209,7 +209,7 @@
 }
 
 .name-listing-terms.is-auction {
-  grid-template-columns: minmax(0, 1fr) minmax(100px, 0.55fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .name-listing-input {
@@ -238,6 +238,44 @@
   padding-right: 14px;
   color: rgb(var(--color-ink-muted));
   font-size: 12px;
+}
+
+.name-listing-duration-unit {
+  position: relative;
+  flex-shrink: 0;
+  margin-right: 4px;
+  border-left: 1px solid rgb(var(--color-border));
+}
+
+.name-listing-duration-unit select {
+  appearance: none;
+  min-height: 40px;
+  padding: 8px 26px 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgb(var(--color-ink));
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.name-listing-duration-unit select option {
+  background: rgb(var(--color-canvas-alt));
+  color: rgb(var(--color-ink));
+}
+
+.name-listing-duration-unit select:focus-visible {
+  outline: 2px solid rgb(var(--color-accent));
+  outline-offset: -2px;
+}
+
+.name-listing-duration-unit > svg {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: rgb(var(--color-ink-muted));
 }
 
 .name-listing-inline-usd {
@@ -374,7 +412,7 @@
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 480px) {
   .name-listing-terms.is-auction {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -195,7 +195,7 @@ function tierLabelFor(length: number) {
 
 const RENEWAL_WINDOW_SECONDS = 60 * 24 * 60 * 60;
 
-// Filled verified seal — primary-name marker (replaces the hollow star).
+// Circular verified badge for primary names.
 function PrimarySeal({ size = 16 }: { size?: number }) {
   return (
     <svg
@@ -206,10 +206,7 @@ function PrimarySeal({ size = 16 }: { size?: number }) {
       style={{ flexShrink: 0 }}
       aria-hidden
     >
-      <path
-        d="M12 1.6l2.6 1.7 3.1.2.9 3 2.2 2.2-1.3 2.8.6 3.1-2.8 1.4-1.4 2.8-3.1-.3L12 22.4l-2.5-1.9-3.1.3-1.4-2.8L2.2 16.6l.6-3.1L1.5 10.7l2.2-2.2.9-3 3.1-.2z"
-        fill="currentColor"
-      />
+      <circle cx="12" cy="12" r="10.5" fill="currentColor" />
       <path
         d="M8.4 12.3l2.4 2.4 4.8-5"
         stroke="rgb(var(--color-accent-foreground))"

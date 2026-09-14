@@ -1,5 +1,6 @@
 import { ChevronDown, Clock3, Coins } from "@/components/ui/icons";
 import { InlineLoading } from "@/components/ui/spinner";
+import type { AuctionDurationUnit } from "@/lib/rns/auction-duration";
 import { useId } from "react";
 import "./name-listing-form.css";
 
@@ -7,7 +8,8 @@ export type NameListingValues = {
   name: string;
   method: "auction" | "buy-now";
   reserveEth: string;
-  durationDays: string;
+  duration: string;
+  durationUnit: AuctionDurationUnit;
   fixedPriceEth: string;
 };
 
@@ -120,14 +122,29 @@ export default function NameListingForm({
               <div className="name-listing-input">
                 <input
                   id={`${id}-duration`}
-                  aria-label="Auction duration in days"
-                  value={value.durationDays}
-                  onChange={(event) => onChange({ durationDays: event.target.value })}
+                  aria-label={`Auction duration in ${value.durationUnit}`}
+                  aria-describedby={value.durationUnit === "months" ? `${id}-duration-hint` : undefined}
+                  value={value.duration}
+                  onChange={(event) => onChange({ duration: event.target.value })}
                   inputMode="numeric"
                   autoComplete="off"
                 />
-                <span aria-hidden="true">Days</span>
+                <div className="name-listing-duration-unit">
+                  <select
+                    aria-label="Auction duration unit"
+                    value={value.durationUnit}
+                    onChange={(event) => onChange({ durationUnit: event.target.value as AuctionDurationUnit })}
+                  >
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                    <option value="months">Months</option>
+                  </select>
+                  <ChevronDown size={14} aria-hidden="true" />
+                </div>
               </div>
+              {value.durationUnit === "months" && (
+                <p id={`${id}-duration-hint`} className="name-listing-hint">1 month = 30 days.</p>
+              )}
             </div>
           )}
         </div>
@@ -145,7 +162,7 @@ export default function NameListingForm({
         </div>
         {isAuction && (
           <dl className="name-listing-facts">
-            <div><dt>Duration</dt><dd>{value.durationDays || "—"} {Number(value.durationDays) === 1 ? "day" : "days"}</dd></div>
+            <div><dt>Duration</dt><dd>{value.duration || "—"} {Number(value.duration) === 1 ? value.durationUnit.slice(0, -1) : value.durationUnit}</dd></div>
             <div><dt>Minimum bid increase</dt><dd>5%</dd></div>
           </dl>
         )}

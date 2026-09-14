@@ -20,6 +20,7 @@ import {
   type RnsReservedSaleMode,
 } from "@/lib/api/rns";
 import { RNSAuctionHouse, RNSMarketplaceEscrow } from "@/lib/rns/abis";
+import { auctionDurationSeconds, type AuctionDurationUnit } from "@/lib/rns/auction-duration";
 import {
   useRnsApproveForAll,
   useRnsBidPrimaryAuction,
@@ -93,7 +94,7 @@ type NotifyModalState =
       name: string;
       node: Hex | null;
       reserveEth: string;
-      days: string;
+      durationSeconds: number;
     }
   | {
       kind: "create-listing";
@@ -471,7 +472,8 @@ function DomainsMarketplacePage() {
   const [saleMethod, setSaleMethod] = useState<SaleMethod>("auction");
   const [selectedOwnedName, setSelectedOwnedName] = useState("");
   const [reserveEth, setReserveEth] = useState("0.05");
-  const [auctionDays, setAuctionDays] = useState("3");
+  const [auctionDuration, setAuctionDuration] = useState("3");
+  const [auctionDurationUnit, setAuctionDurationUnit] = useState<AuctionDurationUnit>("days");
   const [fixedPriceEth, setFixedPriceEth] = useState("0.05");
   const [notifyModal, setNotifyModal] = useState<NotifyModalState | null>(null);
   const [detailSheet, setDetailSheet] = useState<DetailSheetState | null>(null);
@@ -1002,8 +1004,13 @@ function DomainsMarketplacePage() {
     }
 
     if (saleMethod === "auction") {
-      if (Number(reserveEth) <= 0 || Number.parseInt(auctionDays, 10) <= 0) {
-        toast.error("Set a valid reserve price and duration.");
+      const durationSeconds = auctionDurationSeconds(auctionDuration, auctionDurationUnit);
+      if (!Number.isFinite(Number(reserveEth)) || Number(reserveEth) <= 0) {
+        toast.error("Set a valid reserve price.");
+        return;
+      }
+      if (durationSeconds === null) {
+        toast.error("Enter a positive whole number for the auction duration.");
         return;
       }
       setNotifyEmail("");
@@ -1012,7 +1019,7 @@ function DomainsMarketplacePage() {
         name: selectedOwnedName,
         node: selectedOwnedDomain.node as Hex,
         reserveEth,
-        days: auctionDays,
+        durationSeconds,
       });
       return;
     }
@@ -1095,9 +1102,8 @@ function DomainsMarketplacePage() {
         toast.error("Approve marketplace escrow first.");
         return;
       }
-      const durationDays = Number.parseInt(notifyModal.days, 10);
       const startTime = BigInt(Math.floor(Date.now() / 1000) + 120);
-      const endTime = startTime + BigInt(durationDays * 24 * 60 * 60);
+      const endTime = startTime + BigInt(notifyModal.durationSeconds);
       if (email) {
         setPendingAuctionSubscription({
           chainId,
@@ -1534,14 +1540,16 @@ function DomainsMarketplacePage() {
                   name: selectedOwnedName,
                   method: saleMethod,
                   reserveEth,
-                  durationDays: auctionDays,
+                  duration: auctionDuration,
+                  durationUnit: auctionDurationUnit,
                   fixedPriceEth,
                 }}
                 onChange={(patch) => {
                   if (patch.name !== undefined) setSelectedOwnedName(patch.name);
                   if (patch.method !== undefined) setSaleMethod(patch.method);
                   if (patch.reserveEth !== undefined) setReserveEth(patch.reserveEth);
-                  if (patch.durationDays !== undefined) setAuctionDays(patch.durationDays);
+                  if (patch.duration !== undefined) setAuctionDuration(patch.duration);
+                  if (patch.durationUnit !== undefined) setAuctionDurationUnit(patch.durationUnit);
                   if (patch.fixedPriceEth !== undefined) setFixedPriceEth(patch.fixedPriceEth);
                 }}
                 ethUsd={ethUsd}

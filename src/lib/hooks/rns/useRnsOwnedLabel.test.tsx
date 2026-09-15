@@ -10,6 +10,8 @@ const env = vi.hoisted(() => ({
   recipient: "0x2222222222222222222222222222222222222222" as Address,
   owners: [] as { result?: Address; status: string }[],
   domains: [] as { node: string; label: string; custody: string; expiry: bigint }[],
+  primary: null as { primaryName: string; node: string } | null,
+  refreshPrimary: vi.fn(),
   refreshApi: vi.fn(), refreshOwnership: vi.fn(), noop: vi.fn(), recovered: new Map(), resolverResults: [],
 }));
 vi.mock("@/config", () => ({ riseMainnet: { id: 4153 } }));
@@ -19,6 +21,7 @@ vi.mock("./useRnsSubgraph", () => ({ useRnsSubgraphDomainsForOwner: () => ({ ref
 vi.mock("./useRnsRegistry", () => ({ useRnsOwner: () => ({ owner: env.sender, refetch: env.noop }) }));
 vi.mock("./useRnsRegistrar", () => ({ useRnsExpiry: () => ({ expiry: 9999999999n, refetch: env.noop }) }));
 vi.mock("./useRnsLabelRecovery", () => ({ useRnsLabelRecovery: () => ({ recoveredLabels: env.recovered }) }));
+vi.mock("./useRnsPrimaryName", () => ({ useRnsPrimaryName: () => ({ data: env.primary, refetch: env.refreshPrimary }) }));
 vi.mock("wagmi", () => ({
   useReadContracts: ({ contracts }: { contracts: { functionName: string }[] }) => contracts[0]?.functionName === "owner"
     ? { data: env.owners, refetch: env.refreshOwnership }
@@ -27,6 +30,7 @@ vi.mock("wagmi", () => ({
 
 beforeEach(() => {
   localStorage.clear();
+  env.primary = { primaryName: "alice.rise", node: rnsNamehash("alice") };
   env.domains = [
     { node: rnsNamehash("alice"), label: "alice", custody: "wallet", expiry: 9999999999n },
     { node: rnsNamehash("bob"), label: "bob", custody: "wallet", expiry: 9999999999n },
@@ -41,10 +45,14 @@ it("drops a transferred name even when the API still returns it, and refetches o
   env.owners = [{ result: env.recipient, status: "success" }, { result: env.sender, status: "success" }];
   rerender();
   expect(result.current.allDomains.map((domain) => domain.label)).toEqual(["bob"]);
+  expect(result.current.label).toBeNull(); // A stale API choice cannot survive a transfer.
+  env.primary = { primaryName: "bob.rise", node: rnsNamehash("bob") };
+  rerender();
   expect(result.current.label).toBe("bob");
   await result.current.refetch();
   expect(env.refreshApi).toHaveBeenCalledOnce();
   expect(env.refreshOwnership).toHaveBeenCalledOnce();
+  expect(env.refreshPrimary).toHaveBeenCalledOnce();
 });
 
 it("does not resurrect a transferred recent registration absent from the API", () => {
@@ -61,11 +69,24 @@ it("retains seller escrow management but exposes the authoritative owner", () =>
   const { result } = renderHook(() => useRnsOwnedLabel(env.sender));
   expect(result.current.allDomains[0].custody).toBe("marketplace_listing");
   expect(result.current.allDomains[0].registryOwner).toBe(env.recipient);
-  expect(result.current.label).toBe("bob");
+  expect(result.current.label).toBeNull();
 });
 
 it("does not mark ownership verified when an RPC read fails", () => {
   env.owners = [{ status: "failure" }, { status: "failure" }];
   const { result } = renderHook(() => useRnsOwnedLabel(env.sender));
   expect(result.current.allDomains.every((domain) => domain.registryOwner === undefined)).toBe(true);
+});
+
+it("uses the shared choice even when local storage contains a different name", () => {
+  localStorage.setItem("rns_primary_label_v1", JSON.stringify({ [env.sender]: "bob" }));
+  const { result } = renderHook(() => useRnsOwnedLabel(env.sender));
+  expect(result.current.label).toBe("alice");
+});
+
+it("does not invent a primary when the shared API has none", () => {
+  env.primary = null;
+  const { result } = renderHook(() => useRnsOwnedLabel(env.sender));
+  expect(result.current.allDomains).toHaveLength(2);
+  expect(result.current.label).toBeNull();
 });

@@ -7,8 +7,7 @@ import { useRnsSubgraphDomainsForOwner } from "@/lib/hooks/rns/useRnsSubgraph";
 import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
 import { useRnsLabelRecovery } from "@/lib/hooks/rns/useRnsLabelRecovery";
 import { RNSRegistry, RNSResolver } from "@/lib/rns/abis";
-import { getPrimaryLabel } from "@/lib/rns/primary-label";
-import { RNS_PRIMARY_LABEL_EVENT } from "@/lib/rns/primary-label";
+import { useRnsPrimaryName } from "@/lib/hooks/rns/useRnsPrimaryName";
 import {
   getRecentRegistrations,
   removeRecentRegistration,
@@ -30,12 +29,13 @@ import { useReadContracts } from "wagmi";
  *  2. indexed label — from the Senna API (or Goldsky fallback)
  *  3. calldata recovery — decodes label from NameRegistered tx input
  *
- * Pass `hintLabel` immediately after a successful registration so the UI
- * shows the new name while the subgraph indexes the transaction.
+ * Primary identity comes from the same shared API lookup used by other apps.
+ * Recent-registration storage bridges discovery while indexing catches up.
  */
-export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
+export function useRnsOwnedLabel(address?: string) {
   const typedAddress = address as Address | undefined;
   const { resolver: resolverAddress, registrar, registry } = useRnsContracts();
+  const { data: primary, isLoading: isPrimaryLoading, refetch: refetchPrimary } = useRnsPrimaryName(typedAddress);
 
   const {
     data: apiDomains,
@@ -55,20 +55,12 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
   // Recent registrations from localStorage bridge the 30s–few-minute Goldsky lag.
   // Stored on tx success by Senna's buy-name signer and the legacy DomainsPage flow.
   const [recentTick, setRecentTick] = useState(0);
-  const [primaryTick, setPrimaryTick] = useState(0);
   const recentRegistrations = useMemo<RecentRegistration[]>(() => {
     if (!address) return [];
     return getRecentRegistrations(address);
     // recentTick lets the merge re-evaluate after a fresh save without remounting.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, recentTick]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const bump = () => setPrimaryTick((t) => t + 1);
-    window.addEventListener(RNS_PRIMARY_LABEL_EVENT, bump);
-    return () => window.removeEventListener(RNS_PRIMARY_LABEL_EVENT, bump);
-  }, []);
 
   // Re-read localStorage when the tab regains focus or another component
   // dispatches the recent-registration event (Senna's buy-name signer fires
@@ -172,35 +164,14 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
       !domain.registryOwner || domain.registryOwner.toLowerCase() === address?.toLowerCase());
   }, [rawDomains, resolverTextResults, recoveredLabels, ownershipResults, address]);
 
-  // Pick the user's preferred primary if it's still in their owned list,
-  // otherwise fall back to the first domain. Primary preference is stored
-  // in localStorage only for UI ordering — it is never used as a data source.
-  const subgraphLabel = useMemo(() => {
+  // Use the same shared selection/fallback as external reverse lookup. Do not
+  // resurrect a local-only choice or a stale API choice after ownership changes.
+  const label = useMemo(() => {
     const walletDomains = resolvedDomains.filter((domain) => (domain.custody ?? "wallet") === "wallet");
-    if (!walletDomains.length) return null;
-    const stored = address ? getPrimaryLabel(address) : null;
-    if (stored) {
-      const match = walletDomains.find((d) => d.label === stored);
-      if (match) return match.label;
-    }
-    return walletDomains[0].label || null;
-  }, [resolvedDomains, address, primaryTick]);
-
-  // Fallback: onchain ownership check for hintLabel while subgraph indexes
-  const hintNormalized = hintLabel ? normalizeRnsLabel(hintLabel) : "";
-  const {
-    owner: hintOwner,
-    isLoading: isHintLoading,
-    refetch: refetchHintOwner,
-  } = useRnsOwner(
-    hintNormalized,
-    { enabled: Boolean(address && hintNormalized && !subgraphLabel) },
-  );
-  const isHintOwner = Boolean(
-    address && hintOwner && hintOwner.toLowerCase() === address.toLowerCase(),
-  );
-
-  const label = subgraphLabel ?? (isHintOwner ? hintNormalized : null);
+    if (!primary?.primaryName || !primary.node) return null;
+    const match = walletDomains.find((domain) => domain.node.toLowerCase() === primary.node?.toLowerCase());
+    return match ? normalizeRnsLabel(primary.primaryName) : null;
+  }, [resolvedDomains, primary]);
 
   const { expiry, isLoading: isExpiryLoading, refetch: refetchExpiry } = useRnsExpiry(
     label ?? "",
@@ -212,8 +183,8 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
   });
 
   const refetch = useCallback(async () => {
-    await Promise.all([refetchApi(), refetchSubgraph(), refetchOwner(), refetchExpiry(), refetchHintOwner(), refetchOwnership()]);
-  }, [refetchApi, refetchSubgraph, refetchOwner, refetchExpiry, refetchHintOwner, refetchOwnership]);
+    await Promise.all([refetchApi(), refetchSubgraph(), refetchOwner(), refetchExpiry(), refetchPrimary(), refetchOwnership()]);
+  }, [refetchApi, refetchSubgraph, refetchOwner, refetchExpiry, refetchPrimary, refetchOwnership]);
 
   const displayName = useMemo(
     () => (label ? formatDomainDisplay(label) : null),
@@ -230,7 +201,7 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     // that should not block the UI from rendering whatever labels are already available.
     isLoading:
       (isApiLoading || (Boolean(apiError) && isSubgraphLoading)) ||
-      isHintLoading ||
+      isPrimaryLoading ||
       isExpiryLoading ||
       isResolverLoading,
     allDomains: resolvedDomains,

@@ -1,4 +1,5 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
+import PrimarySeal from "@/components/rns/PrimarySeal";
 import TransferNameDialog, { type TransferNameSelection } from "@/components/rns/TransferNameDialog";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
@@ -39,7 +40,7 @@ import {
 } from "@/lib/hooks/rns";
 import { RNSResolver } from "@/lib/rns/abis";
 import { RNS_DEFAULT_REGISTRATION_DURATION } from "@/lib/rns/constants";
-import { setPrimaryLabel } from "@/lib/rns/primary-label";
+import { useSetRnsPrimaryName } from "@/lib/hooks/rns/useRnsPrimaryName";
 import { saveRecentRegistration } from "@/lib/rns/recent-registration";
 import { rnsNamehash } from "@/lib/rns/utils";
 import { transferBlockReason } from "@/lib/rns/transfer";
@@ -197,29 +198,6 @@ function tierLabelFor(length: number) {
 
 const RENEWAL_WINDOW_SECONDS = 60 * 24 * 60 * 60;
 
-// Circular verified badge for primary names.
-function PrimarySeal({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      style={{ flexShrink: 0 }}
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="10.5" fill="currentColor" />
-      <path
-        d="M8.4 12.3l2.4 2.4 4.8-5"
-        stroke="rgb(var(--color-accent-foreground))"
-        strokeWidth="2.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 type OwnedDomainSummary = {
   node: string;
   label: string;
@@ -259,10 +237,11 @@ function getMarketplaceStatusLabel(domain: OwnedDomainSummary) {
 const OwnedNameCard: React.FC<{
   domain: OwnedDomainSummary;
   isPrimary: boolean;
+  isPrimaryPending: boolean;
   onSetPrimary: (label: string) => void;
   onRenewed: () => void;
   onTransfer: (selection: TransferNameSelection) => void;
-}> = ({ domain, isPrimary, onSetPrimary, onRenewed, onTransfer }) => {
+}> = ({ domain, isPrimary, isPrimaryPending, onSetPrimary, onRenewed, onTransfer }) => {
   const { address, isConnected, chainId } = useAccount();
   const [renewArmed, setRenewArmed] = useState(false);
   const firedRef = useRef(false);
@@ -391,14 +370,16 @@ const OwnedNameCard: React.FC<{
         {isEscrowed ? (
           <span className="nm-tag nm-tag-auction">{marketplaceLabel}</span>
         ) : isPrimary ? (
-          <span className="nm-dur-badge nm-dur-primary-badge">Primary</span>
+          <span className="nm-primary-pill"><PrimarySeal size={12} /> Primary</span>
         ) : (
           <button
             type="button"
-            className="own-make-pill"
+            className="own-make-pill disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isPrimaryPending || Boolean(transferBlocked)}
+            title={transferBlocked ?? "Share this identity across apps with a gas-free wallet signature."}
             onClick={() => onSetPrimary(domain.label)}
           >
-            Make primary
+            {isPrimaryPending ? "Updating…" : "Make primary"}
           </button>
         )}
       </div>
@@ -466,7 +447,6 @@ const DomainsPage: React.FC = () => {
     query: { enabled: isConnected && Boolean(address) },
   });
 
-  const [hintLabel, setHintLabel] = useState<string | null>(null);
   const [transferSelection, setTransferSelection] = useState<TransferNameSelection | null>(null);
   const lastRegisteredRef = useRef<string>("");
   const lastRegisteredDurationSecondsRef = useRef<number>(
@@ -481,7 +461,8 @@ const DomainsPage: React.FC = () => {
     expiry: ownedExpiry,
     isLoading: isOwnedLoading,
     allDomains: ownedDomains,
-  } = useRnsOwnedLabel(address, hintLabel ?? undefined);
+  } = useRnsOwnedLabel(address);
+  const primarySelection = useSetRnsPrimaryName();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [pricing, setPricing] = useState<RnsPricingSummary | null>(null);
@@ -806,14 +787,12 @@ const DomainsPage: React.FC = () => {
       node,
       lastRegisteredDurationSecondsRef.current,
     );
-    setPrimaryLabel(address, registeredName);
     writeResolverText({
       address: resolverAddress,
       abi: RNSResolver,
       functionName: "setText",
       args: [node, "label", registeredName],
     });
-    setHintLabel(registeredName);
     void fetchRnsNameResolution({ name: registeredName, chainId }).finally(() => {
       void refetchOwned();
     });
@@ -831,12 +810,6 @@ const DomainsPage: React.FC = () => {
     resolverAddress,
     writeResolverText,
   ]);
-
-  useEffect(() => {
-    if (ownedLabel && hintLabel && ownedLabel === hintLabel) {
-      setHintLabel(null);
-    }
-  }, [ownedLabel, hintLabel]);
 
   useEffect(() => {
     if (registerError) {
@@ -898,10 +871,7 @@ const DomainsPage: React.FC = () => {
   };
 
   const handleSetPrimary = (label: string) => {
-    if (!address) return;
-    setPrimaryLabel(address, label);
-    void refetchOwned();
-    toast.success(`${formatDomainDisplay(label)} set as your primary name.`);
+    if (!primarySelection.isPending) primarySelection.mutate(label);
   };
 
   const handleConnectWallet = () => {
@@ -1346,10 +1316,11 @@ const DomainsPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleSetPrimary(normalized)}
-                            className="btn-primary names-action-btn"
+                            disabled={primarySelection.isPending || chainId !== riseMainnet.id || searchExpiry <= BigInt(Math.floor(Date.now() / 1000))}
+                            title="Share this identity across apps with a gas-free wallet signature."
+                            className="btn-primary names-action-btn disabled:opacity-50"
                           >
-                            <Star className="w-4 h-4" />
-                            Set primary
+                            {primarySelection.isPending ? <InlineLoading label="Updating…" /> : <><Star className="w-4 h-4" /> Set primary</>}
                           </button>
                         ) : null}
                       </div>
@@ -1409,6 +1380,7 @@ const DomainsPage: React.FC = () => {
                     <h2 className="font-display text-2xl text-ink">
                       Your names
                     </h2>
+                    <p className="mt-1 text-xs text-ink-muted">Share your primary identity across apps with a gas-free wallet signature.</p>
                   </div>
                   <span className="nm-tier">
                     {ownedDomainsWithLabels.length} names
@@ -1421,6 +1393,7 @@ const DomainsPage: React.FC = () => {
                       domain={domain}
                       onTransfer={setTransferSelection}
                       isPrimary={domain.label === ownedLabel}
+                      isPrimaryPending={primarySelection.isPending}
                       onSetPrimary={handleSetPrimary}
                       onRenewed={() => {
                         void refetchOwned();
@@ -1439,7 +1412,6 @@ const DomainsPage: React.FC = () => {
               selection={transferSelection}
               onClose={() => setTransferSelection(null)}
               onTransferred={async () => {
-                setHintLabel(null);
                 await Promise.all([refetchOwned(), refetchStatus()]);
               }}
             />

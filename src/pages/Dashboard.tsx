@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import PrimarySeal from '@/components/rns/PrimarySeal';
 import {
   Carousel,
   CarouselContent,
@@ -23,7 +24,7 @@ import { useOffchainTokenImages } from '@/lib/hooks/useOffchainProjectImages';
 import { useUserNFTHoldings } from '@/lib/hooks/useUserNFTHoldings';
 import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import { useRnsOwnedLabel } from '@/lib/hooks/rns/useRnsOwnedLabel';
-import { getPrimaryLabel, setPrimaryLabel } from '@/lib/rns/primary-label';
+import { useSetRnsPrimaryName } from '@/lib/hooks/rns/useRnsPrimaryName';
 import { useUserTokens } from '@/lib/hooks/useUserTokens';
 import { useAllLocks } from '@/lib/hooks/useAllLocks';
 import {
@@ -38,7 +39,7 @@ import {
 } from '@/components/ui/icons';
 import { InlineLoading, Spinner } from '@/components/ui/spinner';
 import { useQuery } from '@tanstack/react-query';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, useReadContracts } from 'wagmi';
@@ -120,24 +121,12 @@ const Dashboard: React.FC = () => {
   const { displayName: domainDisplayName } = useUserDomain(address);
   const {
     allDomains: ownedDomains,
+    label: primaryLabel,
     isLoading: isDomainsLoading,
   } = useRnsOwnedLabel(address);
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
-  // Which label the user has chosen as their primary identity.
-  // Initialise from localStorage; updates trigger a re-render via state.
-  const [primaryLabel, setPrimaryLabelState] = useState<string | null>(() =>
-    address ? getPrimaryLabel(address) : null,
-  );
-
-  const handleSetPrimary = useCallback(
-    (label: string) => {
-      if (!address) return;
-      setPrimaryLabel(address, label);
-      setPrimaryLabelState(label);
-    },
-    [address],
-  );
+  const primarySelection = useSetRnsPrimaryName();
   const safeAddress = (address ?? zeroAddress) as Address;
   const chainId = useChainId();
   const nativeToken = getNativeTokenLabel(chainId);
@@ -195,7 +184,6 @@ const Dashboard: React.FC = () => {
   // ownedDomains already has labels resolved from resolver text records (on-chain).
   // No localStorage or pending-registration merging needed.
   const domainsToDisplay = ownedDomains.filter((domain) => Boolean(domain.label));
-  const walletDomainsToDisplay = domainsToDisplay.filter((domain) => (domain.custody ?? 'wallet') === 'wallet');
 
   const { data: stakingTokenData } = useReadContracts({
     contracts: [
@@ -615,8 +603,7 @@ const Dashboard: React.FC = () => {
             >
               {domainsToDisplay.slice(0, 5).map((domain) => {
                 const label = domain.label || '';
-                const effectivePrimary = primaryLabel ?? (walletDomainsToDisplay[0]?.label || '');
-                const isPrimary = label !== '' && label === effectivePrimary;
+                const isPrimary = label !== '' && label === primaryLabel;
                 const marketplaceLabel = getRnsMarketplaceLabel(domain);
                 const expiryDate = domain.expiry
                   ? new Date(Number(domain.expiry) * 1000).toLocaleDateString(undefined, {
@@ -661,21 +648,23 @@ const Dashboard: React.FC = () => {
                     ) : !isPrimary && label ? (
                       <button
                         type="button"
-                        onClick={() => handleSetPrimary(label)}
-                        className="text-[11px] font-medium text-ink-muted hover:text-accent transition-colors shrink-0 flex items-center gap-1"
-                        title={`Set ${label}.rise as primary identity`}
+                        onClick={() => primarySelection.mutate(label)}
+                        disabled={primarySelection.isPending || chainId !== riseMainnet.id || !domain.registryOwner || domain.registryOwner.toLowerCase() !== address?.toLowerCase() || domain.expiry <= BigInt(nowSec)}
+                        className="text-[11px] font-medium text-ink-muted hover:text-accent transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={`Set ${label}.rise as your public primary identity with a gas-free wallet signature`}
+                        aria-label={`Make ${label}.rise primary`}
                       >
-                        <Star className="w-3 h-3" />
+                        {primarySelection.isPending ? <Spinner size="xs" /> : <Star className="w-3 h-3" />}
                       </button>
-                    ) : (
+                    ) : isPrimary ? (
                       <span
                         className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0"
-                        style={{ background: 'rgb(var(--color-accent-sky) / 0.14)', color: 'rgb(var(--color-accent-sky))' }}
+                        style={{ background: 'rgb(var(--color-accent) / 0.14)', color: 'rgb(var(--color-accent))' }}
                       >
-                        <Star className="w-2.5 h-2.5" />
-                        main
+                        <PrimarySeal size={12} />
+                        Primary
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}

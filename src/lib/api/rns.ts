@@ -559,6 +559,7 @@ export async function fetchRnsPrimaryNameForAddress(input: {
   const params = new URLSearchParams({ chainId: String(input.chainId) });
   const response = await fetch(
     `${SENNA_API_URL}/api/public/rns/resolve/address/${address}?${params.toString()}`,
+    { cache: 'no-store' },
   );
 
   if (!response.ok) {
@@ -567,6 +568,33 @@ export async function fetchRnsPrimaryNameForAddress(input: {
 
   const payload = (await response.json()) as ApiRnsAddressResolution;
   return toAddressResolution(payload);
+}
+
+export type RnsPrimaryAuthorization = {
+  chainId: number;
+  address: Address;
+  name: string;
+  version: string;
+  timestamp: number;
+  message: string;
+};
+
+export async function fetchRnsPrimaryAuthorization(input: { address: Address; name: string; chainId: number }): Promise<RnsPrimaryAuthorization> {
+  const params = new URLSearchParams({ address: input.address, name: input.name, chainId: String(input.chainId) });
+  const response = await fetch(`${SENNA_API_URL}/api/rns/primary/authorization?${params}`, { cache: 'no-store' });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.detail ?? 'Unable to prepare primary-name selection.');
+  return body;
+}
+
+export async function saveRnsPrimaryName(input: RnsPrimaryAuthorization & { signature: Hex }): Promise<{ primaryName: string; node: Hex; version: string }> {
+  const response = await fetch(`${SENNA_API_URL}/api/rns/primary`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.detail ?? 'Unable to save your primary name.');
+  return body;
 }
 
 export async function resolveRnsAddressInput(input: {

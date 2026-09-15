@@ -1,6 +1,6 @@
 /**
- * Per-address primary `.rise` label preference stored in localStorage.
- * When set, this overrides the default "first domain" returned by the subgraph.
+ * Legacy/local cache of an acknowledged primary choice, retained for transfer
+ * cleanup. Shared API reverse lookup is authoritative; this never overrides it.
  */
 
 const STORAGE_KEY = "rns_primary_label_v1";

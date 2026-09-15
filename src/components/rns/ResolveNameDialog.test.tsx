@@ -63,7 +63,9 @@ it.each(["non-owner","expired","custom resolver","already correct","wrong networ
  mount(patch);
  const expected:Record<string,RegExp>={"non-owner":/no longer the registry owner/,"expired":/Renew this name/,"custom resolver":/configured separately/,"already correct":/already points/,"wrong network":/Switch to RISE/,"disconnected":/Connect the wallet/,"escrow":/Cancel the marketplace/,"wrong node":/Cannot verify the resolver/};
  await screen.findByText(expected[kind],{}, {timeout:4000});
- expect(button().disabled).toBe(true);fireEvent.click(button());expect(env.write).not.toHaveBeenCalled();
+ if(kind==="already correct")expect(screen.queryByRole("button",{name:"Use my wallet"})).toBeNull();
+ else {expect(button().disabled).toBe(true);fireEvent.click(button());}
+ expect(env.write).not.toHaveBeenCalled();
 });
 it("rechecks ownership immediately before submission",async()=>{
  mount();await waitFor(()=>expect(button().disabled).toBe(false));env.owner=env.other;fireEvent.click(button());

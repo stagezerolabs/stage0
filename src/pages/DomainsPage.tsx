@@ -43,6 +43,7 @@ import {
 import { RNSResolver } from "@/lib/rns/abis";
 import { RNS_DEFAULT_REGISTRATION_DURATION } from "@/lib/rns/constants";
 import { useSetRnsPrimaryName } from "@/lib/hooks/rns/useRnsPrimaryName";
+import { useRnsWalletAddressUpdates } from "@/lib/hooks/rns/useRnsWalletAddressUpdates";
 import { saveRecentRegistration } from "@/lib/rns/recent-registration";
 import { rnsNamehash } from "@/lib/rns/utils";
 import { transferBlockReason } from "@/lib/rns/transfer";
@@ -244,7 +245,8 @@ const OwnedNameCard: React.FC<{
   onRenewed: () => void;
   onTransfer: (selection: TransferNameSelection) => void;
   onResolve: (selection: TransferNameSelection) => void;
-}> = ({ domain, isPrimary, isPrimaryPending, onSetPrimary, onRenewed, onTransfer, onResolve }) => {
+  needsWalletAddressUpdate: boolean;
+}> = ({ domain, isPrimary, isPrimaryPending, onSetPrimary, onRenewed, onTransfer, onResolve, needsWalletAddressUpdate }) => {
   const { address, isConnected, chainId } = useAccount();
   const [renewArmed, setRenewArmed] = useState(false);
   const firedRef = useRef(false);
@@ -427,11 +429,12 @@ const OwnedNameCard: React.FC<{
             >
               Transfer ownership
             </button>
-            <button type="button" className="own-btn disabled:cursor-not-allowed disabled:opacity-50"
+            {needsWalletAddressUpdate && <button type="button" className="own-btn disabled:cursor-not-allowed disabled:opacity-50"
               disabled={Boolean(transferBlocked) || isBusy || isReleasing}
+              title="Point this name to your wallet"
               onClick={() => { if (address && !transferBlocked) onResolve({label:domain.label,node:domain.node as Hex,custody:getDomainCustody(domain),sender:address}); }}>
-              Resolving address
-            </button>
+              Use my wallet
+            </button>}
           </>
         )}
       </div>
@@ -561,6 +564,7 @@ const DomainsPage: React.FC = () => {
         }),
     [ownedDomains, ownedLabel],
   );
+  const walletAddressUpdates = useRnsWalletAddressUpdates(ownedDomainsWithLabels);
   const registrationPeriodEstimates = useMemo(() => {
     const length = normalized.length;
     return REGISTRATION_PERIODS.reduce<Record<number, ReturnType<typeof estimateRegistrationTotals>>>((acc, period) => {
@@ -1382,7 +1386,7 @@ const DomainsPage: React.FC = () => {
               ) : null}
             </AnimatePresence>
 
-            <IncomingNamesNotice onUseWallet={item => { if (address) setResolveSelection({label:item.label,node:item.node,custody:"wallet",sender:address}); }}/>
+            <IncomingNamesNotice needsWalletAddressUpdate={walletAddressUpdates} onUseWallet={item => { if (address && walletAddressUpdates.has(item.node.toLowerCase())) setResolveSelection({label:item.label,node:item.node,custody:"wallet",sender:address}); }}/>
 
             {ownedDomainsWithLabels.length > 0 ? (
               <motion.section variants={itemVariants}>
@@ -1404,6 +1408,7 @@ const DomainsPage: React.FC = () => {
                       domain={domain}
                       onTransfer={setTransferSelection}
                       onResolve={setResolveSelection}
+                      needsWalletAddressUpdate={walletAddressUpdates.has(domain.node.toLowerCase())}
                       isPrimary={domain.label === ownedLabel}
                       isPrimaryPending={primarySelection.isPending}
                       onSetPrimary={handleSetPrimary}

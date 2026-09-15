@@ -8,9 +8,20 @@ vi.mock("@/lib/hooks/rns/useRnsIncomingTransfers",()=>({useRnsIncomingTransfers:
 afterEach(cleanup);
 beforeEach(()=>{env.ack.mockClear();});
 it("does not acknowledge merely viewing or checking a name; Got it explicitly dismisses",()=>{
- const open=vi.fn();render(<MemoryRouter><IncomingNamesNotice onUseWallet={open}/></MemoryRouter>);
+ const open=vi.fn();render(<MemoryRouter><IncomingNamesNotice needsWalletAddressUpdate={new Set(["0x1234"])} onUseWallet={open}/></MemoryRouter>);
  expect(env.ack).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole("button",{name:"Check address"}));expect(open).toHaveBeenCalledWith(env.unread[0]);expect(env.ack).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole("button",{name:"Use my wallet"}));expect(open).toHaveBeenCalledWith(env.unread[0]);expect(env.ack).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole("button",{name:"Acknowledge alice.rise"}));expect(env.ack).toHaveBeenCalledWith("tx:1");
  expect(screen.getByRole("link",{name:"View transfer"}).getAttribute("href")).toBe("https://explorer.risechain.com/tx/0xabcd");
+});
+it("keeps the receipt and acknowledgement but hides unnecessary address actions",()=>{
+ const open=vi.fn();const tree=(needed:ReadonlySet<string>)=><MemoryRouter><IncomingNamesNotice needsWalletAddressUpdate={needed} onUseWallet={open}/></MemoryRouter>;
+ const view=render(tree(new Set()));
+ expect(screen.queryByRole("button",{name:"Use my wallet"})).toBeNull();
+ expect(screen.getByRole("button",{name:"Acknowledge alice.rise"})).toBeTruthy();
+ view.rerender(tree(new Set(["0x1234"])));
+ expect(screen.getByRole("button",{name:"Use my wallet"})).toBeTruthy();
+ view.rerender(tree(new Set()));
+ expect(screen.queryByRole("button",{name:"Use my wallet"})).toBeNull();
+ expect(env.ack).not.toHaveBeenCalled();expect(open).not.toHaveBeenCalled();
 });

@@ -110,6 +110,7 @@ export default function ResolveNameDialog({ selection, onClose, onUpdated }: {
   };
   const status = phase === "success" ? "Resolving address updated" : phase === "checking" ? "Checking name" : phase === "wallet" ? hash ? isConfirming ? "Confirming update" : "Transaction submitted" : "Awaiting wallet confirmation" : phase === "verifying" ? "Verifying address" : phase === "unverified" ? "Update not yet verified" : phase === "failed" ? "Update failed or rejected" : null;
   const transactionHash = receipt?.transactionHash ?? hash;
+  const alreadyPointsToWallet = Boolean(state.data?.resolvedAddress && isAddressEqual(state.data.resolvedAddress, context.sender));
   return <ResponsiveDialog open dismissible={!busy} onOpenChange={open => { if (!open && !busy) onClose(); }} title="Update resolving address" description={`${context.label}.rise`}>
     <div className="space-y-5">
       <p className="text-sm leading-6 text-ink-muted">Point this name to your wallet so other apps can resolve it to you.</p>
@@ -125,7 +126,7 @@ export default function ResolveNameDialog({ selection, onClose, onUpdated }: {
       {transactionHash && <a className="inline-flex items-center gap-2 text-sm text-accent" href={`${context.explorerUrl}/tx/${transactionHash}`} target="_blank" rel="noopener noreferrer">View transaction <ExternalLink size={14}/></a>}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button onClick={onClose} disabled={busy} className="btn-secondary names-action-btn disabled:opacity-50">{phase === "success" ? "Done" : "Close"}</button>
-        {phase === "unverified" ? <button onClick={() => void (receipt ? verify(receipt) : recoverReceipt())} className="btn-primary names-action-btn">Retry verification</button> : phase !== "success" && <button onClick={() => void submit()} disabled={!editable || Boolean(blocked || state.error)} className="btn-primary names-action-btn disabled:opacity-50">Use my wallet</button>}
+        {phase === "unverified" ? <button onClick={() => void (receipt ? verify(receipt) : recoverReceipt())} className="btn-primary names-action-btn">Retry verification</button> : phase !== "success" && !alreadyPointsToWallet && <button onClick={() => void submit()} disabled={!editable || Boolean(blocked || state.error)} className="btn-primary names-action-btn disabled:opacity-50">Use my wallet</button>}
       </div>
     </div>
   </ResponsiveDialog>;

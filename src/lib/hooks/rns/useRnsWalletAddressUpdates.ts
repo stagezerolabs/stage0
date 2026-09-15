@@ -3,7 +3,7 @@ import { RNSRegistrar, RNSRegistry, RNSResolver } from "@/lib/rns/abis";
 import { resolverUpdateBlockReason } from "@/lib/rns/resolver-update";
 import type { RnsCustody } from "@/lib/rns/transfer";
 import { useEffect, useState } from "react";
-import { isAddress, isAddressEqual, zeroAddress, type Address, type Hex } from "viem";
+import { isAddress, type Address, type Hex } from "viem";
 import { useAccount, useReadContracts } from "wagmi";
 import { useRnsContracts } from "./useRnsContracts";
 
@@ -11,9 +11,10 @@ type NameCandidate = {
   node: Hex; label: string; registrant?: Address | null; custody?: RnsCustody;
 };
 
-/** Only show an address-update action when a received name actually needs it.
- * Registration history comes from the index; current state is checked onchain
- * in one background batch shared by the owned cards and incoming notices.
+/** Only offer acceptance when the owned name actually needs an address update.
+ * Current state is checked onchain in one background batch shared by the owned
+ * cards and incoming notices. A returned name may need updating even when the
+ * current owner was its original registrant.
  */
 export function useRnsWalletAddressUpdates(names: readonly NameCandidate[]) {
   const { address, isConnected, chainId } = useAccount();
@@ -26,10 +27,7 @@ export function useRnsWalletAddressUpdates(names: readonly NameCandidate[]) {
     return () => window.clearInterval(timer);
   }, [supported, names.length]);
   const candidates = supported ? names.filter(name =>
-    (name.custody ?? "wallet") === "wallet" && name.label &&
-    name.registrant && isAddress(name.registrant) &&
-    !isAddressEqual(name.registrant, zeroAddress) &&
-    !isAddressEqual(name.registrant, address!)) : [];
+    (name.custody ?? "wallet") === "wallet" && name.label) : [];
 
   const { data, isError } = useReadContracts({
     contracts: candidates.flatMap(name => [

@@ -34,15 +34,19 @@ it("checks received names in one mainnet batch and refreshes in the background",
   expect(options.contracts.every((c: { chainId: number }) => c.chainId === 4153)).toBe(true);
   expect(options.contracts[2].address).toBe(resolver);
 });
-it("never offers the action to the original registrant, including after a return transfer", () => {
+it("offers acceptance to the original registrant when a returned name points elsewhere", () => {
+  const { result } = renderHook(() => useRnsWalletAddressUpdates([{ ...name, registrant: wallet }]));
+  expect(result.current.has(node)).toBe(true);
+  expect(env.reads.mock.calls[0][0].query.enabled).toBe(true);
+});
+it("hides for an original registration already pointing to its owner", () => {
+  const data = correctReads();data[2] = success(wallet);env.reads.mockReturnValue({ data });
   const { result } = renderHook(() => useRnsWalletAddressUpdates([{ ...name, registrant: wallet }]));
   expect(result.current.size).toBe(0);
-  expect(env.reads.mock.calls[0][0].query.enabled).toBe(false);
-  expect(env.reads.mock.calls[0][0].contracts).toEqual([]);
 });
-it.each([undefined, null, zeroAddress])("hides while registration history is unknown (%s)", registrant => {
+it.each([undefined, null, zeroAddress])("uses verified live ownership when registration history is unknown (%s)", registrant => {
   const { result } = renderHook(() => useRnsWalletAddressUpdates([{ ...name, registrant }]));
-  expect(result.current.size).toBe(0);
+  expect(result.current.has(node)).toBe(true);
 });
 it.each(["already points here", "non-owner", "expired", "custom resolver", "failed read", "missing read", "RPC error", "loading"])("hides for %s", reason => {
   let data: ReturnType<typeof correctReads> | undefined = correctReads();
@@ -77,11 +81,13 @@ it("never flashes a button while loading and removes it after the address catche
   const updated = correctReads();updated[2] = success(wallet);env.reads.mockReturnValue({ data: updated });rerender();
   expect(result.current.size).toBe(0);
 });
-it("keeps batched results aligned when original registrations are filtered out", () => {
+it("keeps batched results aligned for original and received names", () => {
   const original = { ...name, node: `0x${"b".repeat(64)}` as Hex, registrant: wallet };
+  const correctOriginal = correctReads();correctOriginal[2] = success(wallet);
+  env.reads.mockReturnValue({ data: [...correctOriginal, ...correctReads()] });
   const { result } = renderHook(() => useRnsWalletAddressUpdates([original, name]));
   expect([...result.current]).toEqual([node]);
-  expect(env.reads.mock.calls[0][0].contracts).toHaveLength(4);
+  expect(env.reads.mock.calls[0][0].contracts).toHaveLength(8);
 });
 it("does not reuse another connected wallet's eligibility", () => {
   const { result, rerender } = renderHook(() => useRnsWalletAddressUpdates([name]));

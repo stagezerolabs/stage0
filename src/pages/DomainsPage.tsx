@@ -69,8 +69,6 @@ const itemVariants = {
   },
 };
 
-const SUGGESTIONS = ["stage0", "risehub", "antigravity", "mainnet", "builder"];
-
 const REGISTRATION_PERIODS = [
   { years: 1, label: "Starter" },
   { years: 2, label: "Steady" },
@@ -417,23 +415,23 @@ const OwnedNameCard: React.FC<{
                 onClick={handleRelease}
                 disabled={isReleasing}
               >
-                {isReleasing ? <InlineLoading label="Releasing..." size="xs" /> : "Release"}
+                {isReleasing ? <Spinner label="Releasing name" size="sm" /> : "Release"}
+              </button>
+              <button
+                type="button"
+                className="own-btn disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={Boolean(transferBlocked) || isBusy || isReleasing}
+                title={transferBlocked ?? undefined}
+                onClick={() => { if (address && !transferBlocked) onTransfer({ label: domain.label, node: domain.node as Hex, custody: getDomainCustody(domain), sender: address }); }}
+              >
+                Transfer
               </button>
             </div>
-            <button
-              type="button"
-              className="own-btn disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={Boolean(transferBlocked) || isBusy || isReleasing}
-              title={transferBlocked ?? undefined}
-              onClick={() => { if (address && !transferBlocked) onTransfer({ label: domain.label, node: domain.node as Hex, custody: getDomainCustody(domain), sender: address }); }}
-            >
-              Transfer ownership
-            </button>
             {needsWalletAddressUpdate && <button type="button" className="own-btn disabled:cursor-not-allowed disabled:opacity-50"
               disabled={Boolean(transferBlocked) || isBusy || isReleasing}
-              title="Point this name to your wallet"
+              title="Link this domain to your wallet"
               onClick={() => { if (address && !transferBlocked) onResolve({label:domain.label,node:domain.node as Hex,custody:getDomainCustody(domain),sender:address}); }}>
-              Use my wallet
+              Accept domain
             </button>}
           </>
         )}
@@ -1036,7 +1034,7 @@ const DomainsPage: React.FC = () => {
                 </div>
               ) : null}
 
-              {!submittedQuery && (
+              {!submittedQuery && (searchSuggestions.length > 0 || searchHistory.length > 0) && (
                 <div className="names-discovery">
                   {searchSuggestions.length > 0 ? (
                     <>
@@ -1102,25 +1100,7 @@ const DomainsPage: React.FC = () => {
                         ))}
                       </div>
                     </div>
-                  ) : (
-                    <div>
-                      <div className="nm-suggest-label">
-                        Recommended keywords
-                      </div>
-                      <div className="names-keyword-row">
-                        {SUGGESTIONS.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            className="chip active-secondary"
-                            onClick={() => handleSearchHistoryClick(item)}
-                          >
-                            #{item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               )}
             </motion.section>

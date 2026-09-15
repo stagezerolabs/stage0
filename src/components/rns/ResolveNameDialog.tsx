@@ -108,25 +108,25 @@ export default function ResolveNameDialog({ selection, onClose, onUpdated }: {
       setPhase("wallet"); setAddr({ addr: getAddress(context.sender) });
     } catch (error) { locked.current = false; setPhase("failed"); setMessage(error instanceof Error ? error.message.split("\n")[0] : "Unable to verify this update."); }
   };
-  const status = phase === "success" ? "Resolving address updated" : phase === "checking" ? "Checking name" : phase === "wallet" ? hash ? isConfirming ? "Confirming update" : "Transaction submitted" : "Awaiting wallet confirmation" : phase === "verifying" ? "Verifying address" : phase === "unverified" ? "Update not yet verified" : phase === "failed" ? "Update failed or rejected" : null;
+  const status = phase === "success" ? "Domain accepted" : phase === "checking" ? "Checking name" : phase === "wallet" ? hash ? isConfirming ? "Confirming update" : "Transaction submitted" : "Awaiting wallet confirmation" : phase === "verifying" ? "Verifying address" : phase === "unverified" ? "Update not yet verified" : phase === "failed" ? "Update failed or rejected" : null;
   const transactionHash = receipt?.transactionHash ?? hash;
   const alreadyPointsToWallet = Boolean(state.data?.resolvedAddress && isAddressEqual(state.data.resolvedAddress, context.sender));
-  return <ResponsiveDialog open dismissible={!busy} onOpenChange={open => { if (!open && !busy) onClose(); }} title="Update resolving address" description={`${context.label}.rise`}>
+  return <ResponsiveDialog open dismissible={!busy} onOpenChange={open => { if (!open && !busy) onClose(); }} title="Accept domain" description={`${context.label}.rise`}>
     <div className="space-y-5">
-      <p className="text-sm leading-6 text-ink-muted">Point this name to your wallet so other apps can resolve it to you.</p>
+      <p className="text-sm leading-6 text-ink-muted">You own this domain. Link it to your wallet for use in other apps.</p>
       <dl className="space-y-4 rounded-2xl border border-border bg-canvas p-4 text-sm">
         <div><dt className="text-ink-muted">Currently points to</dt><dd className="mt-1 break-all font-mono text-ink">{phase === "success" ? getAddress(context.sender) : state.data?.resolvedAddress && state.data.resolvedAddress !== zeroAddress ? getAddress(state.data.resolvedAddress) : state.data ? state.data.resolvedAddress === undefined ? "Custom or unconfigured resolver" : "No address set" : "Checking…"}</dd></div>
         <div><dt className="text-ink-muted">Your wallet</dt><dd className="mt-1 break-all font-mono text-ink">{getAddress(context.sender)}</dd></div>
       </dl>
-      <p className="text-sm leading-6 text-ink-muted">One transaction with a network fee. Ownership, text records and expiry stay unchanged. Making this your primary name is a separate, gas-free signature.</p>
+      <p className="text-sm leading-6 text-ink-muted">A network fee applies. Your domain’s expiry stays the same.</p>
       {status && <div role="status" className="font-semibold text-ink">{busy ? <InlineLoading label={status} /> : status}</div>}
-      {phase === "success" && <p className="text-sm leading-6 text-ink-muted">Your name now points to your wallet. Other apps will update after indexing; you may need to refresh them.</p>}
+      {phase === "success" && <p className="text-sm leading-6 text-ink-muted">Your domain now points to your wallet. Refresh other apps if needed.</p>}
       {(message || (editable && (blocked || state.error))) && <p role="alert" className="break-words text-sm leading-6 text-ink-muted">{message ?? (state.error ? "Cannot verify the resolver right now. Please retry." : blocked)}</p>}
       {state.error && editable && <button className="text-sm text-accent underline" onClick={() => void state.refetch()}>Retry checks</button>}
       {transactionHash && <a className="inline-flex items-center gap-2 text-sm text-accent" href={`${context.explorerUrl}/tx/${transactionHash}`} target="_blank" rel="noopener noreferrer">View transaction <ExternalLink size={14}/></a>}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button onClick={onClose} disabled={busy} className="btn-secondary names-action-btn disabled:opacity-50">{phase === "success" ? "Done" : "Close"}</button>
-        {phase === "unverified" ? <button onClick={() => void (receipt ? verify(receipt) : recoverReceipt())} className="btn-primary names-action-btn">Retry verification</button> : phase !== "success" && !alreadyPointsToWallet && <button onClick={() => void submit()} disabled={!editable || Boolean(blocked || state.error)} className="btn-primary names-action-btn disabled:opacity-50">Use my wallet</button>}
+        {phase === "unverified" ? <button onClick={() => void (receipt ? verify(receipt) : recoverReceipt())} className="btn-primary names-action-btn">Retry verification</button> : phase !== "success" && !alreadyPointsToWallet && <button onClick={() => void submit()} disabled={!editable || Boolean(blocked || state.error)} className="btn-primary names-action-btn disabled:opacity-50">Accept domain</button>}
       </div>
     </div>
   </ResponsiveDialog>;

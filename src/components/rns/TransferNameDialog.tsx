@@ -197,9 +197,9 @@ export default function TransferNameDialog({ selection, onClose, onTransferred }
     }
   };
 
-  const status = phase === "success" ? "Transfer successful"
+  const status = phase === "success" ? "Transfer sent"
     : phase === "checking" ? "Checking ownership"
-    : phase === "verifying" ? "Verifying new owner"
+    : phase === "verifying" ? "Verifying transfer"
     : phase === "unverified" ? "Ownership not yet verified"
     : phase === "failed" ? "Transfer failed or rejected"
     : phase === "wallet" ? hash ? isConfirming ? "Confirming transfer" : "Transaction submitted" : "Awaiting wallet confirmation"
@@ -207,11 +207,11 @@ export default function TransferNameDialog({ selection, onClose, onTransferred }
 
   return (
     <ResponsiveDialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }} dismissible={!busy}
-      title="Transfer ownership" description={`${context.label}.rise`}>
+      title="Transfer" description={`${context.label}.rise`}>
       <form onSubmit={(event) => { void submit(event); }} className="space-y-5">
         <dl className="space-y-3 rounded-2xl border border-border bg-canvas p-4 text-sm">
-          <div><dt className="text-ink-muted">Current owner</dt><dd className="mt-1 break-all font-mono text-ink">{confirmedRecipient ?? (state.data?.owner ? getAddress(state.data.owner) : "Checking registry…")}</dd></div>
-          <div><dt className="text-ink-muted">Expires</dt><dd className="mt-1 text-ink">{state.data ? state.data.expiry > 0n ? new Date(Number(state.data.expiry) * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "No active registration" : "Checking expiry…"}</dd></div>
+          <div><dt className="font-bold text-ink">Current owner</dt><dd className="mt-1 break-all font-mono font-bold text-ink">{confirmedRecipient ?? (state.data?.owner ? getAddress(state.data.owner) : "Checking registry…")}</dd></div>
+          <div><dt className="font-bold text-ink">Expires</dt><dd className="mt-1 font-bold text-ink">{state.data ? state.data.expiry > 0n ? new Date(Number(state.data.expiry) * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "No active registration" : "Checking expiry…"}</dd></div>
         </dl>
         {phase !== "success" && (
           <>
@@ -226,7 +226,6 @@ export default function TransferNameDialog({ selection, onClose, onTransferred }
             </div>
             <div className="space-y-2 rounded-2xl border border-border bg-canvas p-4 text-sm leading-6 text-ink-muted">
               <p className="font-medium text-ink">Once confirmed, ownership changes immediately. Stage0 cannot reverse the transfer.</p>
-              <p>Resolver, address and text records stay unchanged. The new owner can update them afterward.</p>
               <p>Transferring does not renew the name or extend its expiry.</p>
             </div>
             <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-ink">
@@ -243,7 +242,7 @@ export default function TransferNameDialog({ selection, onClose, onTransferred }
         )}
         <div aria-live="polite" className="space-y-2 text-sm text-ink">
           {status && <p className="font-semibold">{busy ? <InlineLoading label={status} /> : status}</p>}
-          {hash && phase !== "success" && <p className="text-ink-muted">Transaction submitted. Success requires a confirmed receipt and a registry ownership check.</p>}
+          {hash && (phase === "wallet" || phase === "verifying") && <p className="text-ink-muted">Checking confirmation and ownership.</p>}
           {phase === "success" && <p className="break-all text-ink-muted">{context.label}.rise now belongs to {confirmedRecipient}.</p>}
           {message && <p role="alert" className="leading-6 text-ink-muted">{message}</p>}
           {transactionHash && <a href={`${context.explorerUrl}/tx/${transactionHash}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-accent hover:underline">View transaction <ExternalLink size={14} /></a>}
@@ -251,7 +250,7 @@ export default function TransferNameDialog({ selection, onClose, onTransferred }
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary names-action-btn disabled:opacity-50">{phase === "success" ? "Done" : transactionHash ? "Close" : "Cancel"}</button>
           {phase === "unverified" ? <button type="button" onClick={() => { void retryVerification(); }} className="btn-primary names-action-btn">Retry verification</button>
-            : phase !== "success" && <button type="submit" disabled={!editable || !acknowledged || Boolean(recipient.error || blocked || state.error)} className="btn-primary names-action-btn disabled:opacity-50">Transfer ownership</button>}
+            : phase !== "success" && <button type="submit" disabled={!editable || !acknowledged || Boolean(recipient.error || blocked || state.error)} className="btn-primary names-action-btn disabled:opacity-50">Transfer</button>}
         </div>
       </form>
     </ResponsiveDialog>

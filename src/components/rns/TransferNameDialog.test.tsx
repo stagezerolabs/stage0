@@ -55,7 +55,7 @@ function mount(overrides: Partial<TransferNameSelection> = {}) {
   const result = render(tree());
   return () => result.rerender(tree());
 }
-function button() { return screen.getByRole("button", { name: "Transfer ownership" }) as HTMLButtonElement; }
+function button() { return screen.getByRole("button", { name: "Transfer" }) as HTMLButtonElement; }
 async function fill(input: string = env.target) {
   await waitFor(() => expect(env.readContract).toHaveBeenCalled());
   fireEvent.change(screen.getByLabelText("Recipient address"), { target: { value: input } });
@@ -69,11 +69,16 @@ async function submit() {
 }
 
 describe("RNS ownership transfer dialog", () => {
-  it("shows expiry and irreversible/resolver warnings, then submits a checksum-normalized recipient once", async () => {
+  it("shows bold owner/expiry and an irreversible warning, then submits a checksum-normalized recipient once", async () => {
     mount();
     expect(screen.getByText("alice.rise")).toBeTruthy();
     expect(screen.getByText(/does not renew the name/)).toBeTruthy();
-    expect(screen.getByText(/Resolver, address and text records stay unchanged/)).toBeTruthy();
+    expect(screen.queryByText(/Resolver, address and text records stay unchanged/)).toBeNull();
+    for (const label of ["Current owner", "Expires"]) {
+      const field = screen.getByText(label);
+      expect(field.classList.contains("font-bold")).toBe(true);
+      expect(field.nextElementSibling?.classList.contains("font-bold")).toBe(true);
+    }
     await submit();
     expect(env.setOwner).toHaveBeenCalledWith(getAddress(env.target));
     expect(screen.getByText("Awaiting wallet confirmation")).toBeTruthy();
@@ -159,7 +164,7 @@ describe("RNS ownership transfer dialog", () => {
     await screen.findByText("Ownership not yet verified");
     expect(getPrimaryLabel(env.sender)).toBe("alice");
     expect(onTransferred).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: "Transfer ownership" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Transfer" })).toBeNull();
   });
   it("waits for a successful receipt AND verified ownership before clearing primary and refreshing lists", async () => {
     setPrimaryLabel(env.sender, "alice");
@@ -171,7 +176,7 @@ describe("RNS ownership transfer dialog", () => {
     expect(getPrimaryLabel(env.sender)).toBe("alice");
     expect(onTransferred).not.toHaveBeenCalled();
     env.owner = getAddress(env.target); env.tx.receipt = receipt(); rerender();
-    await screen.findByText("Transfer successful");
+    await screen.findByText("Transfer sent");
     expect(getPrimaryLabel(env.sender)).toBeNull();
     expect(queryClient.getQueryData(key)).toEqual([]);
     expect(onTransferred).toHaveBeenCalledOnce();
@@ -194,7 +199,7 @@ describe("RNS ownership transfer dialog", () => {
     expect(getPrimaryLabel(env.sender)).toBe("alice"); expect(onTransferred).not.toHaveBeenCalled();
     env.owner = env.target;
     fireEvent.click(screen.getByRole("button", { name: "Retry verification" }));
-    await screen.findByText("Transfer successful");
+    await screen.findByText("Transfer sent");
     expect(env.setOwner).toHaveBeenCalledOnce();
   });
   it("recovers a receipt polling failure without enabling another transfer", async () => {
@@ -202,7 +207,7 @@ describe("RNS ownership transfer dialog", () => {
     await screen.findByText("Ownership not yet verified");
     env.getReceipt.mockResolvedValue(receipt()); env.owner = env.target;
     fireEvent.click(screen.getByRole("button", { name: "Retry verification" }));
-    await screen.findByText("Transfer successful");
+    await screen.findByText("Transfer sent");
     expect(env.setOwner).toHaveBeenCalledOnce();
   });
   it("recovers a reverted receipt when Wagmi reports it as a confirmation error", async () => {
@@ -219,7 +224,7 @@ describe("RNS ownership transfer dialog", () => {
     const rerender = mount(); await submit();
     env.account = { address: env.target, chainId: 1, isConnected: true };
     env.owner = env.target; env.tx.hash = hash; env.tx.receipt = receipt();
-    await act(async () => rerender()); await screen.findByText("Transfer successful");
+    await act(async () => rerender()); await screen.findByText("Transfer sent");
     expect(getPrimaryLabel(env.sender)).toBe("bob"); expect(getPrimaryLabel(env.target)).toBe("carol");
   });
 });

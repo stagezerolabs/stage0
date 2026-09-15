@@ -4511,8 +4511,15 @@
 
 .own-actions-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.own-actions-row .own-btn {
+  min-width: 0;
+  padding-inline: 4px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .own-btn {

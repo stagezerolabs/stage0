@@ -18,9 +18,8 @@ export default function IncomingNamesNotice({ onUseWallet, needsWalletAddressUpd
     <div className="mt-4 max-h-80 divide-y divide-border overflow-y-auto">
       {unread.map(item => <div key={item.id} className="flex min-w-0 flex-col gap-3 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0"><Link to={`/domains?q=${encodeURIComponent(item.label)}`} className="break-all font-semibold text-ink hover:text-accent">{item.name}</Link><a href={`${getExplorerUrl(riseMainnet.id)}/tx/${item.transactionHash}`} target="_blank" rel="noopener noreferrer" className="mt-1 flex w-fit items-center gap-1 text-xs text-ink-muted hover:text-ink">View transfer <ExternalLink size={12}/></a></div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">{needsWalletAddressUpdate.has(item.node.toLowerCase()) && <button type="button" title="Point this name to your wallet" onClick={() => onUseWallet(item)} className="rounded-xl border border-border px-3 py-2 text-xs font-semibold text-ink hover:border-accent">Use my wallet</button>}<button type="button" onClick={() => acknowledge(item.id)} className="rounded-xl bg-accent/10 px-3 py-2 text-xs font-semibold text-accent" aria-label={`Acknowledge ${item.name}`}>Got it</button></div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">{needsWalletAddressUpdate.has(item.node.toLowerCase()) && <button type="button" title="Link this domain to your wallet" onClick={() => onUseWallet(item)} className="rounded-xl border border-border px-3 py-2 text-xs font-semibold text-ink hover:border-accent">Accept domain</button>}<button type="button" onClick={() => acknowledge(item.id)} className="rounded-xl bg-accent/10 px-3 py-2 text-xs font-semibold text-accent" aria-label={`Acknowledge ${item.name}`}>Got it</button></div>
       </div>)}
     </div>
-    <p className="mt-3 text-xs text-ink-muted">“Got it” clears this notice for this wallet in this browser. No signature needed.</p>
   </section>;
 }

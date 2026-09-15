@@ -39,14 +39,15 @@ function mount(patch:Partial<TransferNameSelection>={}){
  const tree=()=> <QueryClientProvider client={client}><ResolveNameDialog selection={selection} onUpdated={updated} onClose={closed}/></QueryClientProvider>;
  const view=render(tree());return ()=>view.rerender(tree());
 }
-const button=()=>screen.getByRole("button",{name:"Use my wallet"}) as HTMLButtonElement;
+const button=()=>screen.getByRole("button",{name:"Accept domain"}) as HTMLButtonElement;
 async function submit(){await waitFor(()=>expect(button().disabled).toBe(false));fireEvent.click(button());await waitFor(()=>expect(env.write).toHaveBeenCalledOnce());}
 const receipt=(status:"success"|"reverted"="success")=>({status,transactionHash:hash,blockNumber:101n} as TransactionReceipt);
 
 it("shows the old and new addresses, simulates, then submits exactly one resolver update",async()=>{
  mount();await submit();
  expect(env.write).toHaveBeenCalledWith({addr:env.wallet});expect(env.simulate).toHaveBeenCalledOnce();
- expect(screen.getByText(/Ownership, text records and expiry stay unchanged/)).toBeTruthy();
+ expect(screen.getByText("A network fee applies. Your domain’s expiry stays the same.")).toBeTruthy();
+ expect(screen.queryByText(/Making this your primary name/)).toBeNull();
  expect(screen.getByText("Awaiting wallet confirmation")).toBeTruthy();
  expect(button().disabled).toBe(true);fireEvent.click(button());expect(env.write).toHaveBeenCalledOnce();expect(updated).not.toHaveBeenCalled();
 });
@@ -63,7 +64,7 @@ it.each(["non-owner","expired","custom resolver","already correct","wrong networ
  mount(patch);
  const expected:Record<string,RegExp>={"non-owner":/no longer the registry owner/,"expired":/Renew this name/,"custom resolver":/configured separately/,"already correct":/already points/,"wrong network":/Switch to RISE/,"disconnected":/Connect the wallet/,"escrow":/Cancel the marketplace/,"wrong node":/Cannot verify the resolver/};
  await screen.findByText(expected[kind],{}, {timeout:4000});
- if(kind==="already correct")expect(screen.queryByRole("button",{name:"Use my wallet"})).toBeNull();
+ if(kind==="already correct")expect(screen.queryByRole("button",{name:"Accept domain"})).toBeNull();
  else {expect(button().disabled).toBe(true);fireEvent.click(button());}
  expect(env.write).not.toHaveBeenCalled();
 });
@@ -80,7 +81,7 @@ it("a hash alone is not success; verified receipt refreshes API and caches",asyn
  const invalidate=vi.spyOn(client,"invalidateQueries");const rerender=mount();await submit();
  env.tx.hash=hash;env.tx.isConfirming=true;rerender();expect(updated).not.toHaveBeenCalled();
  env.tx.receipt=receipt();env.resolving=env.wallet;rerender();
- await screen.findByText("Resolving address updated");await waitFor(()=>expect(updated).toHaveBeenCalledOnce());
+ await screen.findByText("Domain accepted");await waitFor(()=>expect(updated).toHaveBeenCalledOnce());
  expect(env.refreshApi).toHaveBeenCalledWith({name:"alice",chainId:4153});expect(invalidate).toHaveBeenCalled();expect(screen.getByRole("link",{name:"View transaction"}).getAttribute("href")).toContain(hash);
 });
 it.each(["rejected","reverted"])("does not refresh or claim success for a %s update",async(kind)=>{
@@ -90,11 +91,11 @@ it.each(["rejected","reverted"])("does not refresh or claim success for a %s upd
 });
 it("unverified receipt blocks duplicate submission and permits verification-only retry",async()=>{
  const rerender=mount();await submit();env.tx.hash=hash;env.tx.receipt=receipt();rerender();
- await screen.findByText("Update not yet verified");expect(screen.queryByRole("button",{name:"Use my wallet"})).toBeNull();
+ await screen.findByText("Update not yet verified");expect(screen.queryByRole("button",{name:"Accept domain"})).toBeNull();
  env.resolving=env.wallet;fireEvent.click(screen.getByRole("button",{name:"Retry verification"}));
- await screen.findByText("Resolving address updated");expect(env.write).toHaveBeenCalledOnce();
+ await screen.findByText("Domain accepted");expect(env.write).toHaveBeenCalledOnce();
 });
 it("recovers a receipt after RPC polling failure without resubmitting",async()=>{
  const rerender=mount();await submit();env.tx.hash=hash;env.tx.error=new Error("RPC timeout");env.resolving=env.wallet;env.getReceipt.mockResolvedValue(receipt());rerender();
- await screen.findByText("Resolving address updated");expect(env.write).toHaveBeenCalledOnce();
+ await screen.findByText("Domain accepted");expect(env.write).toHaveBeenCalledOnce();
 });

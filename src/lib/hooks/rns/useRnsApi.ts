@@ -20,6 +20,7 @@ export function useRnsApiDomainsForOwner(
     queryFn: () => fetchRnsIndexedDomainsForOwner(owner!, chainId),
     enabled,
     staleTime: RNS_QUERY_STALE_TIME,
+    refetchInterval: 30_000,
     gcTime: RNS_QUERY_GC_TIME,
   });
 }

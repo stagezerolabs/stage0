@@ -6,6 +6,18 @@ import { SENNA_API_URL } from './base-url';
 
 type RnsAdminSignMessage = (input: { message: string }) => Promise<Hex>;
 
+export type RnsIncomingTransfer = {
+  id: string; node: Hex; label: string; name: string; transactionHash: Hex; blockNumber: string;
+};
+
+export async function fetchRnsIncomingTransfers(address: Address, chainId: number): Promise<RnsIncomingTransfer[]> {
+  const response = await fetch(`${SENNA_API_URL}/api/public/rns/incoming/${address}?chainId=${chainId}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('Unable to load incoming names.');
+  const body = await response.json();
+  if (body.chainId !== chainId || body.address?.toLowerCase() !== address.toLowerCase() || !Array.isArray(body.items)) throw new Error('Invalid incoming-name response.');
+  return body.items;
+}
+
 function getRnsAdminNetworkName(chainId: number) {
   if (chainId === 4153) return 'RISE Mainnet';
   if (chainId === 11155931) return 'RISE Testnet';
@@ -535,6 +547,7 @@ export async function fetchRnsNameResolution(input: {
   const params = new URLSearchParams({ chainId: String(input.chainId) });
   const response = await fetch(
     `${SENNA_API_URL}/api/public/rns/resolve/name/${encodeURIComponent(`${label}.rise`)}?${params.toString()}`,
+    { cache: 'no-store' },
   );
 
   if (response.status === 404) return null;

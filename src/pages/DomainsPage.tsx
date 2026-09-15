@@ -1,5 +1,7 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
 import PrimarySeal from "@/components/rns/PrimarySeal";
+import ResolveNameDialog from "@/components/rns/ResolveNameDialog";
+import IncomingNamesNotice from "@/components/rns/IncomingNamesNotice";
 import TransferNameDialog, { type TransferNameSelection } from "@/components/rns/TransferNameDialog";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
@@ -241,7 +243,8 @@ const OwnedNameCard: React.FC<{
   onSetPrimary: (label: string) => void;
   onRenewed: () => void;
   onTransfer: (selection: TransferNameSelection) => void;
-}> = ({ domain, isPrimary, isPrimaryPending, onSetPrimary, onRenewed, onTransfer }) => {
+  onResolve: (selection: TransferNameSelection) => void;
+}> = ({ domain, isPrimary, isPrimaryPending, onSetPrimary, onRenewed, onTransfer, onResolve }) => {
   const { address, isConnected, chainId } = useAccount();
   const [renewArmed, setRenewArmed] = useState(false);
   const firedRef = useRef(false);
@@ -424,6 +427,11 @@ const OwnedNameCard: React.FC<{
             >
               Transfer ownership
             </button>
+            <button type="button" className="own-btn disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={Boolean(transferBlocked) || isBusy || isReleasing}
+              onClick={() => { if (address && !transferBlocked) onResolve({label:domain.label,node:domain.node as Hex,custody:getDomainCustody(domain),sender:address}); }}>
+              Resolving address
+            </button>
           </>
         )}
       </div>
@@ -448,6 +456,7 @@ const DomainsPage: React.FC = () => {
   });
 
   const [transferSelection, setTransferSelection] = useState<TransferNameSelection | null>(null);
+  const [resolveSelection, setResolveSelection] = useState<TransferNameSelection | null>(null);
   const lastRegisteredRef = useRef<string>("");
   const lastRegisteredDurationSecondsRef = useRef<number>(
     Number(RNS_DEFAULT_REGISTRATION_DURATION),
@@ -1373,6 +1382,8 @@ const DomainsPage: React.FC = () => {
               ) : null}
             </AnimatePresence>
 
+            <IncomingNamesNotice onUseWallet={item => { if (address) setResolveSelection({label:item.label,node:item.node,custody:"wallet",sender:address}); }}/>
+
             {ownedDomainsWithLabels.length > 0 ? (
               <motion.section variants={itemVariants}>
                 <div className="own-head">
@@ -1392,6 +1403,7 @@ const DomainsPage: React.FC = () => {
                       key={domain.node}
                       domain={domain}
                       onTransfer={setTransferSelection}
+                      onResolve={setResolveSelection}
                       isPrimary={domain.label === ownedLabel}
                       isPrimaryPending={primarySelection.isPending}
                       onSetPrimary={handleSetPrimary}
@@ -1405,6 +1417,8 @@ const DomainsPage: React.FC = () => {
               </motion.section>
             ) : null}
           </div>
+
+          {resolveSelection && <ResolveNameDialog key={`${resolveSelection.node}:${resolveSelection.sender}`} selection={resolveSelection} onClose={() => setResolveSelection(null)} onUpdated={() => refetchOwned()}/>}
 
           {transferSelection && (
             <TransferNameDialog

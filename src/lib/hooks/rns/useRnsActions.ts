@@ -418,10 +418,10 @@ export function useRnsSetResolver(label: string) {
   return { ...write, setResolver, node };
 }
 
-export function useRnsSetAddr(label: string, resolverAddress?: `0x${string}`) {
+export function useRnsSetAddr(label: string, resolverAddress?: `0x${string}`, options: { chainId?: number; account?: `0x${string}` } = {}) {
   const { resolver: defaultResolver } = useRnsContracts();
   const { node } = useRnsNode(label);
-  const write = useRnsWrite();
+  const write = useRnsWrite({ chainId: options.chainId });
 
   const setAddr = useCallback(
     (params: Omit<RnsSetAddrParams, "name">) => {
@@ -432,9 +432,11 @@ export function useRnsSetAddr(label: string, resolverAddress?: `0x${string}`) {
         abi: RNSResolver,
         functionName: "setAddr",
         args: [node, params.addr],
+        chainId: options.chainId,
+        account: options.account,
       });
     },
-    [defaultResolver, node, resolverAddress, write],
+    [defaultResolver, node, resolverAddress, write, options.chainId, options.account],
   );
 
   return { ...write, setAddr, node };

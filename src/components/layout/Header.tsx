@@ -11,6 +11,12 @@ import { useUserDomain } from '@/lib/hooks/useUserDomain';
 import type { Address } from 'viem';
 import { toast } from 'sonner';
 import { useRiseNetworkSwitch } from '@/lib/hooks/useRiseNetworkSwitch';
+import { useRnsIncomingTransfers } from '@/lib/hooks/rns/useRnsIncomingTransfers';
+
+const BRIDGE_URL = 'https://portal.risechain.com/bridge';
+function IncomingDot({ count }: { count: number }) {
+  return count > 0 ? <span role="img" aria-label={`${count} unread received names`} className="relative z-10 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" /> : null;
+}
 
 type HeaderProps = {
   themeMode: 'dark' | 'light';
@@ -37,6 +43,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const { isConnected, address } = useAccount();
   const { isAdmin: isOwner } = useIsAdmin(address as Address | undefined);
   const { displayName: rnsDomain } = useUserDomain(address);
+  const { unread } = useRnsIncomingTransfers();
   const { connect, isPending: isRiseConnectPending } = useConnect();
   const availableConnectors = useConnectors();
   const riseConnector = availableConnectors.find((connector) => connector.id === RISE_CONNECTOR_ID);
@@ -94,6 +101,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   ];
 
   const namesNavLinks = [
+    ...(unread.length ? [{ path: '/domains#incoming-names', label: 'Received names', description: `${unread.length} unread. Review and acknowledge.` }] : []),
     { path: '/domains', label: 'Search names', description: 'Check availability and pricing' },
     { path: '/domains/marketplace', label: 'Marketplace', description: 'Browse domain names' },
   ];
@@ -148,7 +156,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
     >
       <nav className="max-w-7xl mx-auto px-6 lg:px-8 flex justify-between items-center">
         {/* Logo */}
-        <Link to="/" className="group inline-flex items-center">
+        <Link to="/" className="group inline-flex shrink-0 items-center">
           <span className="block h-10 md:h-12 aspect-[466/165]">
             <img
               src={
@@ -163,7 +171,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden xl:flex items-center gap-1 whitespace-nowrap">
           {navItems.map((item) => {
             const isActive =
               item.path === '/'
@@ -184,6 +192,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                     <span className={`relative z-10 ${isActive ? 'text-ink' : 'text-ink-muted hover:text-ink'}`}>
                       {item.label}
                     </span>
+                    <IncomingDot count={unread.length}/>
                     <ChevronDown className={`relative z-10 h-3.5 w-3.5 transition-transform ${namesDrawerOpen ? 'rotate-180 text-ink' : 'text-ink-muted'}`} />
                     <AnimatePresence>
                       {isActive && (
@@ -260,24 +269,25 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
               </Link>
             );
           })}
+          <a href={BRIDGE_URL} target="_blank" rel="noopener noreferrer" className="px-3.5 py-2 text-[13px] font-medium tracking-tight text-ink-muted transition-colors hover:text-ink">Bridge<span className="sr-only"> (opens in a new tab)</span></a>
         </div>
 
         {/* Right side: Theme + Connect + Mobile menu button */}
         <div className="flex items-center gap-3">
           {!isConnected && (
             <div
-              className="hidden lg:inline-flex items-center gap-2 rounded-full border border-border bg-canvas-alt/70 px-3 py-2 text-[12px] font-semibold text-ink-muted"
+              className="hidden xl:inline-flex items-center gap-2 rounded-full border border-border bg-canvas-alt/70 px-3 py-2 text-[12px] font-semibold text-ink-muted"
               aria-label="Default network: RISE Mainnet"
               title={`Default network · Chain ${riseMainnet.id}`}
             >
               <img src="/rise-network.png" alt="" className="h-4 w-4 rounded-full" />
-              <span>RISE Mainnet</span>
+              <span className="whitespace-nowrap">RISE Mainnet</span>
             </div>
           )}
 
           <button
             onClick={onToggleTheme}
-            className={`hidden md:inline-flex btn-ghost p-2 ${themeMode === 'dark' ? 'hover:text-[#FF8A00]' : 'hover:text-[#04DF83]'}`}
+            className={`hidden xl:inline-flex btn-ghost p-2 ${themeMode === 'dark' ? 'hover:text-[#FF8A00]' : 'hover:text-[#04DF83]'}`}
             aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
@@ -340,13 +350,13 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                         <>
                           <button
                             onClick={openConnectModal}
-                            className="hidden md:inline-flex btn-primary"
+                            className="hidden xl:inline-flex btn-primary"
                           >
                             Connect
                           </button>
                           <button
                             onClick={openConnectModal}
-                            className="md:hidden btn-ghost p-2"
+                            className="xl:hidden btn-ghost p-2"
                             aria-label="Connect wallet"
                             title="Connect wallet"
                           >
@@ -364,7 +374,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                               toast.error(error instanceof Error ? error.message : 'Could not switch to RISE Mainnet.');
                             })}
                             disabled={isRiseSwitching}
-                            className="hidden md:inline-flex btn-secondary text-status-error border-status-error"
+                            className="hidden xl:inline-flex btn-secondary text-status-error border-status-error"
                           >
                             {isRiseSwitching ? 'Switching…' : 'Switch to RISE Mainnet'}
                           </button>
@@ -373,7 +383,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                               toast.error(error instanceof Error ? error.message : 'Could not switch to RISE Mainnet.');
                             })}
                             disabled={isRiseSwitching}
-                            className="md:hidden btn-ghost p-2 text-status-error"
+                            className="xl:hidden btn-ghost p-2 text-status-error"
                             aria-label="Wrong network. Switch network"
                             title="Switch network"
                           >
@@ -385,7 +395,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
                     return (
                       <div className="flex items-center gap-2">
-                        <div className="hidden md:flex items-center gap-2">
+                        <div className="hidden xl:flex items-center gap-2">
                           <button
                             onClick={openChainModal}
                             className="btn-ghost flex items-center gap-2"
@@ -395,14 +405,14 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                               src={chain.iconUrl ?? '/rise-network.png'}
                               className="w-4 h-4 rounded-full"
                             />
-                            <span className="hidden sm:inline text-body-sm">{chain.name}</span>
+                            <span className="hidden sm:inline whitespace-nowrap text-body-sm">{chain.name}</span>
                           </button>
 
                           <button
                             onClick={openAccountModal}
                             className="btn-primary"
                           >
-                            <span className="font-mono text-body-sm">
+                            <span className="max-w-36 truncate font-mono text-body-sm" title={rnsDomain ?? account.displayName}>
                               {rnsDomain ?? account.displayName}
                             </span>
                           </button>
@@ -410,7 +420,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
                         <button
                           onClick={openAccountModal}
-                          className="md:hidden btn-ghost p-2"
+                          className="xl:hidden btn-ghost p-2"
                           aria-label="Open wallet menu"
                           title="Wallet"
                         >
@@ -431,10 +441,11 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                 current === location.pathname ? null : location.pathname,
               )
             }
-            className="md:hidden btn-ghost p-2"
+            className="xl:hidden btn-ghost relative p-2"
             aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {unread.length > 0 && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true"/>}
           </button>
         </div>
       </nav>
@@ -447,7 +458,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="md:hidden overflow-hidden border-b border-border bg-canvas-alt/95 backdrop-blur-xl"
+            className="xl:hidden overflow-hidden border-b border-border bg-canvas-alt/95 backdrop-blur-xl"
           >
             <div className="max-w-7xl mx-auto px-6 py-4 space-y-1">
               <button
@@ -542,7 +553,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                           }`}
                         aria-expanded={namesDrawerOpen}
                       >
-                        <span>{item.label}</span>
+                        <span className="inline-flex items-center gap-2">{item.label}<IncomingDot count={unread.length}/></span>
                         <ChevronDown className={`h-4 w-4 transition-transform ${namesDrawerOpen ? 'rotate-180' : ''}`} />
                       </button>
 
@@ -590,6 +601,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
                   </Link>
                 );
               })}
+              <a href={BRIDGE_URL} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} className="block rounded-xl px-4 py-3 text-body font-medium text-ink-muted transition-colors hover:bg-canvas-alt/50 hover:text-ink">Bridge<span className="sr-only"> (opens in a new tab)</span></a>
             </div>
           </motion.div>
         )}

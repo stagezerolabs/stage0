@@ -25,11 +25,11 @@ import { normalizeRnsLabel } from "@/lib/rns/utils";
 import { useCallback } from "react";
 import { useTrackedWriteContract } from "@/lib/hooks/useTrackedWriteContract";
 
-function useRnsWrite() {
-  const { hash, writeContract, isPending, isConfirming, isSuccess, error, reset } =
-    useTrackedWriteContract();
+function useRnsWrite(options: { chainId?: number } = {}) {
+  const { hash, receipt, writeContract, isPending, isConfirming, isSuccess, error, reset } =
+    useTrackedWriteContract(options);
 
-  return { hash, writeContract, isPending, isConfirming, isSuccess, error, reset };
+  return { hash, receipt, writeContract, isPending, isConfirming, isSuccess, error, reset };
 }
 
 export function useRnsRegister() {
@@ -462,10 +462,10 @@ export function useRnsSetText(label: string, resolverAddress?: `0x${string}`) {
   return { ...write, setText, node };
 }
 
-export function useRnsRegistrySetOwner(label: string) {
+export function useRnsRegistrySetOwner(label: string, options: { chainId?: number; account?: `0x${string}` } = {}) {
   const { registry } = useRnsContracts();
   const { node } = useRnsNode(label);
-  const write = useRnsWrite();
+  const write = useRnsWrite({ chainId: options.chainId });
 
   const setOwner = useCallback(
     (owner: `0x${string}`) => {
@@ -475,9 +475,11 @@ export function useRnsRegistrySetOwner(label: string) {
         abi: RNSRegistry,
         functionName: "setOwner",
         args: [node, owner],
+        chainId: options.chainId,
+        account: options.account,
       });
     },
-    [node, registry, write],
+    [node, registry, write, options.chainId, options.account],
   );
 
   return { ...write, setOwner, node };

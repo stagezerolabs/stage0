@@ -1,1 +1,1 @@
-export { RNSResolver } from "@/config";
+export { RNSResolver } from "@/lib/contracts/generatedAbis";

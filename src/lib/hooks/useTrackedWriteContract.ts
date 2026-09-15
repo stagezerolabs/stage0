@@ -13,7 +13,7 @@ interface CallMeta {
  * Drop-in replacement for wagmi's useWriteContract + useWaitForTransactionReceipt
  * that logs every lifecycle phase to the browser console for easy onchain tracing.
  */
-export function useTrackedWriteContract() {
+export function useTrackedWriteContract(options: { chainId?: number } = {}) {
   const {
     data: hash,
     writeContract: wagmiWriteContract,
@@ -22,8 +22,8 @@ export function useTrackedWriteContract() {
     reset: wagmiReset,
   } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess, error: confirmError } =
-    useWaitForTransactionReceipt({ hash });
+  const { data: receipt, isLoading: isConfirming, isSuccess, error: confirmError } =
+    useWaitForTransactionReceipt({ hash, chainId: options.chainId });
 
   // Keep the last call metadata across renders without re-rendering
   const metaRef = useRef<CallMeta | null>(null);
@@ -68,6 +68,7 @@ export function useTrackedWriteContract() {
 
   return {
     hash,
+    receipt,
     writeContract,
     isPending,
     isConfirming,

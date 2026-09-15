@@ -1,4 +1,5 @@
 import NamesSubnav from "@/components/rns/NamesSubnav";
+import TransferNameDialog, { type TransferNameSelection } from "@/components/rns/TransferNameDialog";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   fetchRnsMarketplaceReserved,
@@ -41,11 +42,12 @@ import { RNS_DEFAULT_REGISTRATION_DURATION } from "@/lib/rns/constants";
 import { setPrimaryLabel } from "@/lib/rns/primary-label";
 import { saveRecentRegistration } from "@/lib/rns/recent-registration";
 import { rnsNamehash } from "@/lib/rns/utils";
+import { transferBlockReason } from "@/lib/rns/transfer";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { formatEther } from "viem";
+import { formatEther, type Address, type Hex } from "viem";
 import {
   useAccount,
   useBalance,
@@ -222,6 +224,7 @@ type OwnedDomainSummary = {
   node: string;
   label: string;
   expiry: bigint | number;
+  registryOwner?: Address;
   custody?: "wallet" | "marketplace_listing" | "marketplace_auction";
   marketplace?: {
     kind: "listing" | "auction";
@@ -258,8 +261,9 @@ const OwnedNameCard: React.FC<{
   isPrimary: boolean;
   onSetPrimary: (label: string) => void;
   onRenewed: () => void;
-}> = ({ domain, isPrimary, onSetPrimary, onRenewed }) => {
-  const { isConnected } = useAccount();
+  onTransfer: (selection: TransferNameSelection) => void;
+}> = ({ domain, isPrimary, onSetPrimary, onRenewed, onTransfer }) => {
+  const { address, isConnected, chainId } = useAccount();
   const [renewArmed, setRenewArmed] = useState(false);
   const firedRef = useRef(false);
   const isEscrowed = isMarketplaceCustody(domain);
@@ -268,6 +272,15 @@ const OwnedNameCard: React.FC<{
   const expirySec = Number(domain.expiry);
   const nowSec = Math.floor(Date.now() / 1000);
   const isExpired = expirySec > 0 && expirySec < nowSec;
+  const transferBlocked = transferBlockReason({
+    connected: isConnected,
+    supportedChain: chainId === riseMainnet.id,
+    wallet: address,
+    owner: domain.registryOwner,
+    custody: getDomainCustody(domain),
+    expiry: BigInt(domain.expiry),
+    now: BigInt(nowSec),
+  });
   const isSoon =
     expirySec > 0 && !isExpired && expirySec - nowSec <= RENEWAL_WINDOW_SECONDS;
 
@@ -392,9 +405,12 @@ const OwnedNameCard: React.FC<{
       <div className={`own-exp ${isSoon || isExpired ? "soon" : ""}`}>{expiryText}</div>
       <div className={`own-actions ${isEscrowed ? "single" : ""}`}>
         {isEscrowed ? (
-          <Link to="/domains/marketplace" className="own-btn primary">
-            View marketplace
-          </Link>
+          <>
+            <Link to="/domains/marketplace" className="own-btn primary">
+              View marketplace
+            </Link>
+            <p className="text-xs leading-5 text-ink-muted">To transfer, cancel the listing or auction first, if cancellation is available.</p>
+          </>
         ) : (
           <>
             <button
@@ -418,6 +434,15 @@ const OwnedNameCard: React.FC<{
                 {isReleasing ? <InlineLoading label="Releasing..." size="xs" /> : "Release"}
               </button>
             </div>
+            <button
+              type="button"
+              className="own-btn disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={Boolean(transferBlocked) || isBusy || isReleasing}
+              title={transferBlocked ?? undefined}
+              onClick={() => { if (address && !transferBlocked) onTransfer({ label: domain.label, node: domain.node as Hex, custody: getDomainCustody(domain), sender: address }); }}
+            >
+              Transfer ownership
+            </button>
           </>
         )}
       </div>
@@ -442,6 +467,7 @@ const DomainsPage: React.FC = () => {
   });
 
   const [hintLabel, setHintLabel] = useState<string | null>(null);
+  const [transferSelection, setTransferSelection] = useState<TransferNameSelection | null>(null);
   const lastRegisteredRef = useRef<string>("");
   const lastRegisteredDurationSecondsRef = useRef<number>(
     Number(RNS_DEFAULT_REGISTRATION_DURATION),
@@ -1393,6 +1419,7 @@ const DomainsPage: React.FC = () => {
                     <OwnedNameCard
                       key={domain.node}
                       domain={domain}
+                      onTransfer={setTransferSelection}
                       isPrimary={domain.label === ownedLabel}
                       onSetPrimary={handleSetPrimary}
                       onRenewed={() => {
@@ -1405,6 +1432,18 @@ const DomainsPage: React.FC = () => {
               </motion.section>
             ) : null}
           </div>
+
+          {transferSelection && (
+            <TransferNameDialog
+              key={`${transferSelection.node}:${transferSelection.sender}`}
+              selection={transferSelection}
+              onClose={() => setTransferSelection(null)}
+              onTransferred={async () => {
+                setHintLabel(null);
+                await Promise.all([refetchOwned(), refetchStatus()]);
+              }}
+            />
+          )}
 
           <aside className="names-side-column">
             {!isConnected ? (

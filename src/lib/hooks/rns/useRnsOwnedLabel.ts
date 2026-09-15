@@ -6,7 +6,7 @@ import { useRnsApiDomainsForOwner } from "@/lib/hooks/rns/useRnsApi";
 import { useRnsSubgraphDomainsForOwner } from "@/lib/hooks/rns/useRnsSubgraph";
 import { useRnsContracts } from "@/lib/hooks/rns/useRnsContracts";
 import { useRnsLabelRecovery } from "@/lib/hooks/rns/useRnsLabelRecovery";
-import { RNSResolver } from "@/lib/rns/abis";
+import { RNSRegistry, RNSResolver } from "@/lib/rns/abis";
 import { getPrimaryLabel } from "@/lib/rns/primary-label";
 import { RNS_PRIMARY_LABEL_EVENT } from "@/lib/rns/primary-label";
 import {
@@ -35,7 +35,7 @@ import { useReadContracts } from "wagmi";
  */
 export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
   const typedAddress = address as Address | undefined;
-  const { resolver: resolverAddress, registrar } = useRnsContracts();
+  const { resolver: resolverAddress, registrar, registry } = useRnsContracts();
 
   const {
     data: apiDomains,
@@ -119,6 +119,20 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
     return [...synthetic, ...fromGraph];
   }, [apiDomains, subgraphDomains, recentRegistrations, typedAddress]);
 
+  // The index discovers names; registry.owner remains authoritative. In
+  // particular, stale API/local registration rows must not resurrect a name
+  // after a direct transfer. One batched hook serves every name and consumer.
+  const { data: ownershipResults, refetch: refetchOwnership } = useReadContracts({
+    contracts: rawDomains.map((domain) => ({
+      chainId: riseMainnet.id,
+      address: registry,
+      abi: RNSRegistry,
+      functionName: "owner" as const,
+      args: [domain.node as Hex] as const,
+    })),
+    query: { enabled: Boolean(address) && rawDomains.length > 0, staleTime: 0, refetchInterval: 30_000 },
+  });
+
   // Batch-read resolver.text(node, "label") for older names that already have it.
   const { data: resolverTextResults, isLoading: isResolverLoading } = useReadContracts({
     contracts: rawDomains.map((d) => ({
@@ -151,9 +165,12 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
       const onChainLabel = (resolverTextResults?.[i]?.result as string | undefined) ?? "";
       const recoveredLabel = recoveredLabels.get(d.node.toLowerCase()) ?? "";
       const label = onChainLabel || d.label || recoveredLabel;
-      return { ...d, label };
-    });
-  }, [rawDomains, resolverTextResults, recoveredLabels]);
+      const registryOwner = ownershipResults?.[i]?.result as Address | undefined;
+      return { ...d, label, registryOwner };
+    }).filter((domain) =>
+      (domain.custody ?? "wallet") !== "wallet" ||
+      !domain.registryOwner || domain.registryOwner.toLowerCase() === address?.toLowerCase());
+  }, [rawDomains, resolverTextResults, recoveredLabels, ownershipResults, address]);
 
   // Pick the user's preferred primary if it's still in their owned list,
   // otherwise fall back to the first domain. Primary preference is stored
@@ -195,8 +212,8 @@ export function useRnsOwnedLabel(address?: string, hintLabel?: string) {
   });
 
   const refetch = useCallback(async () => {
-    await Promise.all([refetchApi(), refetchSubgraph(), refetchOwner(), refetchExpiry(), refetchHintOwner()]);
-  }, [refetchApi, refetchSubgraph, refetchOwner, refetchExpiry, refetchHintOwner]);
+    await Promise.all([refetchApi(), refetchSubgraph(), refetchOwner(), refetchExpiry(), refetchHintOwner(), refetchOwnership()]);
+  }, [refetchApi, refetchSubgraph, refetchOwner, refetchExpiry, refetchHintOwner, refetchOwnership]);
 
   const displayName = useMemo(
     () => (label ? formatDomainDisplay(label) : null),

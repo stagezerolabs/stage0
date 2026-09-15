@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -41,6 +43,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.10.4",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
@@ -50,10 +53,12 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^30.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^5.0.0"
   }
 }

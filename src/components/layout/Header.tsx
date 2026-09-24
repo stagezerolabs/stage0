@@ -25,7 +25,7 @@ type HeaderProps = {
 
 const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const location = useLocation();
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled, setScrolled] = useState(() => typeof window !== 'undefined' && window.scrollY > 20);
   const [mobileMenuOpenForPath, setMobileMenuOpenForPath] = useState<string | null>(null);
   const isMobileMenuOpen = mobileMenuOpenForPath === location.pathname;
   const [namesDrawerOpenForPath, setNamesDrawerOpenForPath] = useState<string | null>(null);
@@ -50,8 +50,13 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const { switchToRise, isSwitching: isRiseSwitching } = useRiseNetworkSwitch();
 
   useEffect(() => {
+    let wasScrolled = window.scrollY > 20;
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      const isScrolled = window.scrollY > 20;
+      if (isScrolled !== wasScrolled) {
+        wasScrolled = isScrolled;
+        setScrolled(isScrolled);
+      }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -149,7 +154,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   }, [closeMobileMenu, onToggleTheme]);
 
   const headerSurfaceClass = scrolled || themeMode === 'light'
-    ? 'bg-canvas-alt/90 backdrop-blur-xl border-border'
+    ? 'bg-canvas-alt/90 backdrop-blur-sm border-border'
     : 'bg-transparent';
 
   return (

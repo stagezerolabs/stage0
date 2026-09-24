@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Search, X } from '@/components/ui/icons';
 
@@ -166,6 +167,7 @@ export default function NFTMarketplacePage() {
             <button
               key={entry}
               type="button"
+              aria-pressed={category === entry && !collectionId}
               onClick={() => { setCategory(entry); setCollectionId(null); }}
               className={`shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold transition ${category === entry && !collectionId ? 'bg-ink text-canvas' : 'border border-border bg-canvas-alt text-ink-muted hover:border-border-strong hover:text-ink'}`}
             >{entry}</button>
@@ -214,11 +216,11 @@ export default function NFTMarketplacePage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {(['Trending', 'Top'] as const).map((entry) => (
-              <button key={entry} type="button" onClick={() => setRanking(entry)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${ranking === entry ? 'bg-ink text-canvas' : 'bg-canvas-alt text-ink-muted hover:text-ink'}`}>{entry}</button>
+              <button key={entry} type="button" aria-pressed={ranking === entry} onClick={() => setRanking(entry)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${ranking === entry ? 'bg-ink text-canvas' : 'bg-canvas-alt text-ink-muted hover:text-ink'}`}>{entry}</button>
             ))}
             <span className="mx-1 self-center text-border-strong">│</span>
             {(['24h', '7d', '30d'] as const).map((entry) => (
-              <button key={entry} type="button" onClick={() => setTimeframe(entry)} className={`rounded-xl px-3 py-2 text-sm font-semibold ${timeframe === entry ? 'bg-accent/15 text-accent' : 'text-ink-muted hover:text-ink'}`}>{entry}</button>
+              <button key={entry} type="button" aria-pressed={timeframe === entry} onClick={() => setTimeframe(entry)} className={`rounded-xl px-3 py-2 text-sm font-semibold ${timeframe === entry ? 'bg-accent/15 text-accent' : 'text-ink-muted hover:text-ink'}`}>{entry}</button>
             ))}
           </div>
         </div>
@@ -295,7 +297,8 @@ export default function NFTMarketplacePage() {
         <Link to="/create/nft" className="btn-primary inline-flex shrink-0 items-center gap-2">Create collection <ArrowRight className="h-4 w-4" /></Link>
       </section>
 
-      {selectedItem && selectedCollection && (
+      {/* Portaled so the overlay escapes <main>'s stacking context and covers the header. */}
+      {selectedItem && selectedCollection && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedItem(null); }}>
           <div ref={modalRef} role="dialog" aria-modal="true" aria-label={selectedItem.name} className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-canvas-alt shadow-2xl md:grid md:grid-cols-2">
             <button ref={modalCloseRef} type="button" onClick={() => setSelectedItem(null)} aria-label="Close item preview" className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white"><X className="h-5 w-5" /></button>
@@ -309,10 +312,11 @@ export default function NFTMarketplacePage() {
                 <div><p className="text-ink-faint">Owner</p><p className="mt-1 font-semibold">{selectedItem.owner}</p></div>
                 <div><p className="text-ink-faint">Collection floor</p><p className="mt-1 font-semibold">{formatEth(selectedCollection.floor)}</p></div>
               </div>
-              <div className="mt-auto pt-8"><p className="text-xs uppercase tracking-wider text-ink-faint">Listed price · demo</p><p className="mt-1 font-display text-3xl font-bold">{formatEth(selectedItem.price)}</p><button type="button" disabled className="mt-5 w-full cursor-not-allowed rounded-2xl bg-accent px-5 py-4 font-bold text-white opacity-55">Buy now (demo)</button><p className="mt-3 text-center text-xs text-ink-faint">Transactions are disabled in this demo. No wallet action will be requested.</p></div>
+              <div className="mt-auto pt-8"><p className="text-xs uppercase tracking-wider text-ink-faint">Listed price · demo</p><p className="mt-1 font-display text-3xl font-bold">{formatEth(selectedItem.price)}</p><button type="button" disabled className="mt-5 w-full cursor-not-allowed rounded-2xl bg-accent px-5 py-4 font-bold text-accent-foreground opacity-55">Buy now (demo)</button><p className="mt-3 text-center text-xs text-ink-faint">Transactions are disabled in this demo. No wallet action will be requested.</p></div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

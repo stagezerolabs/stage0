@@ -44,7 +44,6 @@
     --color-status-upcoming: 245 158 11;
     --color-status-closed: 156 163 175;
     --color-status-error: 239 68 68;
-    --noise-opacity: 0.018;
     --layout-top-glow:
       radial-gradient(ellipse 80% 55% at 50% -20%, rgba(255, 138, 0, 0.18), transparent 62%),
       radial-gradient(ellipse 70% 50% at 20% -10%, rgba(255, 170, 50, 0.10), transparent 62%),
@@ -107,7 +106,6 @@
     --color-accent-secondary-hover: 245 155 30;
     --color-accent-tertiary: 255 138 0;
     --color-accent-tertiary-hover: 245 124 0;
-    --noise-opacity: 0.008;
     --layout-top-glow:
       radial-gradient(ellipse 82% 56% at 50% -20%, rgba(255, 150, 44, 0.12), transparent 60%),
       radial-gradient(ellipse 74% 50% at 14% -8%, rgba(255, 184, 96, 0.09), transparent 64%),
@@ -166,7 +164,6 @@
     background: rgb(var(--color-canvas-alt) / 0.9);
     border: 1px solid rgb(var(--color-border) / 0.6);
     box-shadow: var(--shadow-float);
-    will-change: transform, box-shadow;
     transition: transform 600ms var(--ease-dream),
       box-shadow 600ms var(--ease-dream),
       border-color 600ms var(--ease-dream);
@@ -236,7 +233,20 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     color: transparent;
-    animation: riseColorMorph 10s ease-in-out infinite;
+  }
+
+  .hero-rise-orbs {
+    position: absolute;
+    inset: -0.3em -0.4em;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .hero-rise-orb {
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: riseOrbDrift 12s ease-in-out infinite;
   }
 
   :root[data-theme='light'] .hero-rise-orbs {
@@ -318,11 +328,10 @@
   /* Stat card styling */
   .stat-card {
     @apply relative overflow-hidden rounded-3xl p-8 bg-canvas-alt border border-border;
-    @apply transition-all;
     box-shadow: var(--shadow-float);
+    transition-property: transform, box-shadow, border-color;
     transition-duration: 700ms;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, box-shadow;
   }
 
   .stat-card:hover {
@@ -460,11 +469,10 @@
   /* Project card styling */
   .project-card {
     @apply relative overflow-hidden rounded-3xl bg-canvas-alt border border-border;
-    @apply transition-all;
     box-shadow: var(--shadow-float);
+    transition-property: transform, box-shadow, border-color;
     transition-duration: 600ms;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, box-shadow;
   }
 
   .project-card::before {
@@ -514,19 +522,6 @@
   .stagger-4 { animation-delay: 0.4s; }
   .stagger-5 { animation-delay: 0.5s; }
   .stagger-6 { animation-delay: 0.6s; }
-
-  /* Noise texture overlay */
-  .noise-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 9999;
-    opacity: var(--noise-opacity);
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  }
 
   /* Input styling */
   .input-field {
@@ -732,9 +727,7 @@
     inset: 0;
     background: var(--layout-sky);
     background-size: 200% 200%;
-    animation: skyDrift 30s ease infinite;
     pointer-events: none;
-    will-change: background-position;
   }
 
   /* Horizontal light streaks */
@@ -754,15 +747,6 @@
     height: 1px;
     background: linear-gradient(90deg, transparent 10%, rgba(139, 124, 255, 0.04) 40%, rgba(255, 138, 0, 0.03) 60%, transparent 90%);
     pointer-events: none;
-  }
-
-  /* Geometric monolith — rotating border rectangle */
-  .geo-monolith {
-    position: fixed;
-    border: 1px solid rgb(var(--color-ink) / 0.03);
-    border-radius: 2px;
-    pointer-events: none;
-    will-change: transform;
   }
 
   /* Icon surreal hover effect */
@@ -1017,21 +1001,9 @@
   100% { transform: rotateX(0deg); }
 }
 
-@keyframes skyDrift {
-  0%, 100% { background-position: 0% 0%; }
-  25% { background-position: 50% 20%; }
-  50% { background-position: 100% 50%; }
-  75% { background-position: 50% 80%; }
-}
-
 @keyframes floatIdle {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
-}
-
-@keyframes geoRotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 @keyframes haloExpand {
@@ -1050,37 +1022,10 @@
   100% { background-position: 0% 0%; }
 }
 
-@keyframes riseColorMorph {
-  0%, 100% {
-    --rise-angle: 135deg;
-    --rise-c1: #ff8a00;
-    --rise-c2: #c492e0;
-    --rise-c3: #8b7cff;
-  }
-  20% {
-    --rise-angle: 210deg;
-    --rise-c1: #f49858;
-    --rise-c2: #8b7cff;
-    --rise-c3: #ff8a00;
-  }
-  40% {
-    --rise-angle: 300deg;
-    --rise-c1: #8b7cff;
-    --rise-c2: #ffaa32;
-    --rise-c3: #c492e0;
-  }
-  60% {
-    --rise-angle: 380deg;
-    --rise-c1: #c492e0;
-    --rise-c2: #ff8a00;
-    --rise-c3: #8b7cff;
-  }
-  80% {
-    --rise-angle: 450deg;
-    --rise-c1: #ffaa32;
-    --rise-c2: #c492e0;
-    --rise-c3: #f49858;
-  }
+@keyframes riseOrbDrift {
+  0%, 100% { transform: translate(-50%, -50%); }
+  33% { transform: translate(-50%, -50%) translate(var(--orb-x1), var(--orb-y1)) scale(var(--orb-s1)); }
+  66% { transform: translate(-50%, -50%) translate(var(--orb-x2), var(--orb-y2)) scale(var(--orb-s2)); }
 }
 
 
@@ -1170,7 +1115,6 @@
     animation: none;
   }
   .sky-layer,
-  .geo-monolith,
   .light-streak,
   .light-streak--2 {
     animation: none !important;
@@ -1400,7 +1344,7 @@
   color: rgb(var(--color-ink-muted));
   border: none;
   cursor: pointer;
-  transition: all 200ms ease;
+  transition: background-color 200ms ease, color 200ms ease;
   font-family: inherit;
   white-space: nowrap;
 }
@@ -1710,7 +1654,7 @@
   border: 1px solid rgb(var(--color-border));
   border-radius: 16px;
   overflow: hidden;
-  transition: all 250ms ease;
+  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
   cursor: pointer;
   display: flex; flex-direction: column;
 }
@@ -1750,7 +1694,7 @@
   border-radius: 18px;
   padding: 18px;
   display: flex; flex-direction: column; gap: 12px;
-  transition: all 250ms ease;
+  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease, background-color 250ms ease, color 250ms ease, opacity 250ms ease;
   cursor: pointer;
   min-height: 150px;
   text-decoration: none;
@@ -2134,7 +2078,7 @@
   border: 1px solid rgb(var(--color-border));
   border-radius: 24px;
   overflow: hidden;
-  transition: all 300ms ease;
+  transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
   cursor: pointer;
   position: relative;
   display: flex; flex-direction: column;
@@ -2814,7 +2758,7 @@
   color: rgb(var(--color-ink-muted));
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 200ms ease;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 .ai-chat-icon-btn:hover { background: rgb(var(--color-ink) / 0.06); color: rgb(var(--color-ink)); }
 
@@ -2948,7 +2892,7 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 200ms ease;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
   font-family: inherit;
 }
 .ai-suggest:hover {
@@ -3017,7 +2961,7 @@
   color: rgb(var(--color-accent-foreground));
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 200ms ease;
+  transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
   flex-shrink: 0;
 }
 .ai-send:hover:not(:disabled) {
@@ -3276,7 +3220,7 @@
   color: rgb(var(--color-ink-muted));
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 200ms ease;
+  transition: background-color 200ms ease, color 200ms ease;
   flex-shrink: 0;
 }
 .senna-mic svg {

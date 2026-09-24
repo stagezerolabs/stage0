@@ -1,6 +1,6 @@
-import Dither from '@/components/animated/Dither';
 import CountUp from '@/components/ui/CountUp';
 import FallbackImage from '@/components/ui/fallback-image';
+import LazyLoadBoundary from '@/components/ui/LazyLoadBoundary';
 import { NFT_COLLECTION_IMAGES } from '@/config';
 import { useNFTDeployments, type NFTDeploymentWithMetadata } from '@/lib/hooks/useNFTDeployments';
 import { useLaunchpadPresales, type PresaleWithStatus } from '@/lib/hooks/useLaunchpadPresales';
@@ -37,6 +37,7 @@ import { useAccount } from 'wagmi';
 
 const riseLogoWhite = "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_White_d1vlcb.png"
 const riseLogoBlack = "https://res.cloudinary.com/dma1c8i6n/image/upload/v1774548554/RISE_Logotype_Black_v4snqi.png"
+const Dither = React.lazy(() => import('@/components/animated/Dither'));
 /* ─── Shared Hooks ─── */
 
 // function useMousePosition() {
@@ -184,45 +185,35 @@ const creatorTools = [
 
 /* ─── Rise Glow Orbs (dark mode only) ─── */
 
+// The soft edge comes from the gradient itself (size already includes the old blur
+// radius), so the orbs animate transform only and stay on the compositor.
 const riseOrbs = [
-  { color: 'rgba(255, 138, 0, 0.35)', size: 28, blur: 12, left: '15%', top: '25%', x: [0, 12, -8, 0], y: [0, -10, 8, 0], duration: 12, scale: [1, 1.2, 0.9, 1] },
-  { color: 'rgba(139, 124, 255, 0.28)', size: 32, blur: 14, left: '75%', top: '18%', x: [0, -10, 14, 0], y: [0, 8, -12, 0], duration: 14, scale: [1, 1.15, 0.92, 1] },
-  { color: 'rgba(255, 170, 50, 0.25)', size: 22, blur: 10, left: '50%', top: '65%', x: [0, 10, -12, 0], y: [0, -14, 10, 0], duration: 11, scale: [1, 1.1, 0.95, 1] },
-  { color: 'rgba(120, 200, 255, 0.20)', size: 18, blur: 9, left: '82%', top: '55%', x: [0, -8, 10, 0], y: [0, 10, -8, 0], duration: 13, scale: [1, 1.08, 0.96, 1] },
+  { color: 'rgba(255, 138, 0, 0.35)', size: 52, left: '15%', top: '25%', x: [12, -8], y: [-10, 8], duration: 12, scale: [1.2, 0.9] },
+  { color: 'rgba(139, 124, 255, 0.28)', size: 60, left: '75%', top: '18%', x: [-10, 14], y: [8, -12], duration: 14, scale: [1.15, 0.92] },
+  { color: 'rgba(255, 170, 50, 0.25)', size: 42, left: '50%', top: '65%', x: [10, -12], y: [-14, 10], duration: 11, scale: [1.1, 0.95] },
+  { color: 'rgba(120, 200, 255, 0.20)', size: 36, left: '82%', top: '55%', x: [-8, 10], y: [10, -8], duration: 13, scale: [1.08, 0.96] },
 ];
 
 const RiseGlowOrbs: React.FC = () => (
-  <span
-    className="hero-rise-orbs"
-    style={{ position: 'absolute', inset: '-0.3em -0.4em', zIndex: -1, pointerEvents: 'none', willChange: 'transform' }}
-    aria-hidden="true"
-  >
+  <span className="hero-rise-orbs" aria-hidden="true">
     {riseOrbs.map((orb, i) => (
-      <motion.span
+      <span
         key={i}
+        className="hero-rise-orb"
         style={{
-          position: 'absolute',
           width: orb.size,
           height: orb.size,
           left: orb.left,
           top: orb.top,
-          borderRadius: '50%',
           background: `radial-gradient(circle, ${orb.color}, transparent 70%)`,
-          filter: `blur(${orb.blur}px)`,
-          mixBlendMode: 'screen',
-          transform: 'translate(-50%, -50%)',
-          willChange: 'transform',
-        }}
-        animate={{
-          x: orb.x,
-          y: orb.y,
-          scale: orb.scale,
-        }}
-        transition={{
-          duration: orb.duration,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
+          animationDuration: `${orb.duration}s`,
+          '--orb-x1': `${orb.x[0]}px`,
+          '--orb-y1': `${orb.y[0]}px`,
+          '--orb-s1': orb.scale[0],
+          '--orb-x2': `${orb.x[1]}px`,
+          '--orb-y2': `${orb.y[1]}px`,
+          '--orb-s2': orb.scale[1],
+        } as React.CSSProperties}
       />
     ))}
   </span>
@@ -368,17 +359,24 @@ const HomePage: React.FC = () => {
   const { totalDeployments, activeDeployments, estimatedEthRaised } = useUserNFTs();
   const { pinnedAddress, setPinnedAddress } = usePinnedPresale();
   const reducedMotion = useReducedMotion();
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() =>
+    document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
+  );
+  const [showDither, setShowDither] = useState(false);
   const prefersReducedMotion = typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const shouldDisableAnimations = reducedMotion || prefersReducedMotion;
 
   React.useEffect(() => {
-    // Initial check
-    if (document.documentElement.dataset.theme === 'light') {
-      setThemeMode('light');
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(() => setShowDither(true), { timeout: 1000 });
+      return () => window.cancelIdleCallback(idleId);
     }
+    const timer = window.setTimeout(() => setShowDither(true), 200);
+    return () => window.clearTimeout(timer);
+  }, []);
 
+  React.useEffect(() => {
     // Observe changes to the html element's dataset
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -521,7 +519,6 @@ const HomePage: React.FC = () => {
       {/* ─── Hero Section ─── */}
       <motion.section
         className="relative pt-24 pb-40 md:pt-20 md:pb-56 overflow-hidden rounded-[3rem] mb-20"
-        style={{ willChange: 'transform' }}
       >
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-canvas/25" />
@@ -529,16 +526,22 @@ const HomePage: React.FC = () => {
           <div className="absolute inset-x-3 top-3 bottom-3 md:inset-x-8 md:top-6 md:bottom-6 rounded-[2.4rem] overflow-hidden border border-border/35 shadow-float">
             <motion.div className="absolute -inset-y-8 inset-x-0 pointer-events-auto" style={{ y: heroBgY }}>
               <div className="relative w-full h-full scale-[1.05]" style={{ opacity: 'var(--hero-image-opacity)' }}>
-                <Dither
-                  waveColor={themeMode === 'light' ? [0.8, 0.8, 0.8] : [0.5, 0.5, 0.5]}
-                  disableAnimation={false}
-                  enableMouseInteraction
-                  mouseRadius={0.5}
-                  colorNum={3}
-                  waveAmplitude={0.25}
-                  waveFrequency={2}
-                  waveSpeed={0.03}
-                />
+                {showDither && (
+                  <LazyLoadBoundary fallback={null}>
+                    <React.Suspense fallback={null}>
+                      <Dither
+                        waveColor={themeMode === 'light' ? [0.8, 0.8, 0.8] : [0.5, 0.5, 0.5]}
+                        disableAnimation={!!shouldDisableAnimations}
+                        enableMouseInteraction={!shouldDisableAnimations}
+                        mouseRadius={0.5}
+                        colorNum={3}
+                        waveAmplitude={0.25}
+                        waveFrequency={2}
+                        waveSpeed={0.03}
+                      />
+                    </React.Suspense>
+                  </LazyLoadBoundary>
+                )}
               </div>
             </motion.div>
 
@@ -587,8 +590,8 @@ const HomePage: React.FC = () => {
               <motion.span
                 key={i}
                 className="inline-block mr-[0.3em]"
-                initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.2 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
               >
                 {word}
@@ -596,8 +599,8 @@ const HomePage: React.FC = () => {
             ))}
             <motion.span
               className="inline-block hero-rise"
-              initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 + titleWords.length * 0.05, ease: [0.16, 1, 0.3, 1] }}
             >
               {!shouldDisableAnimations && <RiseGlowOrbs />}
@@ -640,7 +643,6 @@ const HomePage: React.FC = () => {
         whileInView="visible"
         viewport={{ once: true, margin: '-10% 0px' }}
         className="max-w-[1400px] mx-auto px-4 md:px-8 space-y-32"
-        style={{ willChange: 'transform' }}
       >
         {/* ─── Stats Section ─── */}
         <motion.section variants={itemVariants}>
@@ -871,15 +873,9 @@ const HomePage: React.FC = () => {
                   transition={{ duration: 0.7, delay: index * 0.2, ease: [0.16, 1, 0.3, 1] }}
                   className="flex flex-col items-center text-center space-y-6"
                 >
-                  <motion.div
+                  <div
                     className="relative w-32 h-32 flex items-center justify-center"
-                    animate={shouldDisableAnimations ? undefined : { y: [0, -5, 0] }}
-                    transition={{
-                      duration: 4.5,
-                      delay: index * 0.35,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
+                    style={shouldDisableAnimations ? undefined : { animation: `floatIdle 4.5s ease-in-out ${index * 0.35}s infinite` }}
                   >
                     <div className="absolute inset-0 rounded-full border border-border bg-canvas-alt shadow-soft" />
                     <div className="absolute inset-3 rounded-full border border-accent/25 bg-accent/[0.08]" />
@@ -890,7 +886,7 @@ const HomePage: React.FC = () => {
                       {item.step}
                     </div>
                     <div className="absolute inset-0 rounded-full border border-ink/5" />
-                  </motion.div>
+                  </div>
                   <div className="max-w-xs">
                     <h3 className="font-display text-2xl text-ink mb-3">{item.title}</h3>
                     <p className="text-base text-ink-muted leading-relaxed">{item.description}</p>

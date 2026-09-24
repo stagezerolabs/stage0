@@ -31,7 +31,7 @@ const Footer: React.FC<FooterProps> = ({ themeMode }) => {
   ];
 
   return (
-    <footer className="relative mt-auto border-t border-border/30 bg-canvas/40 backdrop-blur-md">
+    <footer className="relative mt-auto border-t border-border/30 bg-canvas/40 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-8 sm:py-12">
         <div className="flex flex-col md:flex-row justify-between items-center gap-5 sm:gap-8">
           {/* Logo & Copyright */}

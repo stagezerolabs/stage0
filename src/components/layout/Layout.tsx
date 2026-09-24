@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
-import AICopilot from '../AICopilot';
+import LazyLoadBoundary from '../ui/LazyLoadBoundary';
+const AICopilot = lazy(() => import('../AICopilot'));
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -14,6 +15,18 @@ const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) =
   const location = useLocation();
   const isHomePage = location.pathname === '/';
   const showAtmosphere = themeMode === 'dark';
+  const [showCopilot, setShowCopilot] = useState(false);
+
+  useEffect(() => {
+    // The chat widget is useful, but its code can wait until the page has painted.
+    const timeout = window.setTimeout(() => setShowCopilot(true), 2500);
+    const idle = window.requestIdleCallback?.(() => setShowCopilot(true));
+
+    return () => {
+      window.clearTimeout(timeout);
+      if (idle !== undefined) window.cancelIdleCallback(idle);
+    };
+  }, []);
 
   return (
     <div className="relative flex flex-col min-h-screen bg-canvas" style={{ overflowX: 'clip' }}>
@@ -35,39 +48,6 @@ const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) =
       {showAtmosphere && <div className="light-streak" style={{ top: '35vh', zIndex: 1 }} />}
       {showAtmosphere && <div className="light-streak--2" style={{ top: '65vh', zIndex: 1 }} />}
 
-      {/* Geometric monoliths */}
-      {showAtmosphere && (
-        <div
-          className="geo-monolith"
-          style={{
-            width: '300px',
-            height: '400px',
-            top: '15%',
-            left: '8%',
-            animation: 'geoRotate 120s linear infinite',
-            opacity: 0.03,
-            zIndex: 1,
-          }}
-        />
-      )}
-      {showAtmosphere && (
-        <div
-          className="geo-monolith"
-          style={{
-            width: '200px',
-            height: '350px',
-            top: '40%',
-            right: '6%',
-            animation: 'geoRotate 180s linear infinite reverse',
-            opacity: 0.05,
-            zIndex: 1,
-          }}
-        />
-      )}
-
-      {/* Subtle noise texture overlay */}
-      <div className="noise-overlay" />
-
       <Header themeMode={themeMode} onToggleTheme={onToggleTheme} />
 
       <main className="relative flex-grow" style={{ zIndex: 10 }}>
@@ -82,7 +62,13 @@ const Layout: React.FC<LayoutProps> = ({ children, themeMode, onToggleTheme }) =
 
       <Footer themeMode={themeMode} />
 
-      <AICopilot />
+      {showCopilot && (
+        <LazyLoadBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <AICopilot />
+          </Suspense>
+        </LazyLoadBoundary>
+      )}
     </div>
   );
 };

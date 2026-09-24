@@ -1,33 +1,39 @@
-import { Route, Routes } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 import MainnetGuard from './components/MainnetGuard';
 import CreatorAccessGate from './components/creator/CreatorAccessGate';
+import LazyLoadBoundary from './components/ui/LazyLoadBoundary';
 
 // Pages
 import HomePage from './pages/HomePage';
-import Dashboard from './pages/Dashboard';
-import PresalesPage from './pages/PresalesPage';
-import PresaleDetailPage from './pages/PresaleDetailPage';
-import ManagePresalePage from './pages/ManagePresalePage';
-import CreateTokenPage from './pages/CreateTokenPage';
-import CreatePresalePage from './pages/CreatePresalePage';
-import CreateNFTPage from './pages/CreateNFTPage';
-import ManageNFTPage from './pages/ManageNFTPage';
-import NFTDetailPage from './pages/NFTDetailPage';
-import TokenLockerPage from './pages/TokenLockerPage';
-import LockDetailPage from './pages/LockDetailPage';
-import AirdropPage from './pages/AirdropPage';
-import Tools from './pages/Tools';
-import ProjectPage from './pages/ProjectPage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminPresalesPage from './pages/admin/AdminPresalesPage';
-import TokensPage from './pages/TokensPage';
-import MyNFTsPage from './pages/MyNFTsPage';
-import MyNFTCollectionPage from './pages/MyNFTCollectionPage';
-import DomainsPage from './pages/DomainsPage';
-import DomainsMarketplacePage from './pages/DomainsMarketplacePage';
+
+// Keep the landing page in the entry bundle; load each other page when visited.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const PresalesPage = lazy(() => import('./pages/PresalesPage'));
+const PresaleDetailPage = lazy(() => import('./pages/PresaleDetailPage'));
+const ManagePresalePage = lazy(() => import('./pages/ManagePresalePage'));
+const CreateTokenPage = lazy(() => import('./pages/CreateTokenPage'));
+const CreatePresalePage = lazy(() => import('./pages/CreatePresalePage'));
+const CreateNFTPage = lazy(() => import('./pages/CreateNFTPage'));
+const ManageNFTPage = lazy(() => import('./pages/ManageNFTPage'));
+const NFTDetailPage = lazy(() => import('./pages/NFTDetailPage'));
+const TokenLockerPage = lazy(() => import('./pages/TokenLockerPage'));
+const LockDetailPage = lazy(() => import('./pages/LockDetailPage'));
+const AirdropPage = lazy(() => import('./pages/AirdropPage'));
+const Tools = lazy(() => import('./pages/Tools'));
+const ProjectPage = lazy(() => import('./pages/ProjectPage'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminPresalesPage = lazy(() => import('./pages/admin/AdminPresalesPage'));
+const TokensPage = lazy(() => import('./pages/TokensPage'));
+const MyNFTsPage = lazy(() => import('./pages/MyNFTsPage'));
+const MyNFTCollectionPage = lazy(() => import('./pages/MyNFTCollectionPage'));
+const DomainsPage = lazy(() => import('./pages/DomainsPage'));
+const DomainsMarketplacePage = lazy(() => import('./pages/DomainsMarketplacePage'));
+const NFTMarketplacePage = lazy(() => import('./pages/NFTMarketplacePage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 type AppRoutesProps = {
   themeMode: 'dark' | 'light';
@@ -37,8 +43,11 @@ type AppRoutesProps = {
 const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
   return (
     <Layout themeMode={themeMode} onToggleTheme={onToggleTheme}>
-      <MainnetGuard>
-        <Routes>
+      <LazyLoadBoundary fallback={<div className="min-h-[40vh]" role="alert">Page failed to load. <button type="button" onClick={() => window.location.reload()} className="underline">Reload page</button></div>}>
+      <Suspense fallback={<div className="min-h-[40vh]" role="status">Loading page…</div>}>
+      <Routes>
+        <Route path="/nft-marketplace" element={<NFTMarketplacePage />} />
+        <Route element={<MainnetGuard><Outlet /></MainnetGuard>}>
           {/* Public routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/presales" element={<PresalesPage />} />
@@ -79,8 +88,11 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/presales" element={<AdminPresalesPage />} />
           </Route>
-        </Routes>
-      </MainnetGuard>
+        </Route>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+      </Suspense>
+      </LazyLoadBoundary>
     </Layout>
   );
 };

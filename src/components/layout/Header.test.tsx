@@ -19,6 +19,12 @@ it.each([false,true])("Bridge is available in desktop and mobile navigation (con
  const bridge=screen.getByRole("link",{name:/^Bridge/});expect(bridge.getAttribute("href")).toBe("https://portal.risechain.com/bridge");expect(bridge.getAttribute("rel")).toContain("noopener");expect(bridge.getAttribute("target")).toBe("_blank");
  fireEvent.click(screen.getByRole("button",{name:"Toggle menu"}));expect(screen.getAllByRole("link",{name:/^Bridge/})).toHaveLength(2);
 });
+it.each([false,true])("NFT Marketplace is available in desktop and mobile navigation (connected=%s)",(connected)=>{
+ env.connected=connected;render(tree());
+ expect(screen.getByRole("link",{name:"NFT Marketplace"}).getAttribute("href")).toBe("/nft-marketplace");
+ fireEvent.click(screen.getByRole("button",{name:"Toggle menu"}));
+ expect(screen.getAllByRole("link",{name:"NFT Marketplace"})).toHaveLength(2);
+});
 it("shows an unread dot and directs users to received names, then removes it after acknowledgement",async()=>{
  env.connected=true;env.unread=[{id:"transfer-1"}];const view=render(tree());
  expect(screen.getByRole("img",{name:"1 unread received names"})).toBeTruthy();

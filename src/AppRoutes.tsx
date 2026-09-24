@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
@@ -28,6 +28,8 @@ import MyNFTsPage from './pages/MyNFTsPage';
 import MyNFTCollectionPage from './pages/MyNFTCollectionPage';
 import DomainsPage from './pages/DomainsPage';
 import DomainsMarketplacePage from './pages/DomainsMarketplacePage';
+import NFTMarketplacePage from './pages/NFTMarketplacePage';
+import NotFoundPage from './pages/NotFoundPage';
 
 type AppRoutesProps = {
   themeMode: 'dark' | 'light';
@@ -37,8 +39,9 @@ type AppRoutesProps = {
 const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
   return (
     <Layout themeMode={themeMode} onToggleTheme={onToggleTheme}>
-      <MainnetGuard>
-        <Routes>
+      <Routes>
+        <Route path="/nft-marketplace" element={<NFTMarketplacePage />} />
+        <Route element={<MainnetGuard><Outlet /></MainnetGuard>}>
           {/* Public routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/presales" element={<PresalesPage />} />
@@ -79,8 +82,9 @@ const AppRoutes = ({ themeMode, onToggleTheme }: AppRoutesProps) => {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/presales" element={<AdminPresalesPage />} />
           </Route>
-        </Routes>
-      </MainnetGuard>
+        </Route>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
     </Layout>
   );
 };

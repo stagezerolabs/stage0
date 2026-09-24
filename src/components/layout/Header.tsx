@@ -97,6 +97,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
 
   const publicNavItems = [
     { path: '/presales', label: 'Launchpad' },
+    { path: '/nft-marketplace', label: 'NFT Marketplace' },
     { path: '/domains', label: 'Names' },
   ];
 
@@ -109,6 +110,7 @@ const Header: React.FC<HeaderProps> = ({ themeMode, onToggleTheme }) => {
   const privateNavItems = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/presales', label: 'Launchpad' },
+    { path: '/nft-marketplace', label: 'NFT Marketplace' },
     { path: '/my-nfts', label: 'My NFTs' },
     { path: '/domains', label: 'Names' },
     { path: '/tools', label: 'Tools' },

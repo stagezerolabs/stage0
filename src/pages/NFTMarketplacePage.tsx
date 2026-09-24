@@ -140,11 +140,6 @@ export default function NFTMarketplacePage() {
 
   return (
     <div className="space-y-11 pb-10 text-ink md:space-y-16">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/25 bg-accent/10 px-4 py-3 text-sm">
-        <span className="font-semibold text-accent">Demo data · Marketplace design preview</span>
-        <span className="text-ink-muted">Prices, activity, owners, and artwork below are illustrative. Transactions are disabled.</span>
-      </div>
-
       <section className="space-y-7">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
